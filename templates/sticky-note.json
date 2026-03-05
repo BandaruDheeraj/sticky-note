@@ -1,0 +1,11 @@
+{
+  "config": {
+    "mcp_servers": [],
+    "skills": [],
+    "conventions": [],
+    "stale_days": 3,
+    "hook_version": "1.0.0"
+  },
+  "threads": [],
+  "audit": []
+}
