@@ -13,7 +13,7 @@ import sys
 
 def get_memory_path():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(script_dir, "..", "sticky-note.json")
+    return os.path.join(script_dir, "..", "..", ".sticky-note", "sticky-note.json")
 
 
 def load_memory(path):

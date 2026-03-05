@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 def get_memory_path():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(script_dir, "..", "sticky-note.json")
+    return os.path.join(script_dir, "..", "..", ".sticky-note", "sticky-note.json")
 
 
 def load_memory(path):
@@ -73,7 +73,7 @@ def extract_file_path(hook_input):
 def dump_debug(hook_input):
     """Write raw hook input to a debug file for format discovery."""
     debug_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "..", "hook-debug.log"
+        os.path.dirname(os.path.abspath(__file__)), "..", "..", ".sticky-note", "hook-debug.log"
     )
     try:
         with open(debug_path, "a", encoding="utf-8") as f:

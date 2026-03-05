@@ -277,8 +277,10 @@ async function cmdInit() {
   // Create directories
   const claudeHooksDir = path.join(process.cwd(), ".claude", "hooks");
   const githubHooksDir = path.join(process.cwd(), ".github", "hooks");
+  const stickyNoteDir = path.join(process.cwd(), ".sticky-note");
   mkdirSafe(claudeHooksDir);
   mkdirSafe(githubHooksDir);
+  mkdirSafe(stickyNoteDir);
 
   // Copy hook scripts
   for (const file of HOOK_FILES) {
@@ -328,9 +330,9 @@ async function cmdInit() {
   memoryTemplate.config.stale_days = staleDaysNum;
   memoryTemplate.config.hook_version = VERSION;
 
-  const memoryDest = path.join(process.cwd(), ".claude", "sticky-note.json");
+  const memoryDest = path.join(process.cwd(), ".sticky-note", "sticky-note.json");
   fs.writeFileSync(memoryDest, JSON.stringify(memoryTemplate, null, 2) + "\n");
-  print("  ✅ .claude/sticky-note.json");
+  print("  ✅ .sticky-note/sticky-note.json");
 
   // Update .gitignore
   const gitignorePath = path.join(process.cwd(), ".gitignore");
@@ -351,7 +353,7 @@ async function cmdInit() {
 
   // Add .gitattributes merge strategy for sticky-note.json
   const gitattrsPath = path.join(process.cwd(), ".gitattributes");
-  const mergeRule = ".claude/sticky-note.json merge=union";
+  const mergeRule = ".sticky-note/sticky-note.json merge=union";
   let gitattrsContent = "";
   if (fs.existsSync(gitattrsPath)) {
     gitattrsContent = fs.readFileSync(gitattrsPath, "utf-8");
@@ -370,7 +372,7 @@ async function cmdInit() {
   print("\n  ✨ Sticky Note initialized!\n");
   print("  Next steps:");
   print("  ┌──────────────────────────────────────────────────────────┐");
-  print("  │  git add .claude .github .gitignore .gitattributes      │");
+  print("  │  git add .claude .github .sticky-note .gitignore .gitattributes │");
   print("  │  git commit -m \"feat: add sticky-note hooks\"             │");
   print("  │  git push                                                │");
   print("  └──────────────────────────────────────────────────────────┘");
@@ -445,7 +447,7 @@ function cmdUpdate() {
   }
 
   // Update hook_version in sticky-note.json
-  const memoryPath = path.join(process.cwd(), ".claude", "sticky-note.json");
+  const memoryPath = path.join(process.cwd(), ".sticky-note", "sticky-note.json");
   if (fs.existsSync(memoryPath)) {
     const memory = JSON.parse(fs.readFileSync(memoryPath, "utf-8"));
     memory.config = memory.config || {};
@@ -497,7 +499,7 @@ function cmdStatus() {
   );
 
   // Sticky Note data
-  const memoryPath = path.join(process.cwd(), ".claude", "sticky-note.json");
+  const memoryPath = path.join(process.cwd(), ".sticky-note", "sticky-note.json");
   print("\n  Sticky Note Data:");
   if (fs.existsSync(memoryPath)) {
     try {

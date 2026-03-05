@@ -40,7 +40,7 @@ This runs an interactive setup that:
 ### 2. Commit
 
 ```bash
-git add .claude .github .gitignore
+git add .claude .github .sticky-note .gitignore .gitattributes
 git commit -m "feat: add sticky-note hooks"
 ```
 
@@ -118,7 +118,6 @@ Threads are **never deleted** — only their status changes.
 ```
 .claude/
 ├── settings.json           # Claude Code hook config
-├── sticky-note.json        # Shared data (threads + audit)
 └── hooks/
     ├── session-start.py    # Load & inject teammate context
     ├── session-end.py      # Capture session thread
@@ -130,6 +129,9 @@ Threads are **never deleted** — only their status changes.
 .github/
 └── hooks/
     └── hooks.json          # Copilot CLI hook config
+
+.sticky-note/
+└── sticky-note.json        # Shared data (threads + audit)
 ```
 
 ---
@@ -140,19 +142,19 @@ In V1, the audit trail is raw JSON. Use `jq` to query it:
 
 ```bash
 # All audit entries
-cat .claude/sticky-note.json | jq '.audit'
+cat .sticky-note/sticky-note.json | jq '.audit'
 
 # Entries by user
-cat .claude/sticky-note.json | jq '.audit[] | select(.user=="alice")'
+cat .sticky-note/sticky-note.json | jq '.audit[] | select(.user=="alice")'
 
 # Entries for a specific file
-cat .claude/sticky-note.json | jq '.audit[] | select(.file | contains("auth"))'
+cat .sticky-note/sticky-note.json | jq '.audit[] | select(.file | contains("auth"))'
 
 # Recent sessions
-cat .claude/sticky-note.json | jq '.threads[] | select(.status=="open")'
+cat .sticky-note/sticky-note.json | jq '.threads[] | select(.status=="open")'
 
 # Stuck threads
-cat .claude/sticky-note.json | jq '.threads[] | select(.status=="stuck")'
+cat .sticky-note/sticky-note.json | jq '.threads[] | select(.status=="stuck")'
 ```
 
 ---
@@ -170,7 +172,7 @@ npx sticky-note --help    # Show help
 
 ## Configuration
 
-Edit `.claude/sticky-note.json` → `config` block:
+Edit `.sticky-note/sticky-note.json` → `config` block:
 
 ```json
 {
@@ -223,7 +225,7 @@ git needs to merge both sides. Sticky Note handles this automatically:
 `npx sticky-note init` adds a `.gitattributes` rule:
 
 ```
-.claude/sticky-note.json merge=union
+.sticky-note/sticky-note.json merge=union
 ```
 
 This tells git to **keep lines from both sides** instead of conflicting.

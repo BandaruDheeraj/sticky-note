@@ -47,7 +47,7 @@ developers write to concurrently. When merge conflicts arise:
 
 Consider adding a `.gitattributes` rule:
 ```
-.claude/sticky-note.json merge=union
+.sticky-note/sticky-note.json merge=union
 ```
 
 ## Code Style
@@ -69,4 +69,4 @@ Please include:
 - Your OS (macOS/Linux/Windows WSL)
 - Python and Node.js versions
 - Output of `npx sticky-note status`
-- The relevant section of `.claude/sticky-note.json`
+- The relevant section of `.sticky-note/sticky-note.json`
