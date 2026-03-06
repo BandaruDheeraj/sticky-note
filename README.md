@@ -1,9 +1,9 @@
-# 📌 Sticky Note
+# 📌 Sticky Note v2
 
 **Human-to-human handoff for AI coding assistants.**
 
 Git-backed shared memory layer that captures session threads and surfaces
-teammate context in Claude Code and Copilot CLI — automatically.
+teammate context in Claude Code, Copilot CLI, and Codex — automatically.
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![npm version](https://img.shields.io/npm/v/sticky-note.svg)](https://www.npmjs.com/package/sticky-note)
@@ -19,12 +19,25 @@ except inside the AI tool where the work actually happened.
 ## The Solution
 
 Sticky Note captures what happened in each AI session (files touched, status,
-notes) and surfaces it to teammates automatically on their next session start.
-No dashboards. No extra tools. Just a shared JSON file in your repo.
+narrative, failed approaches) and surfaces it to teammates automatically on
+their next session start — ranked by relevance. No dashboards. No extra tools.
+Just shared files in your repo.
 
 ---
 
-## Quick Start (5 Steps)
+## What's New in V2
+
+- **Two-file split** — Threads in `sticky-note.json`, audit trail in `sticky-note-audit.jsonl`
+- **Relevance scoring** — Context injected based on file overlap, branch match, and recency
+- **Richer threads** — Narrative summaries, failed approaches, work type, activities
+- **Tombstone expiry** — Old threads are automatically cleaned up via `gc`
+- **Presence tracking** — See who's currently active in the repo
+- **Codex support** — Wrapper script for post-session capture
+- **Separate config** — Team settings in `sticky-note-config.json`
+
+---
+
+## Quick Start
 
 ### 1. Install
 
@@ -44,21 +57,14 @@ git add .claude .github .sticky-note .gitignore .gitattributes
 git commit -m "feat: add sticky-note hooks"
 ```
 
-### 3. Push
+### 3. Push & Pull
 
 ```bash
-git push
+git push        # Share with team
+git pull        # Teammates — no additional setup needed
 ```
 
-### 4. Teammates Pull
-
-```bash
-git pull
-```
-
-That's it. No additional setup needed for teammates.
-
-### 5. Work
+### 4. Work
 
 Open Claude Code or Copilot CLI and start working. Sticky Note runs
 in the background via hooks — capturing threads and surfacing context.
@@ -67,56 +73,73 @@ in the background via hooks — capturing threads and surfacing context.
 
 > "Show me the active sticky note threads"
 
-The agent will read `.sticky-note/sticky-note.json` and show you what your
-teammates are working on, any stuck threads, and recent activity.
-
 ---
 
 ## How It Works
 
 ### Session Start
-When you open Claude Code or Copilot CLI, Sticky Note loads your teammates'
-recent threads and injects them as context before your first message.
+Loads teammates' recent threads, scores them by relevance to your current
+branch and files, and injects the most relevant context before your first message.
 
 ### During Work
-Every tool use (file edits, searches, etc.) is logged in the audit trail.
-When you mention a file a teammate was working on, their thread context
-is surfaced inline.
+Every tool use is logged in the JSONL audit trail. When you mention a file
+a teammate was working on, their thread context is surfaced inline via
+relevance scoring.
 
 ### Session End
-When your session ends, Sticky Note captures the files you touched and
-writes a thread record that your teammates will see next time.
+Captures files touched, generates a narrative summary, detects failed
+approaches, and writes a thread record teammates will see next time.
 
-### Error Handling (Copilot CLI)
-If your session hits an error, it's captured as a "stuck" thread that
-teammates see labeled **[STUCK]** — so they know where you left off.
+### Error Handling
+Errors are captured as "stuck" threads that teammates see labeled **[STUCK]**
+with failed approach details — so they know what was tried and what went wrong.
 
 ---
 
 ## What Gets Captured
 
-| Data             | Captured | Example                         |
-|------------------|----------|---------------------------------|
-| Files touched    | ✅        | `src/auth.ts`, `lib/db.py`     |
-| Session status   | ✅        | open, stuck, stale, closed      |
-| Author           | ✅        | OS username                     |
-| Timestamp        | ✅        | ISO 8601                        |
-| Summary note     | ✅        | "Fixed auth token refresh"      |
-| Code content     | ❌        | Never captured                  |
-| Conversation     | ❌        | Never captured                  |
-| Credentials      | ❌        | Never captured                  |
+| Data              | Captured | Example                              |
+|-------------------|----------|--------------------------------------|
+| Files touched     | ✅        | `src/auth.ts`, `lib/db.py`          |
+| Thread status     | ✅        | open, stuck, stale, closed, expired  |
+| Author            | ✅        | OS username                          |
+| Timestamp         | ✅        | ISO 8601                             |
+| Narrative         | ✅        | "Fixed auth token refresh flow"      |
+| Failed approaches | ✅        | What was tried, errors, files        |
+| Work type         | ✅        | bug-fix, feature, debugging, etc.    |
+| Code content      | ❌        | Never captured                       |
+| Conversation      | ❌        | Never captured                       |
+| Credentials       | ❌        | Never captured                       |
 
 ---
 
 ## Thread Lifecycle
 
 ```
-open → stale (auto, after stale_days)
-open → closed (manual)
-stuck → closed (manual)
+open → stale  (auto, after stale_days with no activity)
+open → closed (on session end)
+stuck → closed (on session end or manual)
+closed → expired (auto, tombstoned by gc after stale_days)
 ```
 
-Threads are **never deleted** — only their status changes.
+Expired threads keep only their ID, status, user, and closed timestamp.
+
+---
+
+## Relevance Scoring
+
+When context is injected, threads are ranked by:
+
+| Signal          | Weight | Description                           |
+|-----------------|--------|---------------------------------------|
+| File overlap    | 3      | Shared files with current session     |
+| Branch match    | 2      | Same git branch                       |
+| Recency         | 2      | Decays 0.2/day from last activity     |
+| Stuck status    | +2     | Boost for stuck threads               |
+| Prompt keywords | 1      | File names mentioned in your prompt   |
+| Same developer  | 1      | Your own previous threads             |
+
+Top thread gets full detail; threads 2–5 get one-liner summaries.
 
 ---
 
@@ -124,44 +147,27 @@ Threads are **never deleted** — only their status changes.
 
 ```
 .claude/
-├── settings.json           # Claude Code hook config
+├── settings.json             # Claude Code hook config
 └── hooks/
-    ├── session-start.py    # Load & inject teammate context
-    ├── session-end.py      # Capture session thread
-    ├── inject-context.py   # Per-prompt file matching
-    ├── track-work.py       # Audit trail per tool use
-    ├── on-stop.py          # Checkpoint on stop (Claude Code)
-    └── on-error.py         # Stuck thread on error (Copilot CLI)
+    ├── sticky_utils.py       # Shared utilities
+    ├── session-start.py      # Load & inject teammate context
+    ├── session-end.py        # Capture session thread
+    ├── inject-context.py     # Per-prompt relevance scoring
+    ├── track-work.py         # JSONL audit + presence heartbeat
+    ├── parse-transcript.py   # Narrative + failed approach extraction
+    ├── on-stop.py            # Handoff summary on stop
+    ├── on-error.py           # Stuck thread on error
+    └── sticky-codex.sh       # Optional Codex wrapper
 
 .github/
 └── hooks/
-    └── hooks.json          # Copilot CLI hook config
+    └── hooks.json            # Copilot CLI hook config
 
 .sticky-note/
-└── sticky-note.json        # Shared data (threads + audit)
-```
-
----
-
-## Querying the Audit Trail
-
-In V1, the audit trail is raw JSON. Use `jq` to query it:
-
-```bash
-# All audit entries
-cat .sticky-note/sticky-note.json | jq '.audit'
-
-# Entries by user
-cat .sticky-note/sticky-note.json | jq '.audit[] | select(.user=="alice")'
-
-# Entries for a specific file
-cat .sticky-note/sticky-note.json | jq '.audit[] | select(.file | contains("auth"))'
-
-# Recent sessions
-cat .sticky-note/sticky-note.json | jq '.threads[] | select(.status=="open")'
-
-# Stuck threads
-cat .sticky-note/sticky-note.json | jq '.threads[] | select(.status=="stuck")'
+├── sticky-note.json          # Shared threads (git-tracked)
+├── sticky-note-config.json   # Team config (git-tracked)
+├── sticky-note-audit.jsonl   # Audit trail (local only)
+└── .sticky-presence.json     # Active users (local only)
 ```
 
 ---
@@ -169,36 +175,49 @@ cat .sticky-note/sticky-note.json | jq '.threads[] | select(.status=="stuck")'
 ## CLI Commands
 
 ```bash
-npx sticky-note init      # Interactive setup
-npx sticky-note update    # Update scripts (preserves data)
-npx sticky-note status    # Diagnostic report
-npx sticky-note --help    # Show help
+npx sticky-note init           # Interactive setup
+npx sticky-note init --codex   # Setup with Codex wrapper
+npx sticky-note update         # Update hook scripts (preserves data)
+npx sticky-note status         # Diagnostic report
+npx sticky-note threads        # List threads with status icons
+npx sticky-note audit          # Query audit trail
+npx sticky-note gc             # Tombstone expired threads
+npx sticky-note --version      # Show version
+npx sticky-note --help         # Show help
+```
+
+### Audit Filters
+
+```bash
+npx sticky-note audit --user alice
+npx sticky-note audit --file src/auth.ts
+npx sticky-note audit --since 2025-01-01
+npx sticky-note audit --session abc-123
+npx sticky-note audit --limit 100
 ```
 
 ---
 
 ## Configuration
 
-Edit `.sticky-note/sticky-note.json` → `config` block:
+Edit `.sticky-note/sticky-note-config.json`:
 
 ```json
 {
-  "config": {
-    "mcp_servers": ["server-name"],
-    "skills": [],
-    "conventions": ["Use TypeScript strict mode", "Test before commit"],
-    "stale_days": 3,
-    "hook_version": "1.0.0"
-  }
+  "stale_days": 14,
+  "mcp_servers": [],
+  "skills": [],
+  "conventions": ["Use TypeScript strict mode", "Test before commit"],
+  "hook_version": "2.0.0"
 }
 ```
 
 | Key            | Description                              | Default |
 |----------------|------------------------------------------|---------|
+| `stale_days`   | Days before threads expire + gc cleanup  | `14`    |
 | `mcp_servers`  | Shared MCP server references             | `[]`    |
 | `skills`       | Team skill definitions                   | `[]`    |
 | `conventions`  | Team coding conventions (injected)       | `[]`    |
-| `stale_days`   | Days before open threads become stale    | `3`     |
 
 ---
 
@@ -207,27 +226,23 @@ Edit `.sticky-note/sticky-note.json` → `config` block:
 - **Git** repository (any host)
 - **Python 3.10+** (for hook scripts)
 - **Node.js 16+** (for `npx` installer only)
-- **Claude Code** and/or **Copilot CLI**
+- **Claude Code**, **Copilot CLI**, and/or **Codex**
 
 ---
 
 ## Supported Tools
 
-| Tool          | Hook Config               | Notes                     |
-|---------------|---------------------------|---------------------------|
-| Claude Code   | `.claude/settings.json`   | All 6 hooks               |
-| Copilot CLI   | `.github/hooks/hooks.json`| 5 hooks + errorOccurred   |
+| Tool        | Hook Config                 | Integration                     |
+|-------------|-----------------------------|---------------------------------|
+| Claude Code | `.claude/settings.json`     | Full — all 6 hooks + transcript |
+| Copilot CLI | `.github/hooks/hooks.json`  | Full — all hooks                |
+| Codex       | `sticky-codex.sh` wrapper   | Post-session capture            |
 
-Both tools call the same Python scripts and share `sticky-note.json`.
+All tools call the same Python scripts and share the same data files.
 
 ---
 
 ## Concurrent Usage & Merge Strategy
-
-When multiple teammates push changes to `sticky-note.json` at the same time,
-git needs to merge both sides. Sticky Note handles this automatically:
-
-### Automatic (default)
 
 `npx sticky-note init` adds a `.gitattributes` rule:
 
@@ -236,23 +251,10 @@ git needs to merge both sides. Sticky Note handles this automatically:
 ```
 
 This tells git to **keep lines from both sides** instead of conflicting.
-Since threads and audit entries are append-only (each on its own lines),
-concurrent pushes merge cleanly in most cases.
+Threads have unique UUIDs, so concurrent pushes merge cleanly.
 
-### If a conflict does occur
-
-In rare cases where the JSON structure itself breaks after a merge:
-
-1. **threads array** — Keep all threads from both sides. They have unique
-   UUIDs so there are no true duplicates.
-2. **audit array** — Concatenate both sides, keep the newest 500 entries.
-3. **config block** — Accept the incoming change (the pusher's config).
-
-### V1 limitation
-
-Sharing requires a `git push` + `git pull` cycle. If two teammates are
-working simultaneously without pushing, they won't see each other's threads
-until the next push/pull. Real-time sync is planned for V2.
+The audit trail (`sticky-note-audit.jsonl`) is local-only and never
+committed, so it never conflicts.
 
 ---
 
@@ -263,13 +265,17 @@ A: No. Only file paths, timestamps, usernames, and status metadata.
 
 **Q: What happens with merge conflicts in sticky-note.json?**
 A: `merge=union` in `.gitattributes` handles most cases automatically.
-See [Concurrent Usage & Merge Strategy](#concurrent-usage--merge-strategy) above.
 
 **Q: Can I close a thread manually?**
-A: Edit `sticky-note.json` and change the thread's `status` to `"closed"`.
+A: Edit `sticky-note.json` and change the thread's `status` to `"closed"`,
+or run `npx sticky-note gc` to tombstone expired threads.
 
 **Q: Does this work offline?**
 A: Yes. Everything is local until you `git push`.
+
+**Q: How do I set up Codex?**
+A: Run `npx sticky-note init --codex`, then alias the wrapper:
+`alias sticky-codex=".claude/hooks/sticky-codex.sh"`
 
 ---
 
