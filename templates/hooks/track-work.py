@@ -66,7 +66,7 @@ def update_presence(user, file_path):
         entry["last_seen"] = datetime.now(timezone.utc).isoformat()
         data[user] = entry
         save_json(path, data)
-    except Exception:
+    except (OSError, IOError, json.JSONDecodeError):
         pass
 
 

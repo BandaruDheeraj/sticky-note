@@ -32,6 +32,7 @@ FILE_PATH_PATTERN = re.compile(
 # ── Path helpers ──────────────────────────────────────────
 
 def _sticky_dir():
+    """Resolve .sticky-note/ dir relative to hook location (.claude/hooks/)."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(script_dir, "..", "..", ".sticky-note")
 
@@ -63,6 +64,7 @@ def load_json(path, default=None):
 
 
 def save_json(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
         f.write("\n")
@@ -70,6 +72,7 @@ def save_json(path, data):
 
 def append_audit_line(entry):
     path = get_audit_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
@@ -88,7 +91,7 @@ def get_branch():
         )
         if result.returncode == 0:
             return result.stdout.strip()
-    except Exception:
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
     return ""
 
@@ -179,7 +182,11 @@ def extract_failed_from_entries(entries):
             text = block.get("text", "")
             if RETRY_PATTERNS.search(text) and ERROR_PATTERNS.search(text):
                 error_match = ERROR_PATTERNS.search(text)
-                error_ctx = text[max(0, error_match.start() - 40):error_match.end() + 60].strip() if error_match else ""
+                if error_match:
+                    start = max(0, error_match.start() - 40)
+                    error_ctx = text[start:error_match.end() + 60].strip()
+                else:
+                    error_ctx = ""
                 files_tried = FILE_PATH_PATTERN.findall(text)[:5]
                 approaches.append({
                     "description": text[:150].strip(),
@@ -199,7 +206,11 @@ def extract_failed_from_text(lines):
     for para in paragraphs:
         if RETRY_PATTERNS.search(para) and ERROR_PATTERNS.search(para):
             error_match = ERROR_PATTERNS.search(para)
-            error_ctx = para[max(0, error_match.start() - 40):error_match.end() + 60].strip() if error_match else ""
+            if error_match:
+                start = max(0, error_match.start() - 40)
+                error_ctx = para[start:error_match.end() + 60].strip()
+            else:
+                error_ctx = ""
             files_tried = FILE_PATH_PATTERN.findall(para)[:5]
             approaches.append({
                 "description": para[:150].strip(),

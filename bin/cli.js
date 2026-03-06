@@ -878,13 +878,13 @@ function cmdGc() {
 // Main
 // ──────────────────────────────────────────────
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
   switch (command) {
     case "init":
-      cmdInit();
+      await cmdInit();
       break;
     case "update":
       cmdUpdate();
@@ -930,4 +930,7 @@ function main() {
   }
 }
 
-main();
+main().catch(err => {
+  process.stderr.write(`Fatal error: ${err.message}\n`);
+  process.exit(1);
+});

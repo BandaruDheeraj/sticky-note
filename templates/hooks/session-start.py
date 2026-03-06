@@ -26,7 +26,11 @@ def age_stale_threads(memory, stale_days):
     for thread in memory.get("threads", []):
         if thread.get("status") not in ("open", "stuck"):
             continue
-        ts_field = thread.get("last_activity_at") or thread.get("updated_at") or thread.get("created_at", "")
+        ts_field = (
+            thread.get("last_activity_at")
+            or thread.get("updated_at")
+            or thread.get("created_at", "")
+        )
         if not ts_field:
             continue
         try:

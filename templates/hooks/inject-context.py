@@ -25,7 +25,7 @@ def get_recently_modified_files():
         )
         if result.returncode == 0:
             files.update(f.strip() for f in result.stdout.strip().split("\n") if f.strip())
-    except Exception:
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
     # Also include uncommitted changes
     try:
@@ -35,7 +35,7 @@ def get_recently_modified_files():
         )
         if result.returncode == 0:
             files.update(f.strip() for f in result.stdout.strip().split("\n") if f.strip())
-    except Exception:
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
     return files
 
@@ -93,7 +93,11 @@ def score_thread(thread, recently_modified, current_branch, current_user, prompt
         score += 2
 
     # Recency (weight 2) — decay over days
-    ts_field = thread.get("last_activity_at") or thread.get("updated_at") or thread.get("created_at", "")
+    ts_field = (
+        thread.get("last_activity_at")
+        or thread.get("updated_at")
+        or thread.get("created_at", "")
+    )
     if ts_field:
         try:
             ts = datetime.fromisoformat(ts_field.replace("Z", "+00:00"))
@@ -222,9 +226,7 @@ def main():
     token_count = 10  # header overhead
 
     output_lines = []
-    count = min(len(scored), 5)
-    header = f"[STICKY NOTE — {count} relevant thread{'s' if count != 1 else ''}]\n"
-    output_lines.append(header)
+    threads_shown = 0
 
     for i, (score, thread) in enumerate(scored[:5]):
         if i == 0:
@@ -239,6 +241,10 @@ def main():
                 output_lines.append(f"... and {remaining} more relevant threads")
             break
         output_lines.append(block)
+        threads_shown += 1
+
+    header = f"[STICKY NOTE — {threads_shown} relevant thread{'s' if threads_shown != 1 else ''}]\n"
+    output_lines.insert(0, header)
 
     output = "\n".join(output_lines).strip()
     print(json.dumps({"output": output}, ensure_ascii=False))

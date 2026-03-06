@@ -10,9 +10,10 @@ Appends JSONL audit line.
 import json
 import os
 import sys
+import uuid
 from datetime import datetime, timezone
 
-from sticky_utils import get_memory_path, load_json, save_json, append_audit_line, get_user
+from sticky_utils import get_memory_path, load_json, save_json, append_audit_line, get_user, get_branch
 
 
 # ── Handoff summary────────────────────────────────────────
@@ -53,7 +54,7 @@ def build_handoff_summary(thread, reason=""):
 def main():
     try:
         hook_input = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
-    except (json.JSONDecodeError, Exception):
+    except Exception:
         hook_input = {}
 
     session_id = hook_input.get("session_id", os.environ.get("SESSION_ID", "unknown"))
@@ -64,14 +65,38 @@ def main():
     memory_path = get_memory_path()
     memory = load_json(memory_path, {"version": "2", "project": "", "threads": []})
 
-    # Find the current session's threadand generate handoff summary
-    for thread in memory.get("threads", []):
+    # Find the current session's thread and generate handoff summary
+    threads = memory.get("threads", [])
+    found = False
+    for thread in threads:
         if thread.get("session_id") == session_id and thread.get("status") in ("open", "stuck"):
             thread["last_activity_at"] = now
             thread["handoff_summary"] = build_handoff_summary(thread, reason)
             if reason:
                 thread["last_note"] = reason[:200]
+            found = True
             break
+
+    if not found and session_id != "unknown":
+        thread = {
+            "id": str(uuid.uuid4()),
+            "user": user,
+            "project": memory.get("project", ""),
+            "status": "closed",
+            "branch": get_branch(),
+            "created_at": now,
+            "closed_at": now,
+            "last_activity_at": now,
+            "files_touched": [],
+            "last_note": reason[:200] if reason else "Session stopped",
+            "narrative": "",
+            "failed_approaches": [],
+            "handoff_summary": build_handoff_summary({}, reason),
+            "related_session_ids": [],
+            "tool": "unknown",
+            "session_id": session_id,
+        }
+        threads.append(thread)
 
     # Append JSONL audit line
     append_audit_line({
