@@ -54,33 +54,7 @@ def get_user():
     return os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
 
 
-# ── V1 compat ──────────────────────────────────────────────
-
-def is_v1(memory):
-    return "audit" in memory and memory.get("version") != "2"
-
-
-def migrate_v1_inline(memory):
-    audit_entries = memory.pop("audit", [])
-    config_block = memory.pop("config", {})
-
-    if audit_entries:
-        path = get_audit_path()
-        with open(path, "a", encoding="utf-8") as f:
-            for entry in audit_entries:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-    config_path = os.path.join(_sticky_dir(), "sticky-note-config.json")
-    if not os.path.exists(config_path) and config_block:
-        save_json(config_path, config_block)
-
-    memory["version"] = "2"
-    memory.setdefault("project", "")
-    memory.setdefault("threads", [])
-    return memory
-
-
-# ── Handoff summary ────────────────────────────────────────
+# ── Handoff summary────────────────────────────────────────
 
 def build_handoff_summary(thread, reason=""):
     """Build a structured handoff summary from available thread data."""
@@ -129,11 +103,7 @@ def main():
     memory_path = get_memory_path()
     memory = load_json(memory_path, {"version": "2", "project": "", "threads": []})
 
-    # Auto-migrate V1
-    if is_v1(memory):
-        memory = migrate_v1_inline(memory)
-
-    # Find the current session's thread and generate handoff summary
+    # Find the current session's threadand generate handoff summary
     for thread in memory.get("threads", []):
         if thread.get("session_id") == session_id and thread.get("status") in ("open", "stuck"):
             thread["last_activity_at"] = now

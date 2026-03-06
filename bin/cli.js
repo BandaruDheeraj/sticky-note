@@ -5,7 +5,7 @@
  *
  * Commands:
  *   npx sticky-note init      Interactive setup, creates V2 hook files
- *   npx sticky-note update    Update scripts only, migrate V1→V2 if needed
+ *   npx sticky-note update    Update scripts only
  *   npx sticky-note status    Diagnostic: threads, audit, hook health
  *   npx sticky-note threads   List open/stuck threads
  *   npx sticky-note audit     Query audit trail (JSONL)
@@ -128,55 +128,6 @@ function countJsonlLines(filePath) {
   } catch {
     return 0;
   }
-}
-
-// ──────────────────────────────────────────────
-// V1 → V2 Migration
-// ──────────────────────────────────────────────
-
-function isV1Data(memory) {
-  return Array.isArray(memory.audit) && memory.version !== "2";
-}
-
-function migrateV1ToV2(stickyDir) {
-  const memoryPath = path.join(stickyDir, "sticky-note.json");
-  if (!fs.existsSync(memoryPath)) return false;
-
-  const memory = readJsonSafe(memoryPath, null);
-  if (!memory || !isV1Data(memory)) return false;
-
-  print("  🔄 V1 data detected — migrating to V2...");
-
-  // Extract audit → JSONL
-  const auditEntries = memory.audit || [];
-  if (auditEntries.length > 0) {
-    const auditPath = path.join(stickyDir, "sticky-note-audit.jsonl");
-    const lines = auditEntries.map((e) => JSON.stringify(e)).join("\n") + "\n";
-    fs.appendFileSync(auditPath, lines);
-    print(`  ✅ Migrated ${auditEntries.length} audit entries to sticky-note-audit.jsonl`);
-  }
-
-  // Extract config → separate file
-  const config = memory.config || {};
-  const configPath = path.join(stickyDir, "sticky-note-config.json");
-  if (!fs.existsSync(configPath)) {
-    // Upgrade stale_days default from V1 (3) to V2 (14)
-    if (config.stale_days === 3) config.stale_days = 14;
-    config.hook_version = VERSION;
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
-    print("  ✅ Extracted config to sticky-note-config.json");
-  }
-
-  // Rewrite sticky-note.json as V2
-  const v2 = {
-    version: "2",
-    project: memory.project || config.project || "",
-    threads: memory.threads || [],
-  };
-  fs.writeFileSync(memoryPath, JSON.stringify(v2, null, 2) + "\n");
-  print("  ✅ sticky-note.json upgraded to V2 schema");
-
-  return true;
 }
 
 // ──────────────────────────────────────────────
@@ -441,9 +392,6 @@ async function cmdInit() {
   mkdirSafe(githubHooksDir);
   mkdirSafe(stickyNoteDir);
 
-  // Auto-migrate V1 data if present
-  migrateV1ToV2(stickyNoteDir);
-
   // Copy hook scripts
   for (const file of HOOK_FILES) {
     const src = path.join(TEMPLATES_DIR, "hooks", file);
@@ -584,12 +532,6 @@ function cmdUpdate() {
   if (!python) {
     print("  ❌ Python 3.10+ not found.");
     process.exit(1);
-  }
-
-  // Auto-migrate V1 → V2 if needed
-  const stickyDir = path.join(process.cwd(), ".sticky-note");
-  if (fs.existsSync(stickyDir)) {
-    migrateV1ToV2(stickyDir);
   }
 
   print("  Updating hook scripts...\n");
@@ -972,7 +914,7 @@ function main() {
       print("  Usage: npx sticky-note <command>\n");
       print("  Commands:");
       print("    init      Interactive setup — creates V2 hooks and config");
-      print("    update    Update hook scripts (preserves data, migrates V1→V2)");
+      print("    update    Update hook scripts (preserves data)");
       print("    status    Diagnostic report: threads, audit, health");
       print("    threads   List open/stuck threads");
       print("    audit     Query audit trail (--file, --user, --since, --session)");

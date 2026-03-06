@@ -60,33 +60,7 @@ def get_user():
     return os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
 
 
-# ── V1 compat ──────────────────────────────────────────────
-
-def is_v1(memory):
-    return "audit" in memory and memory.get("version") != "2"
-
-
-def migrate_v1_inline(memory):
-    audit_entries = memory.pop("audit", [])
-    config_block = memory.pop("config", {})
-
-    if audit_entries:
-        path = get_audit_path()
-        with open(path, "a", encoding="utf-8") as f:
-            for entry in audit_entries:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-    config_path = get_config_path()
-    if not os.path.exists(config_path) and config_block:
-        save_json(config_path, config_block)
-
-    memory["version"] = "2"
-    memory.setdefault("project", "")
-    memory.setdefault("threads", [])
-    return memory
-
-
-# ── File extraction ────────────────────────────────────────
+# ── File extraction────────────────────────────────────────
 
 def extract_file_path(hook_input):
     cwd = hook_input.get("cwd", "")

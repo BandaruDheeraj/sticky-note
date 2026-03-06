@@ -58,33 +58,7 @@ def get_user():
     return os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
 
 
-# ── V1 compat ──────────────────────────────────────────────
-
-def is_v1(memory):
-    return "audit" in memory and memory.get("version") != "2"
-
-
-def migrate_v1_inline(memory):
-    audit_entries = memory.pop("audit", [])
-    config_block = memory.pop("config", {})
-
-    if audit_entries:
-        path = get_audit_path()
-        with open(path, "a", encoding="utf-8") as f:
-            for entry in audit_entries:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-    config_path = get_config_path()
-    if not os.path.exists(config_path) and config_block:
-        save_json(config_path, config_block)
-
-    memory["version"] = "2"
-    memory.setdefault("project", "")
-    memory.setdefault("threads", [])
-    return memory
-
-
-# ── Main ───────────────────────────────────────────────────
+# ── Main───────────────────────────────────────────────────
 
 def main():
     try:
@@ -101,11 +75,7 @@ def main():
     memory_path = get_memory_path()
     memory = load_json(memory_path, {"version": "2", "project": "", "threads": []})
 
-    # Auto-migrate V1
-    if is_v1(memory):
-        memory = migrate_v1_inline(memory)
-
-    # Find existing thread for this session or create a new one
+    # Find existing threadfor this session or create a new one
     threads = memory.setdefault("threads", [])
     existing = None
     for thread in threads:

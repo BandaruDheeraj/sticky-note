@@ -24,7 +24,6 @@
     "bin/",
     "templates/",
     "README.md",
-    "MIGRATION.md",
     "LICENSE"
   ],
   "engines": {
