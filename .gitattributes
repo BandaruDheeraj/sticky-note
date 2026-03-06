@@ -1,0 +1,3 @@
+
+# Sticky Note - auto-merge threads from both sides
+.sticky-note/sticky-note.json merge=union

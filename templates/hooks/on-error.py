@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""on-error.py — Stuck Thread (F1b, Copilot CLI only)
+"""on-error.py — Stuck Thread (V2)
 
 Hook: errorOccurred (Copilot CLI)
 Writes a thread with status="stuck" and captures the error message.
+Appends JSONL audit line.
 """
 
 import json
@@ -12,28 +13,78 @@ import uuid
 from datetime import datetime, timezone
 
 
-def get_memory_path():
+# ── Paths ──────────────────────────────────────────────────
+
+def _sticky_dir():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(script_dir, "..", "..", ".sticky-note", "sticky-note.json")
+    return os.path.join(script_dir, "..", "..", ".sticky-note")
 
 
-def load_memory(path):
+def get_memory_path():
+    return os.path.join(_sticky_dir(), "sticky-note.json")
+
+
+def get_config_path():
+    return os.path.join(_sticky_dir(), "sticky-note-config.json")
+
+
+def get_audit_path():
+    return os.path.join(_sticky_dir(), "sticky-note-audit.jsonl")
+
+
+# ── I/O ────────────────────────────────────────────────────
+
+def load_json(path, default=None):
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        return {"config": {}, "threads": [], "audit": []}
+        return default if default is not None else {}
 
 
-def save_memory(path, data):
+def save_json(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
         f.write("\n")
 
 
+def append_audit_line(entry):
+    path = get_audit_path()
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
 def get_user():
     return os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
 
+
+# ── V1 compat ──────────────────────────────────────────────
+
+def is_v1(memory):
+    return "audit" in memory and memory.get("version") != "2"
+
+
+def migrate_v1_inline(memory):
+    audit_entries = memory.pop("audit", [])
+    config_block = memory.pop("config", {})
+
+    if audit_entries:
+        path = get_audit_path()
+        with open(path, "a", encoding="utf-8") as f:
+            for entry in audit_entries:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    config_path = get_config_path()
+    if not os.path.exists(config_path) and config_block:
+        save_json(config_path, config_block)
+
+    memory["version"] = "2"
+    memory.setdefault("project", "")
+    memory.setdefault("threads", [])
+    return memory
+
+
+# ── Main ───────────────────────────────────────────────────
 
 def main():
     try:
@@ -48,7 +99,11 @@ def main():
     now = datetime.now(timezone.utc).isoformat()
 
     memory_path = get_memory_path()
-    memory = load_memory(memory_path)
+    memory = load_json(memory_path, {"version": "2", "project": "", "threads": []})
+
+    # Auto-migrate V1
+    if is_v1(memory):
+        memory = migrate_v1_inline(memory)
 
     # Find existing thread for this session or create a new one
     threads = memory.setdefault("threads", [])
@@ -61,36 +116,43 @@ def main():
     if existing:
         existing["status"] = "stuck"
         existing["last_note"] = error_msg
-        existing["updated_at"] = now
+        existing["last_activity_at"] = now
+        # Track as a failed approach
+        failed = existing.setdefault("failed_approaches", [])
+        failed.append({"description": error_msg[:150], "error": error_msg[:100]})
+        failed[:] = failed[-5:]  # cap at 5
     else:
         thread = {
             "id": str(uuid.uuid4()),
-            "author": user,
+            "user": user,
+            "project": memory.get("project", ""),
+            "status": "stuck",
+            "branch": "",
+            "created_at": now,
+            "closed_at": None,
+            "last_activity_at": now,
+            "files_touched": [],
+            "last_note": error_msg,
+            "narrative": "",
+            "failed_approaches": [{"description": error_msg[:150], "error": error_msg[:100]}],
+            "handoff_summary": "",
+            "related_session_ids": [],
             "tool": tool_name,
             "session_id": session_id,
-            "files_touched": [],
-            "status": "stuck",
-            "last_note": error_msg,
-            "created_at": now,
-            "updated_at": now,
         }
         threads.append(thread)
 
-    # Append audit entry
-    audit = memory.setdefault("audit", [])
-    audit.append({
+    # Append JSONL audit line
+    append_audit_line({
         "type": "error",
         "user": user,
-        "timestamp": now,
+        "ts": now,
         "session_id": session_id,
         "error": error_msg,
         "tool": tool_name,
     })
-    if len(audit) > 500:
-        memory["audit"] = audit[-500:]
 
-    save_memory(memory_path, memory)
-
+    save_json(memory_path, memory)
     print(json.dumps({"output": ""}))
 
 

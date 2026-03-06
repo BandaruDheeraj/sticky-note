@@ -1,2 +1,8 @@
 # Sticky Note - local overrides
 .claude/settings.local.json
+
+# Sticky Note - audit log (append-only, not committed)
+.sticky-note/sticky-note-audit.jsonl
+
+# Sticky Note - presence (local-only)
+.sticky-note/.sticky-presence.json

@@ -1,31 +1,88 @@
 #!/usr/bin/env python3
-"""inject-context.py — Prompt-Level Thread Surfacing (F3)
+"""inject-context.py — Relevance-Scored Thread Injection (V2)
 
 Hook: UserPromptSubmit (Claude Code) / userPromptSubmitted (Copilot CLI)
-Keyword-matches the user prompt against open thread file paths.
-Injects compact context only when relevant. Silent if no match.
+Scores threads by file overlap, branch, recency, stuck status, same dev.
+Injects top 3-5 most relevant threads under a 300-token budget.
 """
 
 import json
 import os
+import subprocess
 import sys
+from datetime import datetime, timezone
+
+
+# ── Paths ──────────────────────────────────────────────────
+
+def _sticky_dir():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(script_dir, "..", "..", ".sticky-note")
 
 
 def get_memory_path():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(script_dir, "..", "..", ".sticky-note", "sticky-note.json")
+    return os.path.join(_sticky_dir(), "sticky-note.json")
 
 
-def load_memory(path):
+def get_config_path():
+    return os.path.join(_sticky_dir(), "sticky-note-config.json")
+
+
+# ── I/O ────────────────────────────────────────────────────
+
+def load_json(path, default=None):
     try:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        return {"config": {}, "threads": [], "audit": []}
+        return default if default is not None else {}
 
+
+def get_user():
+    return os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
+
+
+def get_branch():
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return ""
+
+
+def get_recently_modified_files():
+    """Get files modified in recent commits (proxy for current work area)."""
+    files = set()
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "HEAD~5"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            files.update(f.strip() for f in result.stdout.strip().split("\n") if f.strip())
+    except Exception:
+        pass
+    # Also include uncommitted changes
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            files.update(f.strip() for f in result.stdout.strip().split("\n") if f.strip())
+    except Exception:
+        pass
+    return files
+
+
+# ── Keyword extraction ─────────────────────────────────────
 
 def extract_keywords(prompt):
-    """Extract potential file paths and keywords from the user prompt."""
     keywords = set()
     words = prompt.lower().replace("/", " ").replace("\\", " ").replace(".", " ").split()
 
@@ -34,12 +91,10 @@ def extract_keywords(prompt):
         if len(cleaned) >= 2:
             keywords.add(cleaned)
 
-    # Also check for path-like patterns in the original prompt
     for token in prompt.split():
         token = token.strip("()[]{}\"'`,;:")
         if "/" in token or "\\" in token or "." in token:
             keywords.add(token.lower())
-            # Add individual path segments
             parts = token.replace("\\", "/").split("/")
             for part in parts:
                 if len(part) >= 2:
@@ -48,36 +103,121 @@ def extract_keywords(prompt):
     return keywords
 
 
-def match_thread(thread, keywords):
-    """Check if a thread's files match any of the prompt keywords."""
-    if thread.get("status") not in ("open", "stuck"):
-        return False
+# ── Relevance scoring ──────────────────────────────────────
 
-    for file_path in thread.get("files_touched", []):
+def score_thread(thread, recently_modified, current_branch, current_user, prompt_keywords):
+    """Score a thread for relevance. Higher = more relevant."""
+    if thread.get("status") in ("expired", "stale"):
+        return -1
+
+    score = 0.0
+    now = datetime.now(timezone.utc)
+
+    # File overlap (weight 3) — highest signal
+    thread_files = set(thread.get("files_touched", []))
+    overlap = thread_files & recently_modified
+    if overlap:
+        score += 3 * min(len(overlap), 5)
+
+    # Prompt keyword match against thread files
+    for file_path in thread_files:
         path_lower = file_path.lower()
-        path_parts = set(
-            path_lower.replace("\\", "/").replace(".", "/").split("/")
-        )
+        path_parts = set(path_lower.replace("\\", "/").replace(".", "/").split("/"))
+        for kw in prompt_keywords:
+            if kw in path_lower or kw in path_parts:
+                score += 1
+                break
 
-        for keyword in keywords:
-            if keyword in path_lower or keyword in path_parts:
-                return True
+    # Branch match (weight 2)
+    if current_branch and thread.get("branch") == current_branch:
+        score += 2
 
-    return False
+    # Recency (weight 2) — decay over days
+    ts_field = thread.get("last_activity_at") or thread.get("updated_at") or thread.get("created_at", "")
+    if ts_field:
+        try:
+            ts = datetime.fromisoformat(ts_field.replace("Z", "+00:00"))
+            days_ago = max((now - ts).total_seconds() / 86400, 0)
+            recency = max(2 - (days_ago * 0.2), 0)
+            score += recency
+        except (ValueError, TypeError):
+            pass
+
+    # Stuck boost (+2)
+    if thread.get("status") == "stuck":
+        score += 2
+
+    # Same developer (weight 1)
+    thread_user = thread.get("user") or thread.get("author", "")
+    if thread_user == current_user:
+        score += 1
+
+    return score
 
 
-def format_match(thread):
-    """Format a matched thread for compact injection."""
-    status_label = "[STUCK] " if thread.get("status") == "stuck" else ""
-    author = thread.get("author", "unknown")
+# ── Formatting ─────────────────────────────────────────────
+
+def format_top_thread(thread):
+    """Full detail for top-scoring thread."""
+    user = thread.get("user") or thread.get("author", "unknown")
+    status = thread.get("status", "open")
     files = ", ".join(thread.get("files_touched", [])[:3])
-    note = thread.get("last_note", "")[:80]
+    narrative = thread.get("narrative", "")
+    failed = thread.get("failed_approaches", [])
+    branch = thread.get("branch", "")
 
-    line = f"📌 {status_label}{author} was working on: {files}"
+    status_icon = "🔴" if status == "stuck" else "🟢" if status == "open" else "⚪"
+    line = f"{status_icon} {files} · {user}"
+    if branch:
+        line += f" · {branch}"
+    ts_field = thread.get("last_activity_at") or thread.get("updated_at", "")
+    if ts_field:
+        line += f" · {_relative_time(ts_field)}"
+    line += "\n"
+
+    if narrative:
+        line += narrative[:200] + "\n"
+    elif thread.get("last_note"):
+        line += thread["last_note"][:150] + "\n"
+
+    if failed:
+        line += f"{len(failed)} failed approach(es)."
+        line += f" Full context: ask get_session_context(\"{thread.get('id', '')}\")\n"
+
+    return line.strip()
+
+
+def format_summary_thread(thread):
+    """One-liner for matches 2-5."""
+    user = thread.get("user") or thread.get("author", "unknown")
+    status = thread.get("status", "open")
+    files = ", ".join(thread.get("files_touched", [])[:2])
+    note = thread.get("last_note", "")[:60]
+
+    status_icon = "🔴" if status == "stuck" else "🟢" if status == "open" else "⚪"
+    line = f"{status_icon} {files} · {user}"
     if note:
         line += f" — {note}"
     return line
 
+
+def _relative_time(ts_str):
+    try:
+        ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        delta = now - ts
+        hours = delta.total_seconds() / 3600
+        if hours < 1:
+            return f"{int(delta.total_seconds() / 60)}min ago"
+        elif hours < 24:
+            return f"{int(hours)}hrs ago"
+        else:
+            return f"{int(hours / 24)}d ago"
+    except (ValueError, TypeError):
+        return ""
+
+
+# ── Main ───────────────────────────────────────────────────
 
 def main():
     try:
@@ -90,29 +230,57 @@ def main():
         print(json.dumps({"output": ""}))
         return
 
+    memory = load_json(get_memory_path(), {"version": "2", "threads": []})
+    threads = memory.get("threads", [])
+
+    # Only consider live threads
+    live = [t for t in threads if t.get("status") in ("open", "stuck", "closed")]
+    if not live:
+        print(json.dumps({"output": ""}))
+        return
+
     keywords = extract_keywords(prompt)
-    if not keywords:
+    current_branch = get_branch()
+    current_user = get_user()
+    recently_modified = get_recently_modified_files()
+
+    # Score all live threads
+    scored = []
+    for t in live:
+        s = score_thread(t, recently_modified, current_branch, current_user, keywords)
+        if s > 0:
+            scored.append((s, t))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    if not scored:
         print(json.dumps({"output": ""}))
         return
 
-    memory_path = get_memory_path()
-    memory = load_memory(memory_path)
+    # Token budget: ~300 tokens max
+    MAX_TOKENS = 300
+    token_count = 10  # header overhead
 
-    matches = []
-    for thread in memory.get("threads", []):
-        if match_thread(thread, keywords):
-            matches.append(format_match(thread))
+    output_lines = []
+    count = min(len(scored), 5)
+    header = f"[STICKY NOTE — {count} relevant thread{'s' if count != 1 else ''}]\n"
+    output_lines.append(header)
 
-    if not matches:
-        print(json.dumps({"output": ""}))
-        return
+    for i, (score, thread) in enumerate(scored[:5]):
+        if i == 0:
+            block = format_top_thread(thread)
+        else:
+            block = format_summary_thread(thread)
 
-    # Cap at 3 matches to keep context compact
-    output_lines = matches[:3]
-    if len(matches) > 3:
-        output_lines.append(f"... and {len(matches) - 3} more related threads")
+        token_count += len(block) // 4
+        if token_count > MAX_TOKENS:
+            remaining = len(scored) - i
+            if remaining > 0:
+                output_lines.append(f"... and {remaining} more relevant threads")
+            break
+        output_lines.append(block)
 
-    output = "\n".join(output_lines)
+    output = "\n".join(output_lines).strip()
     print(json.dumps({"output": output}))
 
 
