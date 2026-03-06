@@ -656,7 +656,7 @@ function cmdStatus() {
     if (config.conventions && config.conventions.length > 0) {
       print(`    📋 Conventions: ${config.conventions.length} defined`);
     }
-    print(`    ⏰ Stale after: ${config.stale_days || "?"} days`);
+    print(`    ⏰ Stale after: ${config.stale_days ?? "?"} days`);
   } else {
     print("    ❌ sticky-note-config.json not found");
   }
@@ -835,7 +835,7 @@ function cmdGc() {
 
   const memory = readJsonSafe(memoryPath, { version: "2", threads: [] });
   const config = readJsonSafe(configPath, { stale_days: 14 });
-  const staleDays = config.stale_days || 14;
+  const staleDays = config.stale_days ?? 14;
   const threads = memory.threads || [];
   const now = new Date();
 

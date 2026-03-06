@@ -8,3 +8,7 @@ __pycache__/
 
 # Sticky Note - debug log
 .sticky-note/hook-debug.log
+
+# Sticky Note
+.sticky-note/sticky-note-audit.jsonl
+.sticky-note/.sticky-presence.json
