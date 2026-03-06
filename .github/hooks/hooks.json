@@ -1,0 +1,59 @@
+{
+  "hooks": {
+    "sessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/session-start.py"
+          }
+        ]
+      }
+    ],
+    "sessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/session-end.py"
+          }
+        ]
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/inject-context.py"
+          }
+        ]
+      }
+    ],
+    "postToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/track-work.py"
+          }
+        ]
+      }
+    ],
+    "errorOccurred": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/on-error.py"
+          }
+        ]
+      }
+    ]
+  }
+}
