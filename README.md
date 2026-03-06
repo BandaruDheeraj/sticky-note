@@ -63,6 +63,13 @@ That's it. No additional setup needed for teammates.
 Open Claude Code or Copilot CLI and start working. Sticky Note runs
 in the background via hooks — capturing threads and surfacing context.
 
+**First thing to try** — ask your AI agent:
+
+> "Show me the active sticky note threads"
+
+The agent will read `.sticky-note/sticky-note.json` and show you what your
+teammates are working on, any stuck threads, and recent activity.
+
 ---
 
 ## How It Works
