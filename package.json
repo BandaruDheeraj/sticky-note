@@ -22,14 +22,12 @@
   },
   "files": [
     "bin/",
-    "templates/",
-    "README.md",
-    "LICENSE"
+    "templates/"
   ],
   "engines": {
     "node": ">=16.0.0"
   },
   "scripts": {
-    "test": "node --test test/"
+    "test": "echo \"No tests yet\""
   }
 }

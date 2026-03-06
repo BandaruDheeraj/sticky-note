@@ -3,7 +3,7 @@
 
 Extracts narrative + failed_approaches from a session transcript file.
 Used by sticky-codex.sh to process Codex stdout/stderr logs.
-Also usable standalone: python parse-transcript.py <transcript_path> <session_id>
+Also usable standalone: python parse-transcript.py <transcript_path>
 
 Outputs JSON to stdout: {"narrative": "...", "failed_approaches": [...]}
 """

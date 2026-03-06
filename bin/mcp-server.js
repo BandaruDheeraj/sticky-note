@@ -57,12 +57,6 @@ function getMemory() {
   });
 }
 
-function getConfig() {
-  return readJsonSafe(path.join(stickyDir(), "sticky-note-config.json"), {
-    stale_days: 14,
-  });
-}
-
 function getPresence() {
   return readJsonSafe(path.join(stickyDir(), ".sticky-presence.json"), {});
 }

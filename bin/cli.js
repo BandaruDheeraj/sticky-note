@@ -24,6 +24,7 @@ const { execSync } = require("child_process");
 const VERSION = "2.0.0";
 
 const HOOK_FILES = [
+  "sticky_utils.py",
   "session-start.py",
   "session-end.py",
   "inject-context.py",
@@ -219,11 +220,7 @@ async function syncMcpFromStickyNote(rl) {
   if (fs.existsSync(configPath)) {
     config = readJsonSafe(configPath, {});
   } else {
-    // Fall back to V1 location
-    const stickyPath = path.join(process.cwd(), ".sticky-note", "sticky-note.json");
-    if (!fs.existsSync(stickyPath)) return;
-    const memory = readJsonSafe(stickyPath, {});
-    config = memory.config || {};
+    return;
   }
 
   const teamServers = config.mcp_servers || [];
@@ -523,6 +520,7 @@ function cmdUpdate() {
   printBanner();
 
   const claudeHooksDir = path.join(process.cwd(), ".claude", "hooks");
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
   if (!fs.existsSync(claudeHooksDir)) {
     print("  ❌ No .claude/hooks/ directory found. Run `npx sticky-note init` first.");
     process.exit(1);
@@ -630,7 +628,7 @@ function cmdStatus() {
     try {
       const memory = JSON.parse(fs.readFileSync(memoryPath, "utf-8"));
       const threads = memory.threads || [];
-      const schemaVersion = memory.version || "1";
+      const schemaVersion = memory.version || "2";
 
       const openThreads = threads.filter((t) => t.status === "open").length;
       const stuckThreads = threads.filter((t) => t.status === "stuck").length;

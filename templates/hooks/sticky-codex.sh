@@ -51,11 +51,12 @@ echo "📌 Sticky Note — processing Codex session..."
 # Parse transcript for narrative + failed_approaches
 PARSED=$(python3 "$SCRIPT_DIR/parse-transcript.py" "$TRANSCRIPT_FILE" 2>/dev/null || echo '{"narrative":"","failed_approaches":[]}')
 
-# Call session-end.py with the transcript info
+# Call session-end.py with the transcript info + parsed data
 python3 "$SCRIPT_DIR/session-end.py" <<EOF 2>/dev/null || true
 {
     "session_id": "$SESSION_ID",
     "transcript_path": "$TRANSCRIPT_FILE",
+    "parsed_transcript": $PARSED,
     "hook_event_name": "sessionEnd",
     "reason": "codex_exit"
 }

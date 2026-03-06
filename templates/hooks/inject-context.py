@@ -12,47 +12,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
-
-# ── Paths ──────────────────────────────────────────────────
-
-def _sticky_dir():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(script_dir, "..", "..", ".sticky-note")
-
-
-def get_memory_path():
-    return os.path.join(_sticky_dir(), "sticky-note.json")
-
-
-def get_config_path():
-    return os.path.join(_sticky_dir(), "sticky-note-config.json")
-
-
-# ── I/O ────────────────────────────────────────────────────
-
-def load_json(path, default=None):
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return default if default is not None else {}
-
-
-def get_user():
-    return os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
-
-
-def get_branch():
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True, text=True, timeout=5
-        )
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except Exception:
-        pass
-    return ""
+from sticky_utils import get_memory_path, load_json, get_user, get_branch
 
 
 def get_recently_modified_files():
