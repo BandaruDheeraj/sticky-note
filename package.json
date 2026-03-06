@@ -4,7 +4,8 @@
   "description": "Human-to-human handoff for AI coding assistants. Git-backed shared memory for Claude Code and Copilot CLI.",
   "license": "MIT",
   "bin": {
-    "sticky-note": "./bin/cli.js"
+    "sticky-note": "./bin/cli.js",
+    "sticky-note-mcp": "./bin/mcp-server.js"
   },
   "keywords": [
     "ai",
@@ -23,6 +24,7 @@
     "bin/",
     "templates/",
     "README.md",
+    "MIGRATION.md",
     "LICENSE"
   ],
   "engines": {
