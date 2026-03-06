@@ -8,7 +8,6 @@ appends JSONL audit line, runs lazy tombstone sweep, clears presence.
 
 import json
 import os
-import re
 import subprocess
 import sys
 import uuid
@@ -17,6 +16,8 @@ from datetime import datetime, timezone, timedelta
 from sticky_utils import (
     get_memory_path, get_config_path, get_audit_path, get_presence_path,
     load_json, save_json, append_audit_line, get_user, get_branch,
+    parse_jsonl_file, extract_narrative_from_entries, extract_failed_from_entries,
+    ERROR_PATTERNS, RETRY_PATTERNS,
 )
 
 
@@ -174,53 +175,8 @@ def extract_narrative(hook_input):
     if not transcript_path or not os.path.exists(transcript_path):
         return ""
 
-    last_assistant_texts = []
-    try:
-        with open(transcript_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                message = entry.get("message", {})
-                if not isinstance(message, dict):
-                    continue
-                role = message.get("role", entry.get("role", ""))
-                if role != "assistant":
-                    continue
-                for content in _get_content_blocks(entry):
-                    if isinstance(content, dict) and content.get("type") == "text":
-                        text = content["text"].strip()
-                        if text:
-                            last_assistant_texts.append(text)
-    except (OSError, IOError):
-        pass
-
-    if not last_assistant_texts:
-        return ""
-
-    # Use the last substantial text block as narrative seed
-    final_text = last_assistant_texts[-1]
-    # Truncate to first ~300 chars for a concise narrative
-    return final_text[:300].strip()
-
-
-ERROR_PATTERNS = re.compile(
-    r"(error|exception|traceback|failed|fatal|panic|ENOENT|EACCES|"
-    r"segfault|undefined|TypeError|SyntaxError|ReferenceError|"
-    r"ImportError|ModuleNotFoundError|KeyError|ValueError|"
-    r"RuntimeError|ConnectionError|TimeoutError|PermissionError)",
-    re.IGNORECASE,
-)
-
-RETRY_PATTERNS = re.compile(
-    r"(try again|let me try|didn't work|doesn't work|failed|let's try|"
-    r"another approach|instead|alternatively|that approach)",
-    re.IGNORECASE,
-)
+    entries = parse_jsonl_file(transcript_path)
+    return extract_narrative_from_entries(entries)
 
 
 def extract_failed_approaches(hook_input):
@@ -229,45 +185,8 @@ def extract_failed_approaches(hook_input):
     if not transcript_path or not os.path.exists(transcript_path):
         return []
 
-    approaches = []
-    try:
-        with open(transcript_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                for content in _get_content_blocks(entry):
-                    if not isinstance(content, dict):
-                        continue
-                    if content.get("type") == "text":
-                        text = content.get("text", "")
-                        if RETRY_PATTERNS.search(text) and ERROR_PATTERNS.search(text):
-                            # Extract associated file paths from nearby tool uses
-                            files_tried = []
-                            for c2 in _get_content_blocks(entry):
-                                if (isinstance(c2, dict) and c2.get("type") == "tool_use"):
-                                    inp = c2.get("input", {})
-                                    if isinstance(inp, dict):
-                                        for k in ("file_path", "path", "file"):
-                                            if k in inp:
-                                                files_tried.append(inp[k])
-                                                break
-                            # Find the error snippet
-                            error_match = ERROR_PATTERNS.search(text)
-                            error_ctx = text[max(0, error_match.start() - 40):error_match.end() + 60].strip() if error_match else ""
-                            approaches.append({
-                                "description": text[:150].strip(),
-                                "error": error_ctx[:100],
-                                "files_tried": files_tried[:5],
-                            })
-    except (OSError, IOError):
-        pass
-
-    return approaches[:5]
+    entries = parse_jsonl_file(transcript_path)
+    return extract_failed_from_entries(entries)
 
 
 def extract_last_note(hook_input):

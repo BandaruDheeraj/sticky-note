@@ -162,7 +162,7 @@ def main():
     # Output injection context
     parts = [p for p in [thread_context, config_context, presence_context] if p]
     output = "\n".join(parts).strip()
-    print(json.dumps({"output": output}))
+    print(json.dumps({"output": output}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

@@ -54,6 +54,17 @@
           }
         ]
       }
+    ],
+    "ErrorOccurred": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/on-error.py"
+          }
+        ]
+      }
     ]
   }
 }

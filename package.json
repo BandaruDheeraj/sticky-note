@@ -16,9 +16,11 @@
     "hooks",
     "developer-tools"
   ],
+  "author": "Dheeraj Bandaru",
+  "homepage": "https://github.com/BandaruDheeraj/sticky-note#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sticky-note/sticky-note.git"
+    "url": "https://github.com/BandaruDheeraj/sticky-note.git"
   },
   "files": [
     "bin/",

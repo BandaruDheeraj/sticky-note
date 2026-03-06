@@ -46,7 +46,7 @@ function print(msg) {
 
 function printBanner() {
   print("");
-  print("  📌 sticky-note v" + VERSION);
+  print(`  📌 sticky-note v${VERSION}`);
   print("  Human-to-human handoff for AI coding assistants");
   print("");
 }
@@ -574,7 +574,7 @@ function cmdUpdate() {
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
   }
 
-  print("\n  ✨ Scripts updated to v" + VERSION);
+  print(`\n  ✨ Scripts updated to v${VERSION}`);
   print("  ⚠️  Thread data was NOT modified.\n");
 }
 

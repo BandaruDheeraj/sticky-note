@@ -241,7 +241,7 @@ def main():
         output_lines.append(block)
 
     output = "\n".join(output_lines).strip()
-    print(json.dumps({"output": output}))
+    print(json.dumps({"output": output}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

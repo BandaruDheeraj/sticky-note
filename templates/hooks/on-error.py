@@ -20,7 +20,7 @@ from sticky_utils import get_memory_path, load_json, save_json, append_audit_lin
 def main():
     try:
         hook_input = json.loads(sys.stdin.read()) if not sys.stdin.isatty() else {}
-    except (json.JSONDecodeError, Exception):
+    except Exception:
         hook_input = {}
 
     session_id = hook_input.get("session_id", os.environ.get("SESSION_ID", "unknown"))
