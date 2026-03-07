@@ -811,6 +811,12 @@ function cmdResume() {
       const shortId = t.id.slice(0, 8);
 
       print(`  ${icon} ${shortId} [${t.status}] ${user}${branch}: ${files}${note}`);
+      const prompts = t.prompts || [];
+      if (prompts.length > 0) {
+        const preview = prompts.slice(0, 3).map((p, i) => `     ${i + 1}. ${p.slice(0, 60)}`).join("\n");
+        print(preview);
+        if (prompts.length > 3) print(`     ... and ${prompts.length - 3} more prompt(s)`);
+      }
     }
     print(`\n  Usage: npx sticky-note resume <thread-id>`);
     print("  You can use the first 8 characters of the ID.\n");

@@ -26,6 +26,7 @@ cat .sticky-note/sticky-note.json
 | `handoff_summary`  | Handoff notes for teammates                |
 | `last_note`        | Most recent status note                    |
 | `work_type`        | bug-fix, feature, debugging, refactor, etc.|
+| `prompts`          | User prompts from the session (for cross-tool resume) |
 | `related_session_ids` | Session IDs that resumed this thread    |
 
 ### Status icons

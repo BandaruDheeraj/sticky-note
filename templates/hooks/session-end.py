@@ -21,6 +21,7 @@ from sticky_utils import (
     parse_jsonl_file, extract_narrative_from_entries, extract_failed_from_entries,
     ERROR_PATTERNS, RETRY_PATTERNS,
     extract_session_from_audit,
+    clear_session_file,
 )
 
 
@@ -593,6 +594,14 @@ def main():
                 existing = thread
                 break
 
+    # Store conversation prompts in the thread for cross-tool resume
+    prompts = audit_data.get("prompts", [])
+    if prompts:
+        # Truncate each prompt and cap the list for reasonable JSON size
+        stored_prompts = [p[:300] for p in prompts[:20]]
+    else:
+        stored_prompts = []
+
     if existing:
         existing["files_touched"] = list(set(existing.get("files_touched", []) + files_touched))
         existing["last_note"] = last_note
@@ -607,6 +616,9 @@ def main():
             existing["narrative"] = narrative
         if failed:
             existing["failed_approaches"] = failed
+        if stored_prompts:
+            prev = existing.get("prompts", [])
+            existing["prompts"] = (prev + stored_prompts)[-20:]
     else:
         thread = {
             "id": str(uuid.uuid4()),
@@ -627,6 +639,7 @@ def main():
             "session_id": session_id,
             "work_type": session_analysis["work_type"],
             "activities": session_analysis["activities"],
+            "prompts": stored_prompts,
         }
         threads.append(thread)
 
@@ -644,12 +657,16 @@ def main():
         "work_type": session_analysis["work_type"],
     })
 
-    # Clear presence
+    # Clear presence and session file
     clear_presence(user)
+    clear_session_file()
 
     save_json(memory_path, memory)
     print(json.dumps({"output": ""}))
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        print(json.dumps({"output": ""}))

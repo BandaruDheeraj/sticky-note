@@ -7,5 +7,9 @@
 # Sticky Note - presence (local-only)
 .sticky-note/.sticky-presence.json
 
+# Sticky Note - transient session/resume signals
+.sticky-note/.sticky-session
+.sticky-note/.sticky-resume
+
 # Sticky Note - debug log
 .sticky-note/hook-debug.log
