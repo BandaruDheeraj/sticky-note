@@ -12,7 +12,10 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
-from sticky_utils import get_memory_path, load_json, get_user, get_branch, get_resume_thread_id
+from sticky_utils import (
+    get_memory_path, load_json, save_json, get_user, get_branch,
+    get_resume_thread_id, find_thread_by_id, get_session_id,
+)
 
 
 def get_recently_modified_files():
@@ -210,6 +213,20 @@ def main():
 
     # Score all live threads
     resume_thread_id = get_resume_thread_id()
+    memory_dirty = False
+
+    # Mid-session resume: reopen the thread if signal file exists
+    if resume_thread_id:
+        resumed = find_thread_by_id(threads, resume_thread_id)
+        if resumed and resumed.get("status") != "open":
+            resumed["status"] = "open"
+            resumed["last_activity_at"] = datetime.now(timezone.utc).isoformat()
+            session_id = get_session_id(hook_input)
+            related = resumed.setdefault("related_session_ids", [])
+            if session_id not in related:
+                related.append(session_id)
+            memory_dirty = True
+
     scored = []
     for t in live:
         s = score_thread(t, recently_modified, current_branch, current_user, keywords)
@@ -218,6 +235,9 @@ def main():
             s = max(s, 0) + 10
         if s > 0:
             scored.append((s, t))
+
+    if memory_dirty:
+        save_json(get_memory_path(), memory)
 
     scored.sort(key=lambda x: x[0], reverse=True)
 

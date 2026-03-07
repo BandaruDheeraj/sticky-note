@@ -43,6 +43,18 @@ This writes a `.sticky-resume` signal file that hooks detect automatically.
 The resumed thread reopens as `open`, and its full context is injected at
 session start.
 
+### Resuming threads mid-session
+
+When a user asks to resume a thread **during an active session**, do NOT
+tell them to exit. Instead, run the resume command directly:
+
+```bash
+npx sticky-note resume <thread-id>
+```
+
+The next prompt will automatically pick up the resumed thread's context
+(the inject-context hook detects the signal file and reopens the thread).
+
 ### Example queries the user might ask
 
 - "Show me all threads" → read sticky-note.json, list all threads
@@ -50,7 +62,7 @@ session start.
 - "What did Alice work on?" → filter threads where user = "alice"
 - "Show threads for this branch" → filter by current branch name
 - "What files were touched?" → aggregate files_touched across threads
-- "Resume thread X" → tell user to run `npx sticky-note resume <id>`
+- "Resume thread X" → run `npx sticky-note resume <id>` directly (works mid-session)
 
 ### Displaying threads
 
