@@ -64,8 +64,4 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception:
-        print(json.dumps({"narrative": "", "failed_approaches": []}))
-        sys.exit(0)
+    main()

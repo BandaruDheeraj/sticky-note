@@ -148,6 +148,15 @@ def format_top_thread(thread):
     elif thread.get("last_note"):
         line += thread["last_note"][:150] + "\n"
 
+    # Include conversation prompts for cross-tool context
+    prompts = thread.get("prompts", [])
+    if prompts:
+        line += f"Conversation ({len(prompts)} prompt(s)):\n"
+        for i, p in enumerate(prompts[:5], 1):
+            line += f"  {i}. {p[:120]}\n"
+        if len(prompts) > 5:
+            line += f"  ... and {len(prompts) - 5} more\n"
+
     if failed:
         line += f"{len(failed)} failed approach(es)."
         line += f" Full context: ask get_session_context(\"{thread.get('id', '')}\")\n"
@@ -286,4 +295,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        # Never let hook failures block the user prompt
+        print(json.dumps({"output": ""}))
