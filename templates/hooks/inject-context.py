@@ -294,21 +294,19 @@ def main():
 
     scored.sort(key=lambda x: x[0], reverse=True)
 
-    # Debug mode: append scoring details to the injected output
-    debug_block = ""
-    if os.environ.get("STICKY_DEBUG"):
-        debug_lines = [f"\n---\n[STICKY_DEBUG] scoring — prompt: {prompt[:80]}"]
-        debug_lines.append(f"  keywords: {', '.join(sorted(keywords)[:15])}")
-        debug_lines.append(f"  branch: {current_branch}  user: {current_user}")
-        debug_lines.append(f"  recently_modified: {', '.join(sorted(recently_modified)[:10])}")
-        debug_lines.append(f"  live threads: {len(live)}  scored>0: {len(scored)}")
-        for s, t in scored[:10]:
-            tid = t.get("id", "")[:8]
-            status = t.get("status", "?")
-            files = t.get("files_touched", [])[:3]
-            tool = t.get("tool", "?")
-            debug_lines.append(f"  {s:5.1f}  {tid}  [{status}] {tool}  files={files}")
-        debug_block = "\n".join(debug_lines)
+    # Transparency: append scoring details so the AI tool can explain relevance
+    debug_lines = [f"\n---\n[STICKY NOTE — scoring] prompt: {prompt[:80]}"]
+    debug_lines.append(f"  keywords: {', '.join(sorted(keywords)[:15])}")
+    debug_lines.append(f"  branch: {current_branch}  user: {current_user}")
+    debug_lines.append(f"  recently_modified: {', '.join(sorted(recently_modified)[:10])}")
+    debug_lines.append(f"  live threads: {len(live)}  scored>0: {len(scored)}")
+    for s, t in scored[:10]:
+        tid = t.get("id", "")[:8]
+        status = t.get("status", "?")
+        files = t.get("files_touched", [])[:3]
+        tool = t.get("tool", "?")
+        debug_lines.append(f"  {s:5.1f}  {tid}  [{status}] {tool}  files={files}")
+    scoring_block = "\n".join(debug_lines)
 
     if not scored:
         print(json.dumps({"output": ""}))
@@ -340,8 +338,7 @@ def main():
     output_lines.insert(0, header)
 
     output = "\n".join(output_lines).strip()
-    if debug_block:
-        output += debug_block
+    output += scoring_block
     print(json.dumps({"output": output}, ensure_ascii=False))
 
 
