@@ -20,6 +20,7 @@ from sticky_utils import (
     get_resume_thread_id, find_thread_by_id, clear_resume_signal,
     parse_jsonl_file, extract_narrative_from_entries, extract_failed_from_entries,
     ERROR_PATTERNS, RETRY_PATTERNS,
+    extract_session_from_audit,
 )
 
 
@@ -174,11 +175,28 @@ def _extract_user_prompt(hook_input):
 def extract_narrative(hook_input):
     """Extract a narrative summary from the last assistant messages."""
     transcript_path = hook_input.get("transcript_path", "")
-    if not transcript_path or not os.path.exists(transcript_path):
-        return ""
+    if transcript_path and os.path.exists(transcript_path):
+        entries = parse_jsonl_file(transcript_path)
+        narrative = extract_narrative_from_entries(entries)
+        if narrative:
+            return narrative
 
-    entries = parse_jsonl_file(transcript_path)
-    return extract_narrative_from_entries(entries)
+    # Fallback: build narrative from audit trail user prompts
+    session_id = get_session_id(hook_input)
+    audit_data = extract_session_from_audit(session_id)
+    prompts = audit_data.get("prompts", [])
+    if prompts:
+        # Combine first and last prompt for context
+        if len(prompts) == 1:
+            return prompts[0][:300].strip()
+        summary = f"{prompts[0][:150].strip()}"
+        if len(prompts) > 2:
+            summary += f" … ({len(prompts)} prompts total) … {prompts[-1][:100].strip()}"
+        else:
+            summary += f" → {prompts[-1][:100].strip()}"
+        return summary[:300]
+
+    return ""
 
 
 def extract_failed_approaches(hook_input):
@@ -191,15 +209,30 @@ def extract_failed_approaches(hook_input):
     return extract_failed_from_entries(entries)
 
 
-def extract_last_note(hook_input):
+def extract_last_note(hook_input, narrative="", session_analysis=None, audit_data=None):
+    # Best: explicit summary from hook input (e.g. Claude Code stop reason)
     for key in ("summary", "last_message", "description"):
         note = hook_input.get(key, "")
         if note and isinstance(note, str):
             return note[:200]
 
-    prompt = _extract_user_prompt(hook_input)
-    if prompt:
-        return prompt
+    work_type = ""
+    activities = []
+    if session_analysis:
+        work_type = session_analysis.get("work_type", "")
+        activities = session_analysis.get("activities", [])
+
+    # Good: narrative from last assistant message combined with work type
+    if narrative and narrative not in ("Session completed", ""):
+        prefix = f"[{work_type}] " if work_type and work_type != "general" else ""
+        return f"{prefix}{narrative}"[:200]
+
+    # OK: synthesize from work type + activities + files
+    if work_type and work_type != "general" and activities:
+        return f"[{work_type}] {', '.join(activities[:4])}"[:200]
+
+    if activities:
+        return ", ".join(activities[:4])[:200]
 
     reason = hook_input.get("reason", "")
     reason_labels = {
@@ -208,18 +241,30 @@ def extract_last_note(hook_input):
         "error": "Session ended with error",
     }
     if reason in reason_labels:
-        return reason_labels[reason]
+        label = reason_labels[reason]
+        if work_type and work_type != "general":
+            return f"[{work_type}] {label}"[:200]
+        return label
 
     files = extract_files_touched(hook_input)
     if files:
-        return f"Worked on {', '.join(files[:3])}{'...' if len(files) > 3 else ''}"[:200]
+        prefix = f"[{work_type}] " if work_type and work_type != "general" else ""
+        return f"{prefix}Worked on {', '.join(files[:3])}{'...' if len(files) > 3 else ''}"[:200]
+
+    # Fallback: first user prompt from audit trail
+    if audit_data is None:
+        session_id = get_session_id(hook_input)
+        audit_data = extract_session_from_audit(session_id)
+    first_prompt = audit_data.get("first_prompt", "")
+    if first_prompt:
+        return first_prompt[:200]
 
     return "Session completed"
 
 
 # ── Activity analysis ──────────────────────────────────────
 
-def analyze_session_activities(hook_input):
+def analyze_session_activities(hook_input, audit_data=None):
     activities = []
     work_type = "general"
     tool_counts = {}
@@ -227,21 +272,51 @@ def analyze_session_activities(hook_input):
     commands_run = []
 
     transcript_path = hook_input.get("transcript_path", "")
-    if not transcript_path or not os.path.exists(transcript_path):
-        return {"work_type": work_type, "activities": activities}
+    has_transcript = transcript_path and os.path.exists(transcript_path)
 
-    try:
-        with open(transcript_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                _analyze_entry(entry, tool_counts, errors_seen, commands_run)
-    except (OSError, IOError):
+    if has_transcript:
+        try:
+            with open(transcript_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    _analyze_entry(entry, tool_counts, errors_seen, commands_run)
+        except (OSError, IOError):
+            has_transcript = False
+
+    # Fallback: use audit trail for tool counts and files
+    if not has_transcript:
+        if audit_data is None:
+            session_id = get_session_id(hook_input)
+            audit_data = extract_session_from_audit(session_id)
+        audit_tools = audit_data.get("tools", {})
+        audit_files = audit_data.get("files", [])
+        if audit_tools or audit_files:
+            tool_counts = audit_tools
+            if audit_files:
+                edit_like = {"edit", "create", "write", "Edit", "Write", "MultiEdit",
+                             "multi_edit", "editedExistingFile", "createdNewFile"}
+                audit_edit_count = sum(
+                    c for t, c in audit_tools.items() if t in edit_like
+                )
+                if audit_edit_count > 0:
+                    activities.append(f"edited {audit_edit_count} file(s)")
+                activities.append(f"touched {len(audit_files)} file(s)")
+            num_prompts = len(audit_data.get("prompts", []))
+            if num_prompts > 0:
+                activities.append(f"{num_prompts} prompt(s)")
+            # If we have tool usage but no specific activities yet, summarize tool count
+            if not activities and audit_tools:
+                total_calls = sum(audit_tools.values())
+                activities.append(f"used {total_calls} tool(s)")
+            return {"work_type": work_type, "activities": activities[:8]}
+
+    if not tool_counts and not has_transcript:
         return {"work_type": work_type, "activities": activities}
 
     has_edits = any(t in tool_counts for t in ("Write", "Edit", "MultiEdit"))
@@ -481,10 +556,22 @@ def main():
     stale_days = config.get("stale_days", 14)
 
     files_touched = extract_files_touched(hook_input)
-    last_note = extract_last_note(hook_input)
-    session_analysis = analyze_session_activities(hook_input)
+
+    # Pre-fetch audit data once so we don't read the file multiple times
+    audit_data = extract_session_from_audit(session_id)
+
+    session_analysis = analyze_session_activities(hook_input, audit_data=audit_data)
     narrative = extract_narrative(hook_input)
     failed = extract_failed_approaches(hook_input)
+    last_note = extract_last_note(
+        hook_input, narrative=narrative,
+        session_analysis=session_analysis, audit_data=audit_data,
+    )
+
+    # Merge audit trail files into files_touched
+    audit_files = audit_data.get("files", [])
+    if audit_files:
+        files_touched = list(set(files_touched + audit_files))
 
     # Find or create thread — resume signal takes priority over session_id match
     threads = memory.setdefault("threads", [])

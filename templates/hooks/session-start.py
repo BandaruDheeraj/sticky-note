@@ -187,6 +187,12 @@ def main():
             resume_lines.append(f"**Files:** {files}")
         if resumed_thread.get("branch"):
             resume_lines.append(f"**Branch:** {resumed_thread['branch']}")
+        work_type = resumed_thread.get("work_type", "")
+        if work_type and work_type != "general":
+            resume_lines.append(f"**Work type:** {work_type}")
+        activities = resumed_thread.get("activities", [])
+        if activities:
+            resume_lines.append(f"**Activities:** {', '.join(activities[:6])}")
         if resumed_thread.get("narrative"):
             resume_lines.append(f"**Context:** {resumed_thread['narrative']}")
         elif resumed_thread.get("last_note"):
@@ -199,6 +205,16 @@ def main():
                 resume_lines.append(f"  - {desc}")
         if resumed_thread.get("handoff_summary"):
             resume_lines.append(f"**Handoff:** {resumed_thread['handoff_summary']}")
+        related = resumed_thread.get("related_session_ids", [])
+        if len(related) > 1:
+            resume_lines.append(f"**Sessions:** this is session #{len(related)} on this thread")
+        resume_lines.append("")
+        resume_lines.append(
+            "**→ Start by giving the user a brief recap of what happened in "
+            "the previous session(s) on this thread — what was worked on, "
+            "what was accomplished, what problems were hit, and what's left to do. "
+            "Then ask how they'd like to proceed.**"
+        )
         parts.append("\n".join(resume_lines))
 
     parts.extend([p for p in [thread_context, config_context, presence_context] if p])

@@ -284,3 +284,52 @@ def extract_failed_from_text(lines):
             })
 
     return approaches[:5]
+
+
+# ── Audit trail extraction ────────────────────────────────
+
+def extract_session_from_audit(session_id):
+    """Read audit JSONL and extract prompts, tools, and files for a session.
+
+    Returns dict with keys: prompts (list[str]), tools (dict[str,int]),
+    files (list[str]), first_prompt (str|None).
+    """
+    result = {"prompts": [], "tools": {}, "files": [], "first_prompt": None}
+    if not session_id or session_id == "unknown":
+        return result
+
+    audit_path = get_audit_path()
+    if not os.path.exists(audit_path):
+        return result
+
+    try:
+        with open(audit_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if entry.get("session_id") != session_id:
+                    continue
+
+                entry_type = entry.get("type", "")
+                if entry_type == "user_prompt":
+                    prompt = entry.get("prompt", "").strip()
+                    if prompt:
+                        result["prompts"].append(prompt)
+                        if result["first_prompt"] is None:
+                            result["first_prompt"] = prompt
+                elif entry_type == "tool_use":
+                    tool_name = entry.get("tool", "")
+                    if tool_name:
+                        result["tools"][tool_name] = result["tools"].get(tool_name, 0) + 1
+                    file_path = entry.get("file", "")
+                    if file_path and file_path not in result["files"]:
+                        result["files"].append(file_path)
+    except (OSError, IOError):
+        pass
+
+    return result

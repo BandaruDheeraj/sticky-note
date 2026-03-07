@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from sticky_utils import (
     get_memory_path, load_json, save_json, get_user, get_branch,
     get_resume_thread_id, find_thread_by_id, get_session_id,
+    append_audit_line,
 )
 
 
@@ -196,6 +197,16 @@ def main():
     if not prompt:
         print(json.dumps({"output": ""}))
         return
+
+    # Log user prompt to audit trail so session-end can use it
+    session_id = get_session_id(hook_input)
+    append_audit_line({
+        "type": "user_prompt",
+        "user": get_user(),
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "session_id": session_id,
+        "prompt": prompt[:500],
+    })
 
     memory = load_json(get_memory_path(), {"version": "2", "threads": []})
     threads = memory.get("threads", [])

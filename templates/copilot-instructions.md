@@ -23,6 +23,10 @@ This writes a `.sticky-resume` signal file that hooks detect automatically.
 The resumed thread reopens as `open`, and its full context is injected at
 session start.
 
+**When a session starts with a resumed thread**, always present a brief recap
+to the user: what was worked on, what was accomplished, any problems hit,
+and what's left to do. Then ask how they'd like to proceed.
+
 ### Resuming threads mid-session
 
 When a user asks to resume a thread **during an active session**, do NOT
