@@ -22,6 +22,7 @@ from sticky_utils import (
     ERROR_PATTERNS, RETRY_PATTERNS,
     extract_session_from_audit,
     clear_session_file,
+    read_head_sha, clear_head_file,
 )
 
 
@@ -126,6 +127,59 @@ def extract_files_touched(hook_input):
                 pass
 
     return list(files)
+
+
+STICKY_FILES = {".sticky-note/sticky-note.json", ".sticky-note/sticky-note-audit.jsonl",
+                ".sticky-note/.sticky-session", ".sticky-note/.sticky-head",
+                ".sticky-note/.sticky-resume", ".sticky-note/.sticky-debug.jsonl",
+                ".sticky-note/sticky-note-config.json", ".sticky-note/presence.json"}
+
+
+def get_git_files_touched():
+    """Use git to detect files changed since session start (tool-agnostic fallback)."""
+    files = set()
+    saved_sha = read_head_sha()
+
+    try:
+        # Files changed between session-start HEAD and current HEAD (committed during session)
+        if saved_sha:
+            result = subprocess.run(
+                ["git", "diff", "--name-only", saved_sha, "HEAD"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode == 0:
+                for f in result.stdout.strip().splitlines():
+                    f = f.strip()
+                    if f:
+                        files.add(f)
+
+        # Uncommitted changes in working tree
+        result = subprocess.run(
+            ["git", "diff", "--name-only"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            for f in result.stdout.strip().splitlines():
+                f = f.strip()
+                if f:
+                    files.add(f)
+
+        # Staged but not yet committed
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--name-only"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            for f in result.stdout.strip().splitlines():
+                f = f.strip()
+                if f:
+                    files.add(f)
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+
+    # Filter out sticky-note internal files — normalize to forward slash for comparison
+    return [f for f in files if f.replace("\\", "/") not in STICKY_FILES
+            and not f.replace("\\", "/").startswith(".sticky-note/.sticky-")]
 
 
 def _extract_user_prompt(hook_input):
@@ -574,6 +628,11 @@ def main():
     if audit_files:
         files_touched = list(set(files_touched + audit_files))
 
+    # Git-based fallback: detect files changed since session start
+    git_files = get_git_files_touched()
+    if git_files:
+        files_touched = list(set(files_touched + git_files))
+
     # Find or create thread — resume signal takes priority over session_id match
     threads = memory.setdefault("threads", [])
     existing = None
@@ -657,9 +716,10 @@ def main():
         "work_type": session_analysis["work_type"],
     })
 
-    # Clear presence and session file
+    # Clear presence, session file, and HEAD snapshot
     clear_presence(user)
     clear_session_file()
+    clear_head_file()
 
     save_json(memory_path, memory)
     print(json.dumps({"output": ""}))

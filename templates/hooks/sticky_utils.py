@@ -88,6 +88,47 @@ def clear_session_file():
         pass
 
 
+# ── Git HEAD snapshot (for files_touched fallback) ────────
+
+def get_head_file_path():
+    return os.path.join(_sticky_dir(), ".sticky-head")
+
+
+def save_head_sha():
+    """Save the current git HEAD SHA so session-end can diff against it."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            sha = result.stdout.strip()
+            path = get_head_file_path()
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(sha + "\n")
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+
+
+def read_head_sha():
+    """Read the saved HEAD SHA from session start."""
+    try:
+        with open(get_head_file_path(), "r", encoding="utf-8") as f:
+            sha = f.read().strip()
+            return sha if sha else None
+    except (FileNotFoundError, OSError):
+        return None
+
+
+def clear_head_file():
+    """Remove the .sticky-head file at session end."""
+    try:
+        os.remove(get_head_file_path())
+    except (FileNotFoundError, OSError):
+        pass
+
+
 # ── Thread resume helpers ─────────────────────────────────
 
 def get_resume_thread_id():

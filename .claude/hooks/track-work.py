@@ -13,8 +13,30 @@ from datetime import datetime, timezone
 from sticky_utils import (
     get_config_path, get_presence_path,
     load_json, save_json, append_audit_line, get_user,
-    detect_tool, get_session_id,
+    detect_tool, get_session_id, _sticky_dir,
 )
+
+
+WRITE_TOOLS = {"edit", "Edit", "create", "Create", "Write", "write", "MultiEdit", "multi_edit"}
+
+
+def _log_debug(tool_name, hook_input):
+    """Log raw hook_input when file extraction fails for a write tool."""
+    if tool_name not in WRITE_TOOLS:
+        return
+    try:
+        debug_path = os.path.join(_sticky_dir(), ".sticky-debug.jsonl")
+        entry = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "tool": tool_name,
+            "hook_input_keys": sorted(hook_input.keys()),
+            "hook_input": {k: v for k, v in hook_input.items()
+                          if k not in ("output", "result", "stdout", "stderr")},
+        }
+        with open(debug_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, default=str) + "\n")
+    except (OSError, IOError, TypeError):
+        pass
 
 
 # ── File extraction────────────────────────────────────────
@@ -107,6 +129,8 @@ def main():
                 break
 
     file_path = extract_file_path(hook_input)
+    if not file_path:
+        _log_debug(tool_name, hook_input)
     user = get_user()
     now = datetime.now(timezone.utc).isoformat()
 
@@ -142,4 +166,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        print(json.dumps({"output": ""}))

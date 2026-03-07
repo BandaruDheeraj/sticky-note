@@ -10,6 +10,8 @@
 # Sticky Note - transient session/resume signals
 .sticky-note/.sticky-session
 .sticky-note/.sticky-resume
+.sticky-note/.sticky-head
 
 # Sticky Note - debug log
 .sticky-note/hook-debug.log
+.sticky-note/.sticky-debug.jsonl

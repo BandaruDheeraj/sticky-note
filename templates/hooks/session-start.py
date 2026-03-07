@@ -16,7 +16,7 @@ from sticky_utils import (
     get_memory_path, get_config_path, get_presence_path,
     load_json, save_json, append_audit_line, get_user, get_session_id,
     get_resume_thread_id, find_thread_by_id,
-    save_session_id,
+    save_session_id, save_head_sha,
 )
 
 
@@ -143,6 +143,9 @@ def main():
         session_id = str(uuid.uuid4())
     # Always persist session ID so all hooks in this session share it
     save_session_id(session_id)
+
+    # Snapshot HEAD so session-end can diff for files_touched
+    save_head_sha()
 
     memory_path = get_memory_path()
     memory = load_json(memory_path, {"version": "2", "project": "", "threads": []})

@@ -9,12 +9,14 @@ Reads presence file if recent. Writes audit line to JSONL.
 import json
 import os
 import sys
+import uuid
 from datetime import datetime, timezone, timedelta
 
 from sticky_utils import (
     get_memory_path, get_config_path, get_presence_path,
     load_json, save_json, append_audit_line, get_user, get_session_id,
     get_resume_thread_id, find_thread_by_id,
+    save_session_id, save_head_sha,
 )
 
 
@@ -136,6 +138,15 @@ def main():
 
     session_id = get_session_id(hook_input)
 
+    # Generate a stable session ID if none was provided (e.g. Copilot CLI)
+    if session_id == "unknown":
+        session_id = str(uuid.uuid4())
+    # Always persist session ID so all hooks in this session share it
+    save_session_id(session_id)
+
+    # Snapshot HEAD so session-end can diff for files_touched
+    save_head_sha()
+
     memory_path = get_memory_path()
     memory = load_json(memory_path, {"version": "2", "project": "", "threads": []})
 
@@ -187,6 +198,12 @@ def main():
             resume_lines.append(f"**Files:** {files}")
         if resumed_thread.get("branch"):
             resume_lines.append(f"**Branch:** {resumed_thread['branch']}")
+        work_type = resumed_thread.get("work_type", "")
+        if work_type and work_type != "general":
+            resume_lines.append(f"**Work type:** {work_type}")
+        activities = resumed_thread.get("activities", [])
+        if activities:
+            resume_lines.append(f"**Activities:** {', '.join(activities[:6])}")
         if resumed_thread.get("narrative"):
             resume_lines.append(f"**Context:** {resumed_thread['narrative']}")
         elif resumed_thread.get("last_note"):
@@ -199,6 +216,24 @@ def main():
                 resume_lines.append(f"  - {desc}")
         if resumed_thread.get("handoff_summary"):
             resume_lines.append(f"**Handoff:** {resumed_thread['handoff_summary']}")
+
+        # Inject conversation prompts so the resuming tool has full context
+        prompts = resumed_thread.get("prompts", [])
+        if prompts:
+            resume_lines.append(f"\n**Conversation log ({len(prompts)} prompt(s)):**")
+            for i, p in enumerate(prompts, 1):
+                resume_lines.append(f"  {i}. User: {p[:200]}")
+
+        related = resumed_thread.get("related_session_ids", [])
+        if len(related) > 1:
+            resume_lines.append(f"**Sessions:** this is session #{len(related)} on this thread")
+        resume_lines.append("")
+        resume_lines.append(
+            "**→ Start by giving the user a brief recap of what happened in "
+            "the previous session(s) on this thread — what was worked on, "
+            "what was accomplished, what problems were hit, and what's left to do. "
+            "Then ask how they'd like to proceed.**"
+        )
         parts.append("\n".join(resume_lines))
 
     parts.extend([p for p in [thread_context, config_context, presence_context] if p])
@@ -207,4 +242,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        print(json.dumps({"output": ""}))
