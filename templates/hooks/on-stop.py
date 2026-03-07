@@ -93,7 +93,7 @@ def main():
             "failed_approaches": [],
             "handoff_summary": build_handoff_summary({}, reason),
             "related_session_ids": [],
-            "tool": detect_tool(),
+            "tool": detect_tool(hook_input),
             "session_id": session_id,
         }
         threads.append(thread)

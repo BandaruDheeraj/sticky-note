@@ -4,36 +4,36 @@
     "sessionStart": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 python3 .claude/hooks/session-start.py",
-        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/session-start.py"
+        "bash": "COPILOT_CLI=1 python3 .claude/hooks/session-start.py --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/session-start.py --copilot-cli"
       }
     ],
     "sessionEnd": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 python3 .claude/hooks/session-end.py",
-        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/session-end.py"
+        "bash": "COPILOT_CLI=1 python3 .claude/hooks/session-end.py --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/session-end.py --copilot-cli"
       }
     ],
     "userPromptSubmitted": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 python3 .claude/hooks/inject-context.py",
-        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/inject-context.py"
+        "bash": "COPILOT_CLI=1 python3 .claude/hooks/inject-context.py --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/inject-context.py --copilot-cli"
       }
     ],
     "postToolUse": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 python3 .claude/hooks/track-work.py",
-        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/track-work.py"
+        "bash": "COPILOT_CLI=1 python3 .claude/hooks/track-work.py --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/track-work.py --copilot-cli"
       }
     ],
     "errorOccurred": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 python3 .claude/hooks/on-error.py",
-        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/on-error.py"
+        "bash": "COPILOT_CLI=1 python3 .claude/hooks/on-error.py --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/on-error.py --copilot-cli"
       }
     ]
   }

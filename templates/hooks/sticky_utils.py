@@ -5,6 +5,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 
 
 # ── Shared regex patterns ─────────────────────────────────
@@ -117,6 +118,9 @@ def get_user():
 
 def detect_tool(hook_input=None):
     """Detect which AI tool is running: 'copilot-cli' or 'claude-code'."""
+    # CLI argument is the most reliable method (shell-agnostic)
+    if "--copilot-cli" in sys.argv:
+        return "copilot-cli"
     if os.environ.get("COPILOT_CLI"):
         return "copilot-cli"
     if hook_input:
