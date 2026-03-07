@@ -1,3 +1,4 @@
+<!-- sticky-note:start — DO NOT EDIT between markers; updated by `npx sticky-note update` -->
 # Sticky Note — AI Assistant Instructions
 
 This repository uses **Sticky Note** for team handoff context.
@@ -57,8 +58,10 @@ tell them to exit. Instead, run the resume command directly:
 npx sticky-note resume <thread-id>
 ```
 
-The next prompt will automatically pick up the resumed thread's context
-(the inject-context hook detects the signal file and reopens the thread).
+The command outputs the thread's **full context** (narrative, files, failed
+approaches, prompts). Read and present this context to the user immediately —
+do NOT tell them to start a new session. The inject-context hook will also
+pick up the resumed thread on subsequent prompts.
 
 ### Example queries the user might ask
 
@@ -71,8 +74,9 @@ The next prompt will automatically pick up the resumed thread's context
 
 ### Displaying threads
 
-When listing threads, **always show the `tool` field** so users can see
-which AI assistant created each thread. Use these labels:
+When listing threads, **always show the `user` (author) and `tool` fields**
+so users can see who created each thread and which AI assistant was used.
+Use these labels for the tool field:
 
 - 🤖 `claude-code` — created by Claude Code
 - 🛠️ `copilot-cli` — created by GitHub Copilot CLI
@@ -94,3 +98,4 @@ For detailed session events, read `.sticky-note/sticky-note-audit.jsonl`
 
 Check `.sticky-note/sticky-note-config.json` for team conventions,
 MCP servers, and configuration.
+<!-- sticky-note:end -->

@@ -121,6 +121,44 @@ function readJsonSafe(filePath, fallback) {
   }
 }
 
+const SECTION_START = "<!-- sticky-note:start";
+const SECTION_END = "<!-- sticky-note:end -->";
+
+/**
+ * Update the sticky-note section in a deployed instruction file.
+ * If markers exist, replaces content between them.
+ * If no markers but a known sticky-note heading exists, replaces from that heading onward.
+ * If neither, appends the template content.
+ * Returns true if the file was modified.
+ */
+function updateInstructionSection(destPath, templateContent, heading) {
+  if (!fs.existsSync(destPath)) {
+    fs.writeFileSync(destPath, templateContent);
+    return true;
+  }
+
+  const existing = fs.readFileSync(destPath, "utf-8");
+  const startIdx = existing.indexOf(SECTION_START);
+  const endIdx = existing.indexOf(SECTION_END);
+
+  if (startIdx !== -1 && endIdx !== -1) {
+    // Replace between markers (inclusive)
+    const before = existing.slice(0, startIdx);
+    const after = existing.slice(endIdx + SECTION_END.length);
+    fs.writeFileSync(destPath, before + templateContent.trim() + after);
+  } else if (heading && existing.includes(heading)) {
+    // Migration: old file without markers — replace from known heading onward
+    const headingIdx = existing.indexOf(heading);
+    const before = existing.slice(0, headingIdx);
+    fs.writeFileSync(destPath, before + templateContent);
+  } else {
+    // No markers, no known heading — append with a blank line separator
+    const sep = existing.endsWith("\n") ? "\n" : "\n\n";
+    fs.writeFileSync(destPath, existing + sep + templateContent);
+  }
+  return true;
+}
+
 function countJsonlLines(filePath) {
   if (!fs.existsSync(filePath)) return 0;
   try {
@@ -598,6 +636,20 @@ function cmdUpdate() {
   }
 
   print(`\n  ✨ Scripts updated to v${VERSION}`);
+
+  // Update instruction files (section-based: only replaces between markers)
+  const claudeMdDest = path.join(process.cwd(), "CLAUDE.md");
+  const claudeMdTemplate = readTemplate("CLAUDE.md");
+  if (updateInstructionSection(claudeMdDest, claudeMdTemplate, "# Sticky Note")) {
+    print("  ✅ CLAUDE.md (sticky-note section updated)");
+  }
+
+  const copilotInstrDest = path.join(process.cwd(), ".github", "copilot-instructions.md");
+  const copilotTemplate = readTemplate("copilot-instructions.md");
+  if (updateInstructionSection(copilotInstrDest, copilotTemplate, "# Sticky Note")) {
+    print("  ✅ .github/copilot-instructions.md (sticky-note section updated)");
+  }
+
   print("  ⚠️  Thread data was NOT modified.\n");
 }
 
@@ -853,7 +905,57 @@ function cmdResume() {
   if (match.last_note) {
     print(`     ${match.last_note.slice(0, 80)}`);
   }
-  print(`\n  Next AI session will pick up this thread automatically.`);
+
+  // Output full thread context so AI assistants can use it immediately
+  print(`\n  ── Thread context ──────────────────────────────────`);
+  print(`  ID:       ${match.id}`);
+  print(`  Author:   ${match.user || match.author || "unknown"}`);
+  print(`  Tool:     ${match.tool || "unknown"}`);
+  print(`  Branch:   ${match.branch || "none"}`);
+  print(`  Status:   ${match.status}`);
+  print(`  Created:  ${match.created_at || "?"}`);
+
+  if (match.work_type && match.work_type !== "general") {
+    print(`  Type:     ${match.work_type}`);
+  }
+
+  const files = match.files_touched || [];
+  if (files.length > 0) {
+    print(`  Files:    ${files.join(", ")}`);
+  }
+
+  if (match.narrative) {
+    print(`\n  📖 Narrative:`);
+    print(`  ${match.narrative.slice(0, 500)}`);
+  }
+
+  if (match.handoff_summary && match.handoff_summary !== "Session stopped — no summary available") {
+    print(`\n  🤝 Handoff:`);
+    print(`  ${match.handoff_summary.slice(0, 300)}`);
+  }
+
+  const failed = match.failed_approaches || [];
+  if (failed.length > 0) {
+    print(`\n  ⚠️  Failed approaches (${failed.length}):`);
+    for (const f of failed.slice(0, 5)) {
+      const desc = typeof f === "string" ? f : f.description || JSON.stringify(f);
+      print(`     • ${desc.slice(0, 120)}`);
+    }
+  }
+
+  const prompts = match.prompts || [];
+  if (prompts.length > 0) {
+    print(`\n  💬 Conversation (${prompts.length} prompt(s)):`);
+    for (const [i, p] of prompts.slice(0, 8).entries()) {
+      print(`     ${i + 1}. ${p.slice(0, 120)}`);
+    }
+    if (prompts.length > 8) {
+      print(`     ... and ${prompts.length - 8} more`);
+    }
+  }
+
+  print(`  ────────────────────────────────────────────────────`);
+  print(`\n  Your next prompt will pick up this thread's context automatically.`);
   print("  Run `npx sticky-note resume --clear` to cancel.\n");
 }
 
