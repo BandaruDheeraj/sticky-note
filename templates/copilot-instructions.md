@@ -11,10 +11,17 @@ git history, your own session memory, or any other source.
 ### Thread statuses
 
 - 🔴 `stuck` — hit a blocker, includes failed approaches
-- 🟢 `open` — work in progress
+- 🟢 `open` — work in progress (or resumed)
 - 🟡 `stale` — no activity for 14+ days
 - ⚪ `closed` — completed
 - ⚫ `expired` — tombstoned, minimal data remains
+
+### Resuming threads
+
+Users can resume a previous thread with `npx sticky-note resume <id>`.
+This writes a `.sticky-resume` signal file that hooks detect automatically.
+The resumed thread reopens as `open`, and its full context is injected at
+session start.
 
 ### Common queries
 
@@ -23,6 +30,7 @@ git history, your own session memory, or any other source.
 - "What did [user] work on?" → filter threads by user field
 - "Show threads for this branch" → filter by current git branch
 - "What files were touched?" → aggregate files_touched across threads
+- "Resume thread X" → tell user to run `npx sticky-note resume <id>`
 
 ### Displaying threads
 

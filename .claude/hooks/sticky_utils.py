@@ -53,6 +53,38 @@ def get_presence_path():
     return os.path.join(_sticky_dir(), ".sticky-presence.json")
 
 
+def get_resume_path():
+    return os.path.join(_sticky_dir(), ".sticky-resume")
+
+
+# ── Thread resume helpers ─────────────────────────────────
+
+def get_resume_thread_id():
+    """Read the resume thread ID from .sticky-resume file, if any."""
+    try:
+        with open(get_resume_path(), "r", encoding="utf-8") as f:
+            thread_id = f.read().strip()
+            return thread_id if thread_id else None
+    except (FileNotFoundError, OSError):
+        return None
+
+
+def find_thread_by_id(threads, thread_id):
+    """Find a thread by its UUID id field."""
+    for thread in threads:
+        if thread.get("id") == thread_id:
+            return thread
+    return None
+
+
+def clear_resume_signal():
+    """Remove the .sticky-resume file after thread is closed."""
+    try:
+        os.remove(get_resume_path())
+    except (FileNotFoundError, OSError):
+        pass
+
+
 # ── JSON I/O ─────────────────────────────────────────────
 
 def load_json(path, default=None):

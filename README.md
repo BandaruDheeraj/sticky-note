@@ -123,6 +123,7 @@ with failed approach details — so they know what was tried and what went wrong
 open → stale  (auto, after stale_days with no activity)
 open → closed (on session end)
 stuck → closed (on session end or manual)
+closed → open  (via `npx sticky-note resume <id>`)
 closed → expired (auto, tombstoned by gc after stale_days)
 ```
 
@@ -142,6 +143,8 @@ When context is injected, threads are ranked by:
 | Stuck status    | +2     | Boost for stuck threads               |
 | Prompt keywords | 1      | File names mentioned in your prompt   |
 | Same developer  | 1      | Your own previous threads             |
+
+| Resume boost    | +10    | Thread marked for resume via CLI      |
 
 Top thread gets full detail; threads 2–5 get one-liner summaries.
 
@@ -174,7 +177,8 @@ CLAUDE.md                         # AI instructions for Claude Code
 ├── sticky-note.json          # Shared threads (git-tracked)
 ├── sticky-note-config.json   # Team config (git-tracked)
 ├── sticky-note-audit.jsonl   # Audit trail (local only)
-└── .sticky-presence.json     # Active users (local only)
+├── .sticky-presence.json     # Active users (local only)
+└── .sticky-resume            # Resume signal (local only)
 ```
 
 ---
@@ -187,6 +191,9 @@ npx sticky-note init --codex   # Setup with Codex wrapper
 npx sticky-note update         # Update hook scripts (preserves data)
 npx sticky-note status         # Diagnostic report
 npx sticky-note threads        # List threads with status icons
+npx sticky-note resume         # List resumable threads
+npx sticky-note resume <id>    # Resume a previous thread
+npx sticky-note resume --clear # Cancel active resume
 npx sticky-note audit          # Query audit trail
 npx sticky-note gc             # Tombstone expired threads
 npx sticky-note --version      # Show version

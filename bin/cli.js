@@ -757,6 +757,101 @@ function cmdThreads() {
 }
 
 // ──────────────────────────────────────────────
+// RESUME command
+// ──────────────────────────────────────────────
+
+function cmdResume() {
+  const args = process.argv.slice(3);
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+  const resumePath = path.join(stickyDir, ".sticky-resume");
+
+  if (!fs.existsSync(memoryPath)) {
+    print("  ❌ No sticky-note.json found. Run `npx sticky-note init` first.");
+    process.exit(1);
+  }
+
+  // resume --clear: remove the resume signal
+  if (args.includes("--clear")) {
+    if (fs.existsSync(resumePath)) {
+      fs.unlinkSync(resumePath);
+      print("  ✅ Resume signal cleared.");
+    } else {
+      print("  ℹ️  No active resume signal.");
+    }
+    return;
+  }
+
+  // resume --list: show resumable threads
+  if (args.includes("--list") || args.length === 0) {
+    const memory = readJsonSafe(memoryPath, { threads: [] });
+    const threads = memory.threads || [];
+    const resumable = threads.filter((t) =>
+      ["closed", "stuck", "open", "stale"].includes(t.status)
+    );
+
+    if (resumable.length === 0) {
+      print("  No resumable threads.");
+      return;
+    }
+
+    // Show current resume signal if active
+    if (fs.existsSync(resumePath)) {
+      const activeId = fs.readFileSync(resumePath, "utf-8").trim();
+      print(`\n  🔄 Active resume: ${activeId}\n`);
+    }
+
+    print("\n  Resumable threads:\n");
+    for (const t of resumable) {
+      const icon = t.status === "stuck" ? "🔴" : t.status === "open" ? "🟢" : t.status === "stale" ? "🟡" : "⚪";
+      const user = t.user || t.author || "?";
+      const files = (t.files_touched || []).slice(0, 3).join(", ");
+      const branch = t.branch ? ` (${t.branch})` : "";
+      const note = t.last_note ? ` — ${t.last_note.slice(0, 60)}` : "";
+      const shortId = t.id.slice(0, 8);
+
+      print(`  ${icon} ${shortId} [${t.status}] ${user}${branch}: ${files}${note}`);
+    }
+    print(`\n  Usage: npx sticky-note resume <thread-id>`);
+    print("  You can use the first 8 characters of the ID.\n");
+    return;
+  }
+
+  // resume <thread-id>: set the resume signal
+  const threadId = args[0];
+  const memory = readJsonSafe(memoryPath, { threads: [] });
+  const threads = memory.threads || [];
+
+  // Support partial ID matching (first 8 chars)
+  const match = threads.find((t) =>
+    t.id === threadId || t.id.startsWith(threadId)
+  );
+
+  if (!match) {
+    print(`  ❌ No thread found matching "${threadId}".`);
+    print("  Run `npx sticky-note resume --list` to see available threads.");
+    process.exit(1);
+  }
+
+  if (match.status === "expired") {
+    print(`  ❌ Thread ${match.id.slice(0, 8)} is expired and cannot be resumed.`);
+    process.exit(1);
+  }
+
+  // Write the resume signal file
+  fs.writeFileSync(resumePath, match.id + "\n");
+
+  const icon = match.status === "stuck" ? "🔴" : match.status === "open" ? "🟢" : "⚪";
+  print(`\n  ✅ Resume signal set for thread ${match.id.slice(0, 8)}`);
+  print(`  ${icon} [${match.status}] ${match.user || "?"} (${match.branch || "no branch"})`);
+  if (match.last_note) {
+    print(`     ${match.last_note.slice(0, 80)}`);
+  }
+  print(`\n  Next AI session will pick up this thread automatically.`);
+  print("  Run `npx sticky-note resume --clear` to cancel.\n");
+}
+
+// ──────────────────────────────────────────────
 // AUDIT command
 // ──────────────────────────────────────────────
 
@@ -918,6 +1013,9 @@ async function main() {
     case "threads":
       cmdThreads();
       break;
+    case "resume":
+      cmdResume();
+      break;
     case "audit":
       cmdAudit();
       break;
@@ -938,6 +1036,7 @@ async function main() {
       print("    update    Update hook scripts (preserves data)");
       print("    status    Diagnostic report: threads, audit, health");
       print("    threads   List open/stuck threads");
+      print("    resume    Resume a previous thread (--list, --clear, <id>)");
       print("    audit     Query audit trail (--file, --user, --since, --session)");
       print("    gc        Manual tombstone sweep for expired threads");
       print("");

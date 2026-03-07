@@ -12,7 +12,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
-from sticky_utils import get_memory_path, load_json, get_user, get_branch
+from sticky_utils import get_memory_path, load_json, get_user, get_branch, get_resume_thread_id
 
 
 def get_recently_modified_files():
@@ -209,9 +209,13 @@ def main():
     recently_modified = get_recently_modified_files()
 
     # Score all live threads
+    resume_thread_id = get_resume_thread_id()
     scored = []
     for t in live:
         s = score_thread(t, recently_modified, current_branch, current_user, keywords)
+        # Resumed thread always surfaces first
+        if resume_thread_id and t.get("id") == resume_thread_id:
+            s = max(s, 0) + 10
         if s > 0:
             scored.append((s, t))
 

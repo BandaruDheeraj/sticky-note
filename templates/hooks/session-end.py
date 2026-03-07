@@ -17,6 +17,7 @@ from sticky_utils import (
     get_memory_path, get_config_path, get_audit_path, get_presence_path,
     load_json, save_json, append_audit_line, get_user, get_branch,
     detect_tool, get_session_id,
+    get_resume_thread_id, find_thread_by_id, clear_resume_signal,
     parse_jsonl_file, extract_narrative_from_entries, extract_failed_from_entries,
     ERROR_PATTERNS, RETRY_PATTERNS,
 )
@@ -485,13 +486,25 @@ def main():
     narrative = extract_narrative(hook_input)
     failed = extract_failed_approaches(hook_input)
 
-    # Find or create thread
+    # Find or create thread — resume signal takes priority over session_id match
     threads = memory.setdefault("threads", [])
     existing = None
-    for thread in threads:
-        if thread.get("session_id") == session_id:
-            existing = thread
-            break
+
+    resume_thread_id = get_resume_thread_id()
+    if resume_thread_id:
+        existing = find_thread_by_id(threads, resume_thread_id)
+        if existing:
+            # Link this session to the resumed thread
+            related = existing.setdefault("related_session_ids", [])
+            if session_id not in related:
+                related.append(session_id)
+        clear_resume_signal()
+
+    if not existing:
+        for thread in threads:
+            if thread.get("session_id") == session_id:
+                existing = thread
+                break
 
     if existing:
         existing["files_touched"] = list(set(existing.get("files_touched", []) + files_touched))

@@ -12,3 +12,4 @@ __pycache__/
 # Sticky Note
 .sticky-note/sticky-note-audit.jsonl
 .sticky-note/.sticky-presence.json
+.sticky-note/.sticky-resume

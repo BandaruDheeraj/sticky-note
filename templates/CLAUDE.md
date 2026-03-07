@@ -26,14 +26,22 @@ cat .sticky-note/sticky-note.json
 | `handoff_summary`  | Handoff notes for teammates                |
 | `last_note`        | Most recent status note                    |
 | `work_type`        | bug-fix, feature, debugging, refactor, etc.|
+| `related_session_ids` | Session IDs that resumed this thread    |
 
 ### Status icons
 
 - 🔴 `stuck` — hit a blocker, includes failed approaches
-- 🟢 `open` — work in progress
+- 🟢 `open` — work in progress (or resumed)
 - 🟡 `stale` — no activity for 14+ days
 - ⚪ `closed` — completed
 - ⚫ `expired` — tombstoned, minimal data remains
+
+### Resuming threads
+
+Users can resume a previous thread with `npx sticky-note resume <id>`.
+This writes a `.sticky-resume` signal file that hooks detect automatically.
+The resumed thread reopens as `open`, and its full context is injected at
+session start.
 
 ### Example queries the user might ask
 
@@ -42,6 +50,7 @@ cat .sticky-note/sticky-note.json
 - "What did Alice work on?" → filter threads where user = "alice"
 - "Show threads for this branch" → filter by current branch name
 - "What files were touched?" → aggregate files_touched across threads
+- "Resume thread X" → tell user to run `npx sticky-note resume <id>`
 
 ### Displaying threads
 

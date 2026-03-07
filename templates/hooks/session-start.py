@@ -14,6 +14,7 @@ from datetime import datetime, timezone, timedelta
 from sticky_utils import (
     get_memory_path, get_config_path, get_presence_path,
     load_json, save_json, append_audit_line, get_user, get_session_id,
+    get_resume_thread_id, find_thread_by_id,
 )
 
 
@@ -144,6 +145,18 @@ def main():
     # Age stale threads
     age_stale_threads(memory, stale_days)
 
+    # Check for thread resume signal
+    resume_thread_id = get_resume_thread_id()
+    resumed_thread = None
+    if resume_thread_id:
+        threads = memory.get("threads", [])
+        resumed_thread = find_thread_by_id(threads, resume_thread_id)
+        if resumed_thread:
+            resumed_thread["status"] = "open"
+            resumed_thread.setdefault("related_session_ids", []).append(session_id)
+            resumed_thread["last_activity_at"] = datetime.now(timezone.utc).isoformat()
+            save_json(memory_path, memory)
+
     # Build injection context
     thread_context = format_threads_for_injection(memory.get("threads", []))
     config_context = format_config_for_injection(config)
@@ -164,7 +177,31 @@ def main():
     save_json(memory_path, memory)
 
     # Output injection context
-    parts = [p for p in [thread_context, config_context, presence_context] if p]
+    parts = []
+
+    # Resumed thread gets top billing
+    if resumed_thread:
+        resume_lines = [f"## 🔄 Resumed Thread — {resumed_thread.get('id', '')[:8]}\n"]
+        files = ", ".join(resumed_thread.get("files_touched", [])[:10])
+        if files:
+            resume_lines.append(f"**Files:** {files}")
+        if resumed_thread.get("branch"):
+            resume_lines.append(f"**Branch:** {resumed_thread['branch']}")
+        if resumed_thread.get("narrative"):
+            resume_lines.append(f"**Context:** {resumed_thread['narrative']}")
+        elif resumed_thread.get("last_note"):
+            resume_lines.append(f"**Context:** {resumed_thread['last_note']}")
+        failed = resumed_thread.get("failed_approaches", [])
+        if failed:
+            resume_lines.append(f"**⚠️ {len(failed)} failed approach(es):**")
+            for fa in failed[:3]:
+                desc = fa.get("description", "")[:100]
+                resume_lines.append(f"  - {desc}")
+        if resumed_thread.get("handoff_summary"):
+            resume_lines.append(f"**Handoff:** {resumed_thread['handoff_summary']}")
+        parts.append("\n".join(resume_lines))
+
+    parts.extend([p for p in [thread_context, config_context, presence_context] if p])
     output = "\n".join(parts).strip()
     print(json.dumps({"output": output}, ensure_ascii=False))
 
