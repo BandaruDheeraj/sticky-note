@@ -251,4 +251,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        # Always exit cleanly so Claude Code never shows a hook error
+        print(json.dumps({"output": ""}))
+        sys.exit(0)
