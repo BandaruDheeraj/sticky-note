@@ -16,6 +16,7 @@ from datetime import datetime, timezone, timedelta
 from sticky_utils import (
     get_memory_path, get_config_path, get_audit_path, get_presence_path,
     load_json, save_json, append_audit_line, get_user, get_branch,
+    detect_tool, get_session_id,
     parse_jsonl_file, extract_narrative_from_entries, extract_failed_from_entries,
     ERROR_PATTERNS, RETRY_PATTERNS,
 )
@@ -455,14 +456,7 @@ def clear_presence(user):
 # ── AI tool detection ──────────────────────────────────────
 
 def detect_ai_tool(hook_input):
-    event = hook_input.get("hook_event_name", "")
-    if event and event[0].isupper():
-        return "claude-code"
-    elif event and event[0].islower():
-        return "copilot-cli"
-    if "transcript_path" in hook_input:
-        return "claude-code"
-    return "unknown"
+    return detect_tool(hook_input)
 
 
 # ── Main ───────────────────────────────────────────────────
@@ -473,7 +467,7 @@ def main():
     except (json.JSONDecodeError, Exception):
         hook_input = {}
 
-    session_id = hook_input.get("session_id", os.environ.get("SESSION_ID", "unknown"))
+    session_id = get_session_id(hook_input)
     ai_tool = detect_ai_tool(hook_input)
     user = get_user()
     now = datetime.now(timezone.utc).isoformat()

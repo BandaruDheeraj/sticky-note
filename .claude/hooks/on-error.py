@@ -12,7 +12,7 @@ import sys
 import uuid
 from datetime import datetime, timezone
 
-from sticky_utils import get_memory_path, load_json, save_json, append_audit_line, get_user
+from sticky_utils import get_memory_path, load_json, save_json, append_audit_line, get_user, detect_tool, get_session_id
 
 
 # ── Main───────────────────────────────────────────────────
@@ -23,8 +23,10 @@ def main():
     except Exception:
         hook_input = {}
 
-    session_id = hook_input.get("session_id", os.environ.get("SESSION_ID", "unknown"))
+    session_id = get_session_id(hook_input)
     tool_name = hook_input.get("tool_name", os.environ.get("TOOL_NAME", "unknown"))
+    if tool_name == "unknown":
+        tool_name = detect_tool(hook_input)
     error_msg = hook_input.get("error", hook_input.get("message", "Unknown error"))[:200]
     user = get_user()
     now = datetime.now(timezone.utc).isoformat()
@@ -84,8 +86,4 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception:
-        print(json.dumps({"output": ""}))
-        sys.exit(0)
+    main()

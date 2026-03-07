@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from sticky_utils import (
     get_config_path, get_presence_path,
     load_json, save_json, append_audit_line, get_user,
+    detect_tool, get_session_id,
 )
 
 
@@ -90,7 +91,7 @@ def main():
     except (json.JSONDecodeError, Exception):
         hook_input = {}
 
-    session_id = hook_input.get("session_id", os.environ.get("SESSION_ID", "unknown"))
+    session_id = get_session_id(hook_input)
     tool_name = hook_input.get("tool_name", "unknown")
     if tool_name == "unknown":
         tool_obj = hook_input.get("tool", "unknown")
@@ -98,6 +99,12 @@ def main():
             tool_name = tool_obj.get("name", "unknown")
         elif isinstance(tool_obj, str):
             tool_name = tool_obj
+    if tool_name == "unknown":
+        for key in ("toolName", "name"):
+            val = hook_input.get(key)
+            if val and isinstance(val, str):
+                tool_name = val
+                break
 
     file_path = extract_file_path(hook_input)
     user = get_user()
@@ -135,8 +142,4 @@ def main():
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception:
-        print(json.dumps({"output": ""}))
-        sys.exit(0)
+    main()

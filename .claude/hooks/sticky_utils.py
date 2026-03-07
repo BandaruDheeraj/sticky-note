@@ -83,6 +83,35 @@ def get_user():
     return os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
 
 
+def detect_tool(hook_input=None):
+    """Detect which AI tool is running: 'copilot-cli' or 'claude-code'."""
+    if os.environ.get("COPILOT_CLI"):
+        return "copilot-cli"
+    if hook_input:
+        event = hook_input.get("hook_event_name", "")
+        if event and event[0].isupper():
+            return "claude-code"
+        if event and event[0].islower():
+            return "copilot-cli"
+        if "transcript_path" in hook_input:
+            return "claude-code"
+    return "unknown"
+
+
+def get_session_id(hook_input=None):
+    """Extract session ID from hook input, env vars, or generate a fallback."""
+    if hook_input:
+        for key in ("session_id", "sessionId", "session"):
+            val = hook_input.get(key)
+            if val and val != "unknown":
+                return val
+    for env_key in ("SESSION_ID", "GITHUB_COPILOT_SESSION_ID", "WT_SESSION"):
+        val = os.environ.get(env_key)
+        if val:
+            return val
+    return "unknown"
+
+
 def get_branch():
     try:
         result = subprocess.run(

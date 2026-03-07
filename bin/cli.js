@@ -281,9 +281,15 @@ function patchPythonCmd(template, pythonCmd) {
   if (pythonCmd === "python3") {
     for (const [, hookArr] of Object.entries(template.hooks)) {
       for (const hookEntry of hookArr) {
-        for (const h of hookEntry.hooks) {
-          h.command = h.command.replace("python ", "python3 ");
+        // Claude Code format: nested matcher/hooks with "command" key
+        if (hookEntry.hooks) {
+          for (const h of hookEntry.hooks) {
+            if (h.command) h.command = h.command.replace("python ", "python3 ");
+          }
         }
+        // Copilot CLI format: flat objects with "bash"/"powershell" keys
+        if (hookEntry.bash) hookEntry.bash = hookEntry.bash.replace("python ", "python3 ");
+        if (hookEntry.powershell) hookEntry.powershell = hookEntry.powershell.replace("python ", "python3 ");
       }
     }
   }
@@ -485,6 +491,23 @@ async function cmdInit() {
     print("  ⏭️  .gitattributes already configured");
   }
 
+  // Deploy AI instruction files (CLAUDE.md + .github/copilot-instructions.md)
+  const claudeMdDest = path.join(process.cwd(), "CLAUDE.md");
+  if (!fs.existsSync(claudeMdDest)) {
+    copyFile(path.join(TEMPLATES_DIR, "CLAUDE.md"), claudeMdDest);
+    print("  ✅ CLAUDE.md (AI instructions for Claude Code)");
+  } else {
+    print("  ⏭️  CLAUDE.md already exists");
+  }
+
+  const copilotInstrDest = path.join(githubHooksDir, "..", "copilot-instructions.md");
+  if (!fs.existsSync(copilotInstrDest)) {
+    copyFile(path.join(TEMPLATES_DIR, "copilot-instructions.md"), copilotInstrDest);
+    print("  ✅ .github/copilot-instructions.md (AI instructions for Copilot CLI)");
+  } else {
+    print("  ⏭️  .github/copilot-instructions.md already exists");
+  }
+
   // Install Codex wrapper if --codex flag
   const wantCodex = process.argv.includes("--codex");
   if (wantCodex) {
@@ -503,7 +526,7 @@ async function cmdInit() {
   print("\n  ✨ Sticky Note V2 initialized!\n");
   print("  Next steps:");
   print("  ┌──────────────────────────────────────────────────────────────┐");
-  print("  │  git add .claude .github .sticky-note .gitignore .gitattributes  │");
+  print("  │  git add .claude .github .sticky-note .gitignore .gitattributes CLAUDE.md  │");
   print("  │  git commit -m \"feat: add sticky-note v2 hooks\"                  │");
   print("  │  git push                                                        │");
   print("  └──────────────────────────────────────────────────────────────┘");

@@ -1,5 +1,9 @@
 # 📌 Sticky Note v2
 
+> 🟢 **Yes, we use Sticky Note to build Sticky Note — and it's working!** It's sticky notes all the way down.
+
+> **Sticky Note is evolving.** Features, APIs, and file formats may change as we learn what works best for teams.
+
 **Human-to-human handoff for AI coding assistants.**
 
 Git-backed shared memory layer that captures session threads and surfaces
@@ -53,7 +57,7 @@ This runs an interactive setup that:
 ### 2. Commit
 
 ```bash
-git add .claude .github .sticky-note .gitignore .gitattributes
+git add .claude .github .sticky-note .gitignore .gitattributes CLAUDE.md
 git commit -m "feat: add sticky-note hooks"
 ```
 
@@ -146,6 +150,8 @@ Top thread gets full detail; threads 2–5 get one-liner summaries.
 ## File Structure
 
 ```
+CLAUDE.md                         # AI instructions for Claude Code
+
 .claude/
 ├── settings.json             # Claude Code hook config
 └── hooks/
@@ -160,6 +166,7 @@ Top thread gets full detail; threads 2–5 get one-liner summaries.
     └── sticky-codex.sh       # Optional Codex wrapper
 
 .github/
+├── copilot-instructions.md   # AI instructions for Copilot CLI
 └── hooks/
     └── hooks.json            # Copilot CLI hook config
 

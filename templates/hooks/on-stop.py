@@ -13,7 +13,7 @@ import sys
 import uuid
 from datetime import datetime, timezone
 
-from sticky_utils import get_memory_path, load_json, save_json, append_audit_line, get_user, get_branch
+from sticky_utils import get_memory_path, load_json, save_json, append_audit_line, get_user, get_branch, get_session_id, detect_tool
 
 
 # ── Handoff summary────────────────────────────────────────
@@ -57,7 +57,7 @@ def main():
     except Exception:
         hook_input = {}
 
-    session_id = hook_input.get("session_id", os.environ.get("SESSION_ID", "unknown"))
+    session_id = get_session_id(hook_input)
     user = get_user()
     now = datetime.now(timezone.utc).isoformat()
     reason = hook_input.get("reason", "")
@@ -93,7 +93,7 @@ def main():
             "failed_approaches": [],
             "handoff_summary": build_handoff_summary({}, reason),
             "related_session_ids": [],
-            "tool": "unknown",
+            "tool": detect_tool(),
             "session_id": session_id,
         }
         threads.append(thread)

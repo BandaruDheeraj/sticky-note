@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 
 from sticky_utils import (
     get_memory_path, get_config_path, get_presence_path,
-    load_json, save_json, append_audit_line, get_user,
+    load_json, save_json, append_audit_line, get_user, get_session_id,
 )
 
 
@@ -133,7 +133,7 @@ def main():
     except (json.JSONDecodeError, Exception):
         hook_input = {}
 
-    session_id = hook_input.get("session_id", os.environ.get("SESSION_ID", "unknown"))
+    session_id = get_session_id(hook_input)
 
     memory_path = get_memory_path()
     memory = load_json(memory_path, {"version": "2", "project": "", "threads": []})
