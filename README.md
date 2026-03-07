@@ -79,24 +79,126 @@ in the background via hooks — capturing threads and surfacing context.
 
 ---
 
-## How It Works
+## How Context Gets Injected
 
-### Session Start
-Loads teammates' recent threads, scores them by relevance to your current
-branch and files, and injects the most relevant context before your first message.
+Sticky Note injects context through **four mechanisms** — two that run
+automatically via hooks, one triggered manually via the CLI, and one
+that's always available as a static file.
 
-### During Work
-Every tool use is logged in the JSONL audit trail. When you mention a file
-a teammate was working on, their thread context is surfaced inline via
-relevance scoring.
+### 1. Static Instruction Files (always available)
 
-### Session End
-Captures files touched, generates a narrative summary, detects failed
-approaches, and writes a thread record teammates will see next time.
+`npx sticky-note init` deploys AI instruction files that teach each tool
+how to interact with Sticky Note:
 
-### Error Handling
-Errors are captured as "stuck" threads that teammates see labeled **[STUCK]**
-with failed approach details — so they know what was tried and what went wrong.
+| File | Consumed by | Installed to |
+|------|-------------|--------------|
+| `CLAUDE.md` | Claude Code | repo root |
+| `copilot-instructions.md` | Copilot CLI | `.github/` |
+
+These files contain thread field references, status icons, resume
+instructions, display formats, and query examples. They're wrapped in
+`<!-- sticky-note:start/end -->` markers so `npx sticky-note update` can
+refresh them without overwriting your own content.
+
+### 2. Session Start Hook (`session-start.py`)
+
+Fires once when a session begins. Injects up to four blocks of context:
+
+- **Resumed thread** — If a `.sticky-resume` signal file exists, the full
+  thread payload is injected: narrative, files touched, failed approaches,
+  conversation prompts, and the complete resume chain history.
+- **Teammate threads** — Top 10 open/stuck threads from `sticky-note.json`,
+  labeled with status, author, branch, and work type.
+- **Team config** — Conventions, MCP servers, and skills from
+  `sticky-note-config.json`.
+- **Active presence** — Developers seen in the last 15 minutes and the
+  files they're working on.
+
+The hook also snapshots `HEAD` (for git-diff at session end), generates a
+stable session ID, and ages stale threads (14+ days → `stale`).
+
+### 3. Per-Prompt Injection (`inject-context.py`)
+
+Fires on **every user prompt**. Scores all live threads by relevance and
+injects the top 3–5 (max 300 tokens) as additional context:
+
+| Signal | Weight | Description |
+|--------|--------|-------------|
+| File overlap | 3 | Thread files match your recent git changes |
+| Branch match | 2 | Thread is on your current branch |
+| Recency | 2 | Decays 0.2 per day from last activity |
+| Stuck status | +2 | Boost for threads marked stuck |
+| Prompt keywords | 1 | File names mentioned in your prompt |
+| Same developer | 1 | Your own previous threads |
+| Resume signal | +10 | Thread targeted by `.sticky-resume` |
+
+The top thread gets full detail; threads 2–5 get one-liner summaries.
+Each prompt is also logged to the audit trail for session-end processing.
+
+### 4. Resume Flow (`npx sticky-note resume <id>`)
+
+A manual trigger that enables **cross-tool handoff** (e.g., Claude Code →
+Copilot CLI):
+
+```
+npx sticky-note resume <thread-id>
+```
+
+1. Writes the thread UUID to a `.sticky-resume` signal file.
+2. Outputs the thread's full context to the terminal (narrative, files,
+   failed approaches, conversation prompts).
+3. On the next session start, `session-start.py` detects the signal,
+   reopens the thread as `open`, and injects the complete payload.
+4. `inject-context.py` gives the resumed thread a +10 score boost on
+   every prompt for the duration of the session.
+5. `session-end.py` clears the signal file and updates the thread's
+   `resume_chain` with the new session.
+
+This means a thread started in Claude Code can be resumed in Copilot CLI
+(or vice versa) with full context preserved — including the original
+conversation prompts.
+
+---
+
+## How Context Gets Collected
+
+The injection hooks above are fed by four **collection hooks** that run
+silently in the background:
+
+### Tool Tracking (`track-work.py`)
+
+Fires after every tool use. Appends a JSONL audit entry with the tool
+name, file path, and session ID. Also updates `.sticky-presence.json`
+with a heartbeat so `session-start.py` can show who's active.
+
+### Session End (`session-end.py`)
+
+Fires when a session ends. Captures the full thread record:
+
+- **Files touched** — from audit trail, transcript parsing, and git diff
+  against the HEAD snapshot from session start.
+- **Narrative** — last assistant message (300 char max).
+- **Work type** — inferred from activity patterns (bug-fix, feature,
+  debugging, testing, documentation, etc.).
+- **Failed approaches** — extracted where error + retry patterns both match.
+- **Prompts** — stored for cross-tool resume (up to 20, 300 chars each).
+- **Tool calls** — counts per tool (Edit, Read, Write, etc.).
+
+Also runs a lazy tombstone sweep: closed threads older than `stale_days`
+are expired to minimal footprint.
+
+### Error Capture (`on-error.py`)
+
+Fires when a tool execution fails. Creates or updates the session thread
+with status `stuck` and appends the error to `failed_approaches`. Next
+session's `inject-context.py` ranks stuck threads higher so teammates
+see them.
+
+### Stop Handler (`on-stop.py`, Claude Code only)
+
+Fires when the user stops a session. Builds a structured handoff summary
+(what was done, what failed, current status, next steps) and saves it to
+the thread's `handoff_summary` field.
 
 ---
 
@@ -128,25 +230,6 @@ closed → expired (auto, tombstoned by gc after stale_days)
 ```
 
 Expired threads keep only their ID, status, user, and closed timestamp.
-
----
-
-## Relevance Scoring
-
-When context is injected, threads are ranked by:
-
-| Signal          | Weight | Description                           |
-|-----------------|--------|---------------------------------------|
-| File overlap    | 3      | Shared files with current session     |
-| Branch match    | 2      | Same git branch                       |
-| Recency         | 2      | Decays 0.2/day from last activity     |
-| Stuck status    | +2     | Boost for stuck threads               |
-| Prompt keywords | 1      | File names mentioned in your prompt   |
-| Same developer  | 1      | Your own previous threads             |
-
-| Resume boost    | +10    | Thread marked for resume via CLI      |
-
-Top thread gets full detail; threads 2–5 get one-liner summaries.
 
 ---
 
