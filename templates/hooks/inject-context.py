@@ -13,10 +13,22 @@ import sys
 from datetime import datetime, timezone
 
 
+def _is_copilot_cli():
+    return "--copilot-cli" in sys.argv or os.environ.get("COPILOT_CLI")
+
+
+def _emit(text=""):
+    """Output JSON in the format the current tool expects."""
+    if _is_copilot_cli():
+        print(json.dumps({"additionalContext": text}, ensure_ascii=False))
+    else:
+        print(json.dumps({"output": text}, ensure_ascii=False))
+
+
 def _safe_exit():
     """Output valid JSON and exit cleanly — used when imports fail."""
     try:
-        print(json.dumps({"output": ""}))
+        _emit("")
     except Exception:
         print('{"output": ""}')
     sys.exit(0)
@@ -218,7 +230,7 @@ def main():
 
     prompt = hook_input.get("prompt", hook_input.get("user_prompt", ""))
     if not prompt:
-        print(json.dumps({"output": ""}))
+        _emit("")
         return
 
     # Log user prompt to audit trail so session-end can use it
@@ -240,7 +252,7 @@ def main():
     # Only consider live threads
     live = [t for t in threads if t.get("status") in ("open", "stuck", "closed")]
     if not live:
-        print(json.dumps({"output": ""}))
+        _emit("")
         return
 
     keywords = extract_keywords(prompt)
@@ -309,7 +321,7 @@ def main():
     scoring_block = "\n".join(debug_lines)
 
     if not scored:
-        print(json.dumps({"output": ""}))
+        _emit("")
         return
 
     # Token budget: ~300 tokens max
@@ -339,7 +351,7 @@ def main():
 
     output = "\n".join(output_lines).strip()
     output += scoring_block
-    print(json.dumps({"output": output}, ensure_ascii=False))
+    _emit(output)
 
 
 if __name__ == "__main__":
