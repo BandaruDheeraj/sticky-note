@@ -383,10 +383,10 @@ def analyze_session_activities(hook_input, audit_data=None):
             if not activities and audit_tools:
                 total_calls = sum(audit_tools.values())
                 activities.append(f"used {total_calls} tool(s)")
-            return {"work_type": work_type, "activities": activities[:8]}
+            return {"work_type": work_type, "activities": activities[:8], "tool_calls": tool_counts}
 
     if not tool_counts and not has_transcript:
-        return {"work_type": work_type, "activities": activities}
+        return {"work_type": work_type, "activities": activities, "tool_calls": {}}
 
     has_edits = any(t in tool_counts for t in ("Write", "Edit", "MultiEdit"))
     has_errors = len(errors_seen) > 0
@@ -446,7 +446,7 @@ def analyze_session_activities(hook_input, audit_data=None):
     if edit_count > 0:
         activities.append(f"edited {edit_count} file(s)")
 
-    return {"work_type": work_type, "activities": activities[:8]}
+    return {"work_type": work_type, "activities": activities[:8], "tool_calls": tool_counts}
 
 
 def _analyze_entry(entry, tool_counts, errors_seen, commands_run):
@@ -659,6 +659,28 @@ def main():
             related = existing.setdefault("related_session_ids", [])
             if session_id not in related:
                 related.append(session_id)
+            # Build resume_chain entry — find what we're resuming from
+            chain = existing.setdefault("resume_chain", [])
+            # The previous session is either the last chain entry or the original session_id
+            prev_session = chain[-1]["session_id"] if chain else existing.get("session_id", "")
+            # Update ended_at on current chain entry (started by session-start)
+            current_entry = None
+            for entry in chain:
+                if entry.get("session_id") == session_id:
+                    current_entry = entry
+                    break
+            if current_entry:
+                current_entry["ended_at"] = now
+                current_entry["tool"] = ai_tool
+            else:
+                # Fallback: session-start didn't add it (e.g., first run after upgrade)
+                chain.append({
+                    "session_id": session_id,
+                    "tool": ai_tool,
+                    "started_at": now,
+                    "ended_at": now,
+                    "resumed_from": prev_session,
+                })
         clear_resume_signal()
 
     if not existing:
@@ -685,6 +707,11 @@ def main():
         existing["status"] = "closed"
         existing["closed_at"] = now
         existing["branch"] = branch or existing.get("branch", "")
+        # Merge tool_calls: accumulate counts from this session
+        prev_calls = existing.get("tool_calls", {})
+        for tool_name, count in session_analysis.get("tool_calls", {}).items():
+            prev_calls[tool_name] = prev_calls.get(tool_name, 0) + count
+        existing["tool_calls"] = prev_calls
         if narrative:
             existing["narrative"] = narrative
         if failed:
@@ -708,10 +735,12 @@ def main():
             "failed_approaches": failed,
             "handoff_summary": "",
             "related_session_ids": [],
+            "resume_chain": [],
             "tool": ai_tool,
             "session_id": session_id,
             "work_type": session_analysis["work_type"],
             "activities": session_analysis["activities"],
+            "tool_calls": session_analysis.get("tool_calls", {}),
             "prompts": stored_prompts,
         }
         threads.append(thread)

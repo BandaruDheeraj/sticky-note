@@ -27,7 +27,7 @@ try:
         get_memory_path, get_config_path, get_presence_path,
         load_json, save_json, append_audit_line, get_user, get_session_id,
         get_resume_thread_id, find_thread_by_id,
-        save_session_id, save_head_sha,
+        save_session_id, save_head_sha, detect_tool,
     )
 except Exception:
     if __name__ == "__main__":
@@ -180,6 +180,17 @@ def main():
             resumed_thread["status"] = "open"
             resumed_thread.setdefault("related_session_ids", []).append(session_id)
             resumed_thread["last_activity_at"] = datetime.now(timezone.utc).isoformat()
+            # Build resume_chain entry for this session
+            ai_tool = detect_tool(hook_input)
+            chain = resumed_thread.setdefault("resume_chain", [])
+            prev_session = chain[-1]["session_id"] if chain else resumed_thread.get("session_id", "")
+            chain.append({
+                "session_id": session_id,
+                "tool": ai_tool,
+                "started_at": datetime.now(timezone.utc).isoformat(),
+                "ended_at": None,
+                "resumed_from": prev_session,
+            })
             save_json(memory_path, memory)
 
     # Build injection context
@@ -218,6 +229,12 @@ def main():
         activities = resumed_thread.get("activities", [])
         if activities:
             resume_lines.append(f"**Activities:** {', '.join(activities[:6])}")
+        # Show tool calls so the resuming tool knows what tools were used
+        tool_calls = resumed_thread.get("tool_calls", {})
+        if tool_calls:
+            sorted_calls = sorted(tool_calls.items(), key=lambda x: x[1], reverse=True)
+            calls_str = ", ".join(f"{name}: {count}" for name, count in sorted_calls[:10])
+            resume_lines.append(f"**Tool calls:** {calls_str}")
         if resumed_thread.get("narrative"):
             resume_lines.append(f"**Context:** {resumed_thread['narrative']}")
         elif resumed_thread.get("last_note"):
@@ -238,8 +255,20 @@ def main():
             for i, p in enumerate(prompts, 1):
                 resume_lines.append(f"  {i}. User: {p[:200]}")
 
+        # Show resume chain history
+        chain = resumed_thread.get("resume_chain", [])
         related = resumed_thread.get("related_session_ids", [])
-        if len(related) > 1:
+        if chain:
+            resume_lines.append(f"\n**Resume chain ({len(chain)} session(s)):**")
+            for i, entry in enumerate(chain):
+                tool = entry.get("tool", "unknown")
+                sid = entry.get("session_id", "?")[:8]
+                started = entry.get("started_at", "?")
+                ended = entry.get("ended_at") or "in-progress"
+                from_sid = entry.get("resumed_from", "")
+                from_label = f" ← {from_sid[:8]}" if from_sid else " (original)"
+                resume_lines.append(f"  {i+1}. [{tool}] session {sid}..  {started}{from_label}")
+        elif len(related) > 1:
             resume_lines.append(f"**Sessions:** this is session #{len(related)} on this thread")
         resume_lines.append("")
         resume_lines.append(

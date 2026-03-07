@@ -26,7 +26,7 @@ try:
     from sticky_utils import (
         get_memory_path, load_json, save_json, get_user, get_branch,
         get_resume_thread_id, find_thread_by_id, get_session_id,
-        append_audit_line,
+        append_audit_line, detect_tool,
     )
 except Exception:
     if __name__ == "__main__":
@@ -262,6 +262,19 @@ def main():
             related = resumed.setdefault("related_session_ids", [])
             if session_id not in related:
                 related.append(session_id)
+            # Build resume_chain entry if not already present
+            chain = resumed.setdefault("resume_chain", [])
+            already_in_chain = any(e.get("session_id") == session_id for e in chain)
+            if not already_in_chain:
+                ai_tool = detect_tool(hook_input)
+                prev_session = chain[-1]["session_id"] if chain else resumed.get("session_id", "")
+                chain.append({
+                    "session_id": session_id,
+                    "tool": ai_tool,
+                    "started_at": datetime.now(timezone.utc).isoformat(),
+                    "ended_at": None,
+                    "resumed_from": prev_session,
+                })
             memory_dirty = True
 
     scored = []
