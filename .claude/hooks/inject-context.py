@@ -38,7 +38,7 @@ try:
     from sticky_utils import (
         get_memory_path, load_json, save_json, get_user, get_branch,
         get_resume_thread_id, find_thread_by_id, get_session_id,
-        append_audit_line, detect_tool,
+        append_audit_line, detect_tool, get_config_path,
     )
 except Exception:
     if __name__ == "__main__":
@@ -160,8 +160,8 @@ def format_top_thread(thread):
     failed = thread.get("failed_approaches", [])
     branch = thread.get("branch", "")
 
-    status_icon = "🔴" if status == "stuck" else "🟢" if status == "open" else "⚪"
-    line = f"{status_icon} {files} · {user}"
+    status_tag = "[STUCK]" if status == "stuck" else "[OPEN]" if status == "open" else "[CLOSED]"
+    line = f"{status_tag} {files} · {user}"
     if branch:
         line += f" · {branch}"
     ts_field = thread.get("last_activity_at") or thread.get("updated_at", "")
@@ -197,8 +197,8 @@ def format_summary_thread(thread):
     files = ", ".join(thread.get("files_touched", [])[:2])
     note = thread.get("last_note", "")[:60]
 
-    status_icon = "🔴" if status == "stuck" else "🟢" if status == "open" else "⚪"
-    line = f"{status_icon} {files} · {user}"
+    status_tag = "[STUCK]" if status == "stuck" else "[OPEN]" if status == "open" else "[CLOSED]"
+    line = f"{status_tag} {files} · {user}"
     if note:
         line += f" — {note}"
     return line
@@ -233,6 +233,27 @@ def main():
         _emit("")
         return
 
+    def _audit_inject(result, threads_scored=0, threads_injected=0, top_scores=None, error=None):
+        """Log injection result to audit trail for observability."""
+        try:
+            entry = {
+                "type": "inject_result",
+                "user": get_user(),
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "session_id": session_id,
+                "prompt": prompt[:120],
+                "result": result,
+                "threads_scored": threads_scored,
+                "threads_injected": threads_injected,
+            }
+            if top_scores:
+                entry["top_scores"] = top_scores
+            if error:
+                entry["error"] = str(error)[:200]
+            append_audit_line(entry)
+        except (OSError, IOError):
+            pass
+
     # Log user prompt to audit trail so session-end can use it
     session_id = get_session_id(hook_input)
     try:
@@ -252,6 +273,7 @@ def main():
     # Only consider live threads
     live = [t for t in threads if t.get("status") in ("open", "stuck", "closed")]
     if not live:
+        _audit_inject("no_live_threads")
         _emit("")
         return
 
@@ -321,11 +343,13 @@ def main():
     scoring_block = "\n".join(debug_lines)
 
     if not scored:
+        _audit_inject("no_scored_threads", threads_scored=0)
         _emit("")
         return
 
-    # Token budget: ~300 tokens max
-    MAX_TOKENS = 300
+    # Token budget from config (default 1000)
+    config = load_json(get_config_path(), {})
+    MAX_TOKENS = config.get("inject_token_budget", 1000)
     token_count = 10  # header overhead
 
     output_lines = []
@@ -351,11 +375,29 @@ def main():
 
     output = "\n".join(output_lines).strip()
     output += scoring_block
+    _audit_inject(
+        "injected",
+        threads_scored=len(scored),
+        threads_injected=threads_shown,
+        top_scores=[
+            {"id": t.get("id", "")[:8], "score": round(s, 1)}
+            for s, t in scored[:5]
+        ],
+    )
     _emit(output)
 
 
 if __name__ == "__main__":
     try:
         main()
-    except BaseException:
+    except BaseException as exc:
+        try:
+            append_audit_line({
+                "type": "inject_result",
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "result": "error",
+                "error": str(exc)[:200],
+            })
+        except Exception:
+            pass
         _safe_exit()

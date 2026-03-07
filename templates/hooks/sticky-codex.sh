@@ -65,7 +65,7 @@ EOF
 # Cleanup transcript
 rm -f "$TRANSCRIPT_FILE"
 
-echo "✅ Session $SESSION_ID recorded."
+echo "[OK] Session $SESSION_ID recorded."
 echo ""
 
 exit $CODEX_EXIT

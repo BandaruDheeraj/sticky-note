@@ -1,13 +1,13 @@
 # 📌 Sticky Note v2
 
-> 🟢 **Yes, we use Sticky Note to build Sticky Note — and it's working!** It's sticky notes all the way down.
+> [OPEN] **Yes, we use Sticky Note to build Sticky Note — and it's working!** It's sticky notes all the way down.
 
 > **Sticky Note is evolving.** Features, APIs, and file formats may change as we learn what works best for teams.
 
 **Human-to-human handoff for AI coding assistants.**
 
 Git-backed shared memory layer that captures session threads and surfaces
-teammate context in Claude Code, Copilot CLI, and Codex — automatically.
+teammate context in Claude Code, Copilot CLI, and Codex. Automatically.
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![npm version](https://img.shields.io/npm/v/sticky-note.svg)](https://www.npmjs.com/package/sticky-note)
@@ -31,13 +31,13 @@ Just shared files in your repo.
 
 ## What's New in V2
 
-- **Two-file split** — Threads in `sticky-note.json`, audit trail in `sticky-note-audit.jsonl`
-- **Relevance scoring** — Context injected based on file overlap, branch match, and recency
-- **Richer threads** — Narrative summaries, failed approaches, work type, activities
-- **Tombstone expiry** — Old threads are automatically cleaned up via `gc`
-- **Presence tracking** — See who's currently active in the repo
-- **Codex support** — Wrapper script for post-session capture
-- **Separate config** — Team settings in `sticky-note-config.json`
+- **Two-file split**: Threads in `sticky-note.json`, audit trail in `sticky-note-audit.jsonl`
+- **Relevance scoring**: Context injected based on file overlap, branch match, and recency
+- **Richer threads**: Narrative summaries, failed approaches, work type, activities
+- **Tombstone expiry**: Old threads are automatically cleaned up via `gc`
+- **Presence tracking**: See who's currently active in the repo
+- **Codex support**: Wrapper script for post-session capture
+- **Separate config**: Team settings in `sticky-note-config.json`
 
 ---
 
@@ -50,7 +50,7 @@ npx sticky-note init
 ```
 
 This runs an interactive setup that:
-- ✅ Checks for git and Python 3.10+
+- [OK] Checks for git and Python 3.10+
 - 📋 Asks for team config (MCP servers, conventions, stale days)
 - 📁 Creates all hook scripts and config files
 
@@ -81,7 +81,7 @@ in the background via hooks — capturing threads and surfacing context.
 
 ## How Context Gets Injected
 
-Sticky Note injects context through **four mechanisms** — two that run
+Sticky Note injects context through **four mechanisms**: two that run
 automatically via hooks, one triggered manually via the CLI, and one
 that's always available as a static file.
 
@@ -102,7 +102,7 @@ refresh them without overwriting your own content.
 
 ### 2. Session Start Hook (`session-start.py`)
 
-Fires once when a session begins. Injects up to four blocks of context:
+Runs once when a session begins. Injects up to four blocks of context:
 
 - **Resumed thread** — If a `.sticky-resume` signal file exists, the full
   thread payload is injected: narrative, files touched, failed approaches,
@@ -119,7 +119,7 @@ stable session ID, and ages stale threads (14+ days → `stale`).
 
 ### 3. Per-Prompt Injection (`inject-context.py`)
 
-Fires on **every user prompt**. Scores all live threads by relevance and
+Runs on **every user prompt**. Scores all live threads by relevance and
 injects the top 3–5 (max 300 tokens) as additional context:
 
 | Signal | Weight | Description |
@@ -167,13 +167,13 @@ silently in the background:
 
 ### Tool Tracking (`track-work.py`)
 
-Fires after every tool use. Appends a JSONL audit entry with the tool
+Runs after every tool use. Appends a JSONL audit entry with the tool
 name, file path, and session ID. Also updates `.sticky-presence.json`
 with a heartbeat so `session-start.py` can show who's active.
 
 ### Session End (`session-end.py`)
 
-Fires when a session ends. Captures the full thread record:
+Runs when a session ends. Captures the full thread record:
 
 - **Files touched** — from audit trail, transcript parsing, and git diff
   against the HEAD snapshot from session start.
@@ -189,14 +189,14 @@ are expired to minimal footprint.
 
 ### Error Capture (`on-error.py`)
 
-Fires when a tool execution fails. Creates or updates the session thread
+Runs when a tool execution fails. Creates or updates the session thread
 with status `stuck` and appends the error to `failed_approaches`. Next
 session's `inject-context.py` ranks stuck threads higher so teammates
 see them.
 
 ### Stop Handler (`on-stop.py`, Claude Code only)
 
-Fires when the user stops a session. Builds a structured handoff summary
+Runs when the user stops a session. Builds a structured handoff summary
 (what was done, what failed, current status, next steps) and saves it to
 the thread's `handoff_summary` field.
 
@@ -206,16 +206,16 @@ the thread's `handoff_summary` field.
 
 | Data              | Captured | Example                              |
 |-------------------|----------|--------------------------------------|
-| Files touched     | ✅        | `src/auth.ts`, `lib/db.py`          |
-| Thread status     | ✅        | open, stuck, stale, closed, expired  |
-| Author            | ✅        | OS username                          |
-| Timestamp         | ✅        | ISO 8601                             |
-| Narrative         | ✅        | "Fixed auth token refresh flow"      |
-| Failed approaches | ✅        | What was tried, errors, files        |
-| Work type         | ✅        | bug-fix, feature, debugging, etc.    |
-| Code content      | ❌        | Never captured                       |
-| Conversation      | ❌        | Never captured                       |
-| Credentials       | ❌        | Never captured                       |
+| Files touched     | [OK]        | `src/auth.ts`, `lib/db.py`          |
+| Thread status     | [OK]        | open, stuck, stale, closed, expired  |
+| Author            | [OK]        | OS username                          |
+| Timestamp         | [OK]        | ISO 8601                             |
+| Narrative         | [OK]        | "Fixed auth token refresh flow"      |
+| Failed approaches | [OK]        | What was tried, errors, files        |
+| Work type         | [OK]        | bug-fix, feature, debugging, etc.    |
+| Code content      | [ERR]        | Never captured                       |
+| Conversation      | [ERR]        | Never captured                       |
+| Credentials       | [ERR]        | Never captured                       |
 
 ---
 

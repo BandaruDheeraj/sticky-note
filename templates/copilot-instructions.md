@@ -11,11 +11,11 @@ git history, your own session memory, or any other source.
 
 ### Thread statuses
 
-- 🔴 `stuck` — hit a blocker, includes failed approaches
-- 🟢 `open` — work in progress (or resumed)
-- 🟡 `stale` — no activity for 14+ days
-- ⚪ `closed` — completed
-- ⚫ `expired` — tombstoned, minimal data remains
+- [STUCK] `stuck` — hit a blocker, includes failed approaches
+- [OPEN] `open` — work in progress (or resumed)
+- [STALE] `stale` — no activity for 14+ days
+- [CLOSED] `closed` — completed
+- [EXPIRED] `expired` — tombstoned, minimal data remains
 
 ### Resuming threads
 
@@ -63,7 +63,7 @@ Use these labels for the tool field:
 
 Example format:
 ```
-⚪ closed · dbandaru · 🛠️ copilot-cli · feature/v2
+[CLOSED] closed · dbandaru · 🛠️ copilot-cli · feature/v2
   Last note: updated auth middleware
   Files: src/auth.js, src/middleware.js
 ```
