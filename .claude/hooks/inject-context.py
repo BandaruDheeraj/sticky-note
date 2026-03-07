@@ -12,11 +12,25 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
-from sticky_utils import (
-    get_memory_path, load_json, save_json, get_user, get_branch,
-    get_resume_thread_id, find_thread_by_id, get_session_id,
-    append_audit_line,
-)
+
+def _safe_exit():
+    """Output valid JSON and exit cleanly — used when imports fail."""
+    try:
+        print(json.dumps({"output": ""}))
+    except Exception:
+        print('{"output": ""}')
+    sys.exit(0)
+
+
+try:
+    from sticky_utils import (
+        get_memory_path, load_json, save_json, get_user, get_branch,
+        get_resume_thread_id, find_thread_by_id, get_session_id,
+        append_audit_line,
+    )
+except Exception:
+    if __name__ == "__main__":
+        _safe_exit()
 
 
 def get_recently_modified_files():
@@ -209,13 +223,16 @@ def main():
 
     # Log user prompt to audit trail so session-end can use it
     session_id = get_session_id(hook_input)
-    append_audit_line({
-        "type": "user_prompt",
-        "user": get_user(),
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "session_id": session_id,
-        "prompt": prompt[:500],
-    })
+    try:
+        append_audit_line({
+            "type": "user_prompt",
+            "user": get_user(),
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "session_id": session_id,
+            "prompt": prompt[:500],
+        })
+    except (OSError, IOError):
+        pass  # Audit write failure must not block context injection
 
     memory = load_json(get_memory_path(), {"version": "2", "threads": []})
     threads = memory.get("threads", [])
@@ -257,7 +274,10 @@ def main():
             scored.append((s, t))
 
     if memory_dirty:
-        save_json(get_memory_path(), memory)
+        try:
+            save_json(get_memory_path(), memory)
+        except (OSError, IOError):
+            pass  # Memory save failure must not block context injection
 
     scored.sort(key=lambda x: x[0], reverse=True)
 
@@ -297,6 +317,5 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception:
-        # Never let hook failures block the user prompt
-        print(json.dumps({"output": ""}))
+    except BaseException:
+        _safe_exit()

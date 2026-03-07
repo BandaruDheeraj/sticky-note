@@ -12,7 +12,21 @@ import sys
 import uuid
 from datetime import datetime, timezone
 
-from sticky_utils import get_memory_path, load_json, save_json, append_audit_line, get_user, detect_tool, get_session_id
+
+def _safe_exit():
+    """Output valid JSON and exit cleanly — used when imports fail."""
+    try:
+        print(json.dumps({"output": ""}))
+    except Exception:
+        print('{"output": ""}')
+    sys.exit(0)
+
+
+try:
+    from sticky_utils import get_memory_path, load_json, save_json, append_audit_line, get_user, detect_tool, get_session_id
+except Exception:
+    if __name__ == "__main__":
+        _safe_exit()
 
 
 # ── Main───────────────────────────────────────────────────
@@ -86,4 +100,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BaseException:
+        _safe_exit()

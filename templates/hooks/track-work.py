@@ -10,11 +10,25 @@ import os
 import sys
 from datetime import datetime, timezone
 
-from sticky_utils import (
-    get_config_path, get_presence_path,
-    load_json, save_json, append_audit_line, get_user,
-    detect_tool, get_session_id, _sticky_dir,
-)
+
+def _safe_exit():
+    """Output valid JSON and exit cleanly — used when imports fail."""
+    try:
+        print(json.dumps({"output": ""}))
+    except Exception:
+        print('{"output": ""}')
+    sys.exit(0)
+
+
+try:
+    from sticky_utils import (
+        get_config_path, get_presence_path,
+        load_json, save_json, append_audit_line, get_user,
+        detect_tool, get_session_id, _sticky_dir,
+    )
+except Exception:
+    if __name__ == "__main__":
+        _safe_exit()
 
 
 WRITE_TOOLS = {"edit", "Edit", "create", "Create", "Write", "write", "MultiEdit", "multi_edit"}
@@ -168,5 +182,5 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception:
-        print(json.dumps({"output": ""}))
+    except BaseException:
+        _safe_exit()

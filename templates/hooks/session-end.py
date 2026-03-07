@@ -13,17 +13,31 @@ import sys
 import uuid
 from datetime import datetime, timezone, timedelta
 
-from sticky_utils import (
-    get_memory_path, get_config_path, get_audit_path, get_presence_path,
-    load_json, save_json, append_audit_line, get_user, get_branch,
-    detect_tool, get_session_id,
-    get_resume_thread_id, find_thread_by_id, clear_resume_signal,
-    parse_jsonl_file, extract_narrative_from_entries, extract_failed_from_entries,
-    ERROR_PATTERNS, RETRY_PATTERNS,
-    extract_session_from_audit,
-    clear_session_file,
-    read_head_sha, clear_head_file,
-)
+
+def _safe_exit():
+    """Output valid JSON and exit cleanly — used when imports fail."""
+    try:
+        print(json.dumps({"output": ""}))
+    except Exception:
+        print('{"output": ""}')
+    sys.exit(0)
+
+
+try:
+    from sticky_utils import (
+        get_memory_path, get_config_path, get_audit_path, get_presence_path,
+        load_json, save_json, append_audit_line, get_user, get_branch,
+        detect_tool, get_session_id,
+        get_resume_thread_id, find_thread_by_id, clear_resume_signal,
+        parse_jsonl_file, extract_narrative_from_entries, extract_failed_from_entries,
+        ERROR_PATTERNS, RETRY_PATTERNS,
+        extract_session_from_audit,
+        clear_session_file,
+        read_head_sha, clear_head_file,
+    )
+except Exception:
+    if __name__ == "__main__":
+        _safe_exit()
 
 
 # ── Transcript parsing─────────────────────────────────────
@@ -728,5 +742,5 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except Exception:
-        print(json.dumps({"output": ""}))
+    except BaseException:
+        _safe_exit()
