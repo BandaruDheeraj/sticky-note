@@ -1,0 +1,553 @@
+#!/usr/bin/env node
+"use strict";
+/**
+ * sticky-utils.js — Shared utilities for Sticky Note hooks (Node.js port).
+ */
+
+const fs = require("fs");
+const path = require("path");
+const { execFileSync } = require("child_process");
+
+// ── Shared regex patterns ─────────────────────────────────
+
+const ERROR_PATTERNS = new RegExp(
+  "(error|exception|traceback|failed|fatal|panic|ENOENT|EACCES|" +
+    "segfault|undefined|TypeError|SyntaxError|ReferenceError|" +
+    "ImportError|ModuleNotFoundError|KeyError|ValueError|" +
+    "RuntimeError|ConnectionError|TimeoutError|PermissionError)",
+  "i"
+);
+
+const RETRY_PATTERNS = new RegExp(
+  "(try again|let me try|didn't work|doesn't work|failed|let's try|" +
+    "another approach|instead|alternatively|that approach|this doesn't|" +
+    "that didn't|won't work|can't|cannot)",
+  "i"
+);
+
+const FILE_PATH_PATTERN = /[\w./\\-]+\.\w{1,10}/g;
+
+// ── Path helpers ──────────────────────────────────────────
+
+function _stickyDir() {
+  const scriptDir = path.dirname(path.resolve(__filename));
+  return path.join(scriptDir, "..", "..", ".sticky-note");
+}
+
+const _paths = {
+  memory: "sticky-note.json",
+  config: "sticky-note-config.json",
+  auditDir: "audit",
+  presenceDir: "presence",
+  // Legacy single-file paths (for migration only)
+  legacyAudit: "sticky-note-audit.jsonl",
+  legacyPresence: ".sticky-presence.json",
+  resume: ".sticky-resume",
+  session: ".sticky-session",
+  head: ".sticky-head",
+};
+const _p = (key) => path.join(_stickyDir(), _paths[key]);
+
+function getMemoryPath() { return _p("memory"); }
+function getConfigPath() { return _p("config"); }
+function getAuditDir() { return _p("auditDir"); }
+function getPresenceDir() { return _p("presenceDir"); }
+function getLegacyAuditPath() { return _p("legacyAudit"); }
+function getLegacyPresencePath() { return _p("legacyPresence"); }
+
+function getUserAuditPath(user) {
+  if (!user) user = getUser();
+  return path.join(getAuditDir(), user + ".jsonl");
+}
+
+function getUserPresencePath(user) {
+  if (!user) user = getUser();
+  return path.join(getPresenceDir(), user + ".json");
+}
+
+function getAllAuditPaths() {
+  const dir = getAuditDir();
+  try {
+    return fs.readdirSync(dir)
+      .filter((f) => f.endsWith(".jsonl"))
+      .map((f) => path.join(dir, f));
+  } catch (_) {
+    return [];
+  }
+}
+
+function getAllPresencePaths() {
+  const dir = getPresenceDir();
+  try {
+    return fs.readdirSync(dir)
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => path.join(dir, f));
+  } catch (_) {
+    return [];
+  }
+}
+
+// Backwards-compatible aliases (read from all per-user files)
+function getAuditPath() { return getUserAuditPath(); }
+function getPresencePath() { return getUserPresencePath(); }
+function getResumePath() { return _p("resume"); }
+function getSessionFilePath() { return _p("session"); }
+function getHeadFilePath() { return _p("head"); }
+
+function saveSessionId(sessionId) {
+  const filePath = getSessionFilePath();
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, sessionId + "\n", "utf-8");
+}
+
+function readSessionIdFromFile() {
+  try {
+    const sid = fs.readFileSync(getSessionFilePath(), "utf-8").trim();
+    return sid || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function clearSessionFile() {
+  try {
+    fs.unlinkSync(getSessionFilePath());
+  } catch (_) {
+    // ignore
+  }
+}
+
+// ── Git HEAD snapshot (for files_touched fallback) ────────
+
+function saveHeadSha() {
+  try {
+    const sha = execFileSync("git", ["rev-parse", "HEAD"], {
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    if (sha) {
+      const filePath = getHeadFilePath();
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, sha + "\n", "utf-8");
+    }
+  } catch (_) {
+    // ignore
+  }
+}
+
+function readHeadSha() {
+  try {
+    const sha = fs.readFileSync(getHeadFilePath(), "utf-8").trim();
+    return sha || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function clearHeadFile() {
+  try {
+    fs.unlinkSync(getHeadFilePath());
+  } catch (_) {
+    // ignore
+  }
+}
+
+// ── Thread resume helpers ─────────────────────────────────
+
+function getResumeThreadId() {
+  try {
+    const threadId = fs.readFileSync(getResumePath(), "utf-8").trim();
+    return threadId || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function findThreadById(threads, threadId) {
+  for (const thread of threads) {
+    if (thread.id === threadId) {
+      return thread;
+    }
+  }
+  return null;
+}
+
+function clearResumeSignal() {
+  try {
+    fs.unlinkSync(getResumePath());
+  } catch (_) {
+    // ignore
+  }
+}
+
+// ── JSON I/O ─────────────────────────────────────────────
+
+function loadJson(filePath, defaultVal) {
+  try {
+    const raw = fs.readFileSync(filePath, "utf-8");
+    return JSON.parse(raw);
+  } catch (_) {
+    return defaultVal !== undefined ? defaultVal : {};
+  }
+}
+
+function saveJson(filePath, data) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n", "utf-8");
+}
+
+function appendAuditLine(entry) {
+  const filePath = getUserAuditPath();
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.appendFileSync(filePath, JSON.stringify(entry) + "\n", "utf-8");
+}
+
+// ── Environment helpers ───────────────────────────────────
+
+function getUser() {
+  return process.env.USER || process.env.USERNAME || "unknown";
+}
+
+function detectTool(hookInput) {
+  if (process.argv.includes("--copilot-cli")) {
+    return "copilot-cli";
+  }
+  if (process.env.COPILOT_CLI) {
+    return "copilot-cli";
+  }
+  if (hookInput) {
+    const event = hookInput.hook_event_name || "";
+    if (event && event[0] === event[0].toUpperCase() && event[0] !== event[0].toLowerCase()) {
+      return "claude-code";
+    }
+    if (event && event[0] === event[0].toLowerCase() && event[0] !== event[0].toUpperCase()) {
+      return "copilot-cli";
+    }
+    if ("transcript_path" in hookInput) {
+      return "claude-code";
+    }
+  }
+  return "unknown";
+}
+
+function getSessionId(hookInput) {
+  if (hookInput) {
+    for (const key of ["session_id", "sessionId", "session"]) {
+      const val = hookInput[key];
+      if (val && val !== "unknown") {
+        return val;
+      }
+    }
+  }
+  for (const envKey of ["SESSION_ID", "GITHUB_COPILOT_SESSION_ID", "WT_SESSION"]) {
+    const val = process.env[envKey];
+    if (val) {
+      return val;
+    }
+  }
+  const fileSid = readSessionIdFromFile();
+  if (fileSid) {
+    return fileSid;
+  }
+  return "unknown";
+}
+
+function getBranch() {
+  try {
+    const result = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    return result;
+  } catch (_) {
+    return "";
+  }
+}
+
+// ── Transcript parsing helpers ────────────────────────────
+
+function parseJsonlFile(filePath) {
+  const entries = [];
+  try {
+    const raw = fs.readFileSync(filePath, "utf-8");
+    for (const line of raw.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        entries.push(JSON.parse(trimmed));
+      } catch (_) {
+        continue;
+      }
+    }
+  } catch (_) {
+    // ignore
+  }
+  return entries;
+}
+
+function extractNarrativeFromEntries(entries) {
+  const lastTexts = [];
+  for (const entry of entries) {
+    const message = entry.message;
+    if (!message || typeof message !== "object" || Array.isArray(message)) {
+      continue;
+    }
+    const role = message.role || entry.role || "";
+    if (role !== "assistant") continue;
+    const content = message.content || entry.content || [];
+    if (Array.isArray(content)) {
+      for (const block of content) {
+        if (block && typeof block === "object" && block.type === "text") {
+          const text = (block.text || "").trim();
+          if (text) {
+            lastTexts.push(text);
+          }
+        }
+      }
+    }
+  }
+  if (lastTexts.length === 0) return "";
+  return lastTexts[lastTexts.length - 1].substring(0, 300).trim();
+}
+
+function extractNarrativeFromText(lines) {
+  const textBlocks = [];
+  let currentBlock = [];
+
+  for (const line of lines) {
+    const stripped = line.trim();
+    if (stripped) {
+      currentBlock.push(stripped);
+    } else if (currentBlock.length) {
+      textBlocks.push(currentBlock.join(" "));
+      currentBlock = [];
+    }
+  }
+  if (currentBlock.length) {
+    textBlocks.push(currentBlock.join(" "));
+  }
+
+  if (textBlocks.length === 0) return "";
+
+  for (let i = textBlocks.length - 1; i >= 0; i--) {
+    if (textBlocks[i].length > 20) {
+      return textBlocks[i].substring(0, 300).trim();
+    }
+  }
+  return "";
+}
+
+function extractFailedFromEntries(entries) {
+  const approaches = [];
+
+  for (const entry of entries) {
+    const message = entry.message;
+    if (!message || typeof message !== "object" || Array.isArray(message)) {
+      continue;
+    }
+    const content = message.content || entry.content || [];
+    if (!Array.isArray(content)) continue;
+
+    for (const block of content) {
+      if (!block || typeof block !== "object" || block.type !== "text") {
+        continue;
+      }
+      const text = block.text || "";
+      if (RETRY_PATTERNS.test(text) && ERROR_PATTERNS.test(text)) {
+        const errorMatch = ERROR_PATTERNS.exec(text);
+        let errorCtx = "";
+        if (errorMatch) {
+          const start = Math.max(0, errorMatch.index - 40);
+          errorCtx = text.substring(start, errorMatch.index + errorMatch[0].length + 60).trim();
+        }
+        // Reset lastIndex for the global regex before using it
+        FILE_PATH_PATTERN.lastIndex = 0;
+        const filesTried = [];
+        let m;
+        while ((m = FILE_PATH_PATTERN.exec(text)) !== null && filesTried.length < 5) {
+          filesTried.push(m[0]);
+        }
+        approaches.push({
+          description: text.substring(0, 150).trim(),
+          error: errorCtx.substring(0, 100),
+          files_tried: filesTried,
+        });
+      }
+    }
+  }
+
+  return approaches.slice(0, 5);
+}
+
+function extractFailedFromText(lines) {
+  const approaches = [];
+  const fullText = lines.join("\n");
+  const paragraphs = fullText.split("\n\n");
+
+  for (const para of paragraphs) {
+    if (RETRY_PATTERNS.test(para) && ERROR_PATTERNS.test(para)) {
+      const errorMatch = ERROR_PATTERNS.exec(para);
+      let errorCtx = "";
+      if (errorMatch) {
+        const start = Math.max(0, errorMatch.index - 40);
+        errorCtx = para.substring(start, errorMatch.index + errorMatch[0].length + 60).trim();
+      }
+      FILE_PATH_PATTERN.lastIndex = 0;
+      const filesTried = [];
+      let m;
+      while ((m = FILE_PATH_PATTERN.exec(para)) !== null && filesTried.length < 5) {
+        filesTried.push(m[0]);
+      }
+      approaches.push({
+        description: para.substring(0, 150).trim(),
+        error: errorCtx.substring(0, 100),
+        files_tried: filesTried,
+      });
+    }
+  }
+
+  return approaches.slice(0, 5);
+}
+
+// ── Audit trail extraction ────────────────────────────────
+
+function extractSessionFromAudit(sessionId) {
+  const result = { prompts: [], tools: {}, files: [], first_prompt: null };
+  if (!sessionId || sessionId === "unknown") return result;
+
+  const auditPaths = getAllAuditPaths();
+  if (auditPaths.length === 0) return result;
+
+  for (const auditPath of auditPaths) {
+    try {
+      const raw = fs.readFileSync(auditPath, "utf-8");
+      for (const line of raw.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        let entry;
+        try {
+          entry = JSON.parse(trimmed);
+        } catch (_) {
+          continue;
+        }
+        if (entry.session_id !== sessionId) continue;
+
+        const entryType = entry.type || "";
+        if (entryType === "user_prompt") {
+          const prompt = (entry.prompt || "").trim();
+          if (prompt) {
+            result.prompts.push(prompt);
+            if (result.first_prompt === null) {
+              result.first_prompt = prompt;
+            }
+          }
+        } else if (entryType === "tool_use") {
+          const toolName = entry.tool || "";
+          if (toolName) {
+            result.tools[toolName] = (result.tools[toolName] || 0) + 1;
+          }
+          const filePath = entry.file || "";
+          if (filePath && !result.files.includes(filePath)) {
+            result.files.push(filePath);
+          }
+        }
+      }
+    } catch (_) {
+      // ignore individual file failures
+    }
+  }
+
+  return result;
+}
+
+// ── Migration: single-file → per-user ─────────────────────
+
+function migrateAuditAndPresence() {
+  const user = getUser();
+
+  // Migrate legacy audit file
+  const legacyAudit = getLegacyAuditPath();
+  try {
+    if (fs.existsSync(legacyAudit)) {
+      const dest = getUserAuditPath(user);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      if (fs.existsSync(dest)) {
+        // Append legacy content to existing per-user file
+        const content = fs.readFileSync(legacyAudit, "utf-8");
+        fs.appendFileSync(dest, content);
+      } else {
+        fs.renameSync(legacyAudit, dest);
+      }
+      // Clean up if rename didn't delete it
+      try { if (fs.existsSync(legacyAudit)) fs.unlinkSync(legacyAudit); } catch (_) {}
+    }
+  } catch (_) {
+    // ignore migration failures
+  }
+
+  // Migrate legacy presence file
+  const legacyPresence = getLegacyPresencePath();
+  try {
+    if (fs.existsSync(legacyPresence)) {
+      const data = loadJson(legacyPresence, {});
+      const presenceDir = getPresenceDir();
+      fs.mkdirSync(presenceDir, { recursive: true });
+      // Split presence data: each key is a username
+      for (const [u, info] of Object.entries(data)) {
+        const dest = getUserPresencePath(u);
+        saveJson(dest, info);
+      }
+      fs.unlinkSync(legacyPresence);
+    }
+  } catch (_) {
+    // ignore migration failures
+  }
+}
+
+// ── Exports ───────────────────────────────────────────────
+
+module.exports = {
+  ERROR_PATTERNS,
+  RETRY_PATTERNS,
+  FILE_PATH_PATTERN,
+  getMemoryPath,
+  getConfigPath,
+  getAuditPath,
+  getAuditDir,
+  getUserAuditPath,
+  getAllAuditPaths,
+  getPresencePath,
+  getPresenceDir,
+  getUserPresencePath,
+  getAllPresencePaths,
+  getLegacyAuditPath,
+  getLegacyPresencePath,
+  getResumePath,
+  getSessionFilePath,
+  saveSessionId,
+  readSessionIdFromFile,
+  clearSessionFile,
+  getHeadFilePath,
+  saveHeadSha,
+  readHeadSha,
+  clearHeadFile,
+  getResumeThreadId,
+  findThreadById,
+  clearResumeSignal,
+  loadJson,
+  saveJson,
+  appendAuditLine,
+  getUser,
+  detectTool,
+  getSessionId,
+  getBranch,
+  parseJsonlFile,
+  extractNarrativeFromEntries,
+  extractNarrativeFromText,
+  extractFailedFromEntries,
+  extractFailedFromText,
+  extractSessionFromAudit,
+  migrateAuditAndPresence,
+};
