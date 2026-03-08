@@ -423,7 +423,12 @@ function main() {
 
   const config = loadJson(getConfigPath(), {});
   const MAX_TOKENS = config.inject_token_budget || 1000;
-  let tokenCount = 10;
+  const _estimateTokens = (str) => Math.floor(str.length / 4);
+
+  // Reserve budget for the scoring debug block and header overhead
+  const scoringTokens = _estimateTokens(scoringBlock);
+  const HEADER_RESERVE = 15; // "[STICKY NOTE -- N relevant thread(s)]"
+  let tokenCount = HEADER_RESERVE + scoringTokens;
 
   const outputLines = [];
   let threadsShown = 0;
@@ -432,14 +437,17 @@ function main() {
     const [score, thread] = scored[i];
     const block =
       i === 0 ? formatThread(thread, true) : formatThread(thread, false);
-    tokenCount += Math.floor(block.length / 4);
-    if (tokenCount > MAX_TOKENS) {
+    const blockTokens = _estimateTokens(block);
+    if (tokenCount + blockTokens > MAX_TOKENS) {
       const remaining = scored.length - i;
       if (remaining > 0) {
-        outputLines.push("... and " + remaining + " more relevant threads");
+        const overflowMsg = "... and " + remaining + " more relevant threads";
+        tokenCount += _estimateTokens(overflowMsg);
+        outputLines.push(overflowMsg);
       }
       break;
     }
+    tokenCount += blockTokens;
     outputLines.push(block);
     threadsShown++;
   }
