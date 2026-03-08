@@ -34,29 +34,24 @@ function _stickyDir() {
   return path.join(scriptDir, "..", "..", ".sticky-note");
 }
 
-function getMemoryPath() {
-  return path.join(_stickyDir(), "sticky-note.json");
-}
+const _paths = {
+  memory: "sticky-note.json",
+  config: "sticky-note-config.json",
+  audit: "sticky-note-audit.jsonl",
+  presence: ".sticky-presence.json",
+  resume: ".sticky-resume",
+  session: ".sticky-session",
+  head: ".sticky-head",
+};
+const _p = (key) => path.join(_stickyDir(), _paths[key]);
 
-function getConfigPath() {
-  return path.join(_stickyDir(), "sticky-note-config.json");
-}
-
-function getAuditPath() {
-  return path.join(_stickyDir(), "sticky-note-audit.jsonl");
-}
-
-function getPresencePath() {
-  return path.join(_stickyDir(), ".sticky-presence.json");
-}
-
-function getResumePath() {
-  return path.join(_stickyDir(), ".sticky-resume");
-}
-
-function getSessionFilePath() {
-  return path.join(_stickyDir(), ".sticky-session");
-}
+function getMemoryPath() { return _p("memory"); }
+function getConfigPath() { return _p("config"); }
+function getAuditPath() { return _p("audit"); }
+function getPresencePath() { return _p("presence"); }
+function getResumePath() { return _p("resume"); }
+function getSessionFilePath() { return _p("session"); }
+function getHeadFilePath() { return _p("head"); }
 
 function saveSessionId(sessionId) {
   const filePath = getSessionFilePath();
@@ -82,10 +77,6 @@ function clearSessionFile() {
 }
 
 // ── Git HEAD snapshot (for files_touched fallback) ────────
-
-function getHeadFilePath() {
-  return path.join(_stickyDir(), ".sticky-head");
-}
 
 function saveHeadSha() {
   try {

@@ -36,26 +36,17 @@ function _safeExit() {
 
 // ── Import sticky-utils ──────────────────────────────────
 
-let getMemoryPath, loadJson, saveJson, getUser, getBranch;
-let getResumeThreadId, findThreadById, getSessionId;
-let appendAuditLine, detectTool, getConfigPath;
-
+let utils;
 try {
-  const utils = require("./sticky-utils.js");
-  getMemoryPath = utils.getMemoryPath;
-  loadJson = utils.loadJson;
-  saveJson = utils.saveJson;
-  getUser = utils.getUser;
-  getBranch = utils.getBranch;
-  getResumeThreadId = utils.getResumeThreadId;
-  findThreadById = utils.findThreadById;
-  getSessionId = utils.getSessionId;
-  appendAuditLine = utils.appendAuditLine;
-  detectTool = utils.detectTool;
-  getConfigPath = utils.getConfigPath;
+  utils = require("./sticky-utils.js");
 } catch (_) {
   _safeExit();
 }
+const {
+  getMemoryPath, loadJson, saveJson, getUser, getBranch,
+  getResumeThreadId, findThreadById, getSessionId,
+  appendAuditLine, detectTool, getConfigPath,
+} = utils;
 
 // ── Git helpers ───────────────────────────────────────────
 
@@ -203,27 +194,29 @@ function _relativeTime(tsStr) {
   }
 }
 
-function formatTopThread(thread) {
+function formatThread(thread, detailed) {
   const user = thread.user || thread.author || "unknown";
   const status = thread.status || "open";
-  const files = (thread.files_touched || []).slice(0, 3).join(", ");
-  const narrative = thread.narrative || "";
-  const failed = thread.failed_approaches || [];
-  const branch = thread.branch || "";
-
   const statusTag = status === "stuck" ? "[STUCK]" : status === "open" ? "[OPEN]" : "[CLOSED]";
+  const fileLimit = detailed ? 3 : 2;
+  const files = (thread.files_touched || []).slice(0, fileLimit).join(", ");
+
   let line = statusTag + " " + files + " . " + user;
-  if (branch) {
-    line += " . " + branch;
+
+  if (!detailed) {
+    const note = (thread.last_note || "").substring(0, 60);
+    if (note) line += " -- " + note;
+    return line;
   }
+
+  const branch = thread.branch || "";
+  if (branch) line += " . " + branch;
   const tsField = thread.last_activity_at || thread.updated_at || "";
-  if (tsField) {
-    line += " . " + _relativeTime(tsField);
-  }
+  if (tsField) line += " . " + _relativeTime(tsField);
   line += "\n";
 
-  if (narrative) {
-    line += narrative.substring(0, 200) + "\n";
+  if (thread.narrative) {
+    line += thread.narrative.substring(0, 200) + "\n";
   } else if (thread.last_note) {
     line += thread.last_note.substring(0, 150) + "\n";
   }
@@ -234,31 +227,16 @@ function formatTopThread(thread) {
     for (let i = 0; i < Math.min(prompts.length, 5); i++) {
       line += "  " + (i + 1) + ". " + prompts[i].substring(0, 120) + "\n";
     }
-    if (prompts.length > 5) {
-      line += "  ... and " + (prompts.length - 5) + " more\n";
-    }
+    if (prompts.length > 5) line += "  ... and " + (prompts.length - 5) + " more\n";
   }
 
+  const failed = thread.failed_approaches || [];
   if (failed.length > 0) {
     line += failed.length + " failed approach(es).";
     line += ' Full context: ask get_session_context("' + (thread.id || "") + '")\n';
   }
 
   return line.trim();
-}
-
-function formatSummaryThread(thread) {
-  const user = thread.user || thread.author || "unknown";
-  const status = thread.status || "open";
-  const files = (thread.files_touched || []).slice(0, 2).join(", ");
-  const note = (thread.last_note || "").substring(0, 60);
-
-  const statusTag = status === "stuck" ? "[STUCK]" : status === "open" ? "[OPEN]" : "[CLOSED]";
-  let line = statusTag + " " + files + " . " + user;
-  if (note) {
-    line += " -- " + note;
-  }
-  return line;
 }
 
 // ── Main ──────────────────────────────────────────────────
@@ -448,7 +426,7 @@ function main() {
   for (let i = 0; i < Math.min(scored.length, 5); i++) {
     const [score, thread] = scored[i];
     const block =
-      i === 0 ? formatTopThread(thread) : formatSummaryThread(thread);
+      i === 0 ? formatThread(thread, true) : formatThread(thread, false);
     tokenCount += Math.floor(block.length / 4);
     if (tokenCount > MAX_TOKENS) {
       const remaining = scored.length - i;

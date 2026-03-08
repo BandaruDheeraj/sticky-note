@@ -148,13 +148,13 @@ function formatPresence(presenceData) {
   const now = Date.now();
   const active = [];
   for (const [user, info] of Object.entries(presenceData || {})) {
-    const lastSeen = (info && info.last_seen) || "";
+    const lastSeen = info.last_seen || "";
     if (!lastSeen) continue;
     try {
       const ts = new Date(lastSeen).getTime();
       if (isNaN(ts)) continue;
       if (now - ts < 15 * 60 * 1000) {
-        const files = ((info && info.active_files) || []).slice(0, 3).join(", ");
+        const files = (info.active_files || []).slice(0, 3).join(", ");
         active.push(`- **${user}** active on: ${files}`);
       }
     } catch (_) {
@@ -216,16 +216,12 @@ function main() {
     resumedThread = findThreadById(threads, resumeThreadId);
     if (resumedThread) {
       resumedThread.status = "open";
-      if (!Array.isArray(resumedThread.related_session_ids)) {
-        resumedThread.related_session_ids = [];
-      }
+      resumedThread.related_session_ids = resumedThread.related_session_ids || [];
       resumedThread.related_session_ids.push(sessionId);
       resumedThread.last_activity_at = new Date().toISOString();
 
       const aiTool = detectTool(hookInput);
-      const chain = Array.isArray(resumedThread.resume_chain)
-        ? resumedThread.resume_chain
-        : [];
+      const chain = resumedThread.resume_chain || [];
       const prevSession = chain.length
         ? chain[chain.length - 1].session_id
         : resumedThread.session_id || "";

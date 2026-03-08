@@ -84,7 +84,6 @@ function _getContentBlocks(entry) {
 }
 
 function _normalizePath(filePath, cwd) {
-  if (!filePath) return filePath;
   if (cwd && path.isAbsolute(filePath)) {
     try {
       return path.relative(cwd, filePath);
