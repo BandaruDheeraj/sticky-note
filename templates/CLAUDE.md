@@ -117,6 +117,17 @@ merged trail across all team members.
 Per-user presence is stored in `.sticky-note/presence/<username>.json`.
 Use `npx sticky-note who` to see who's active.
 
+### Branch switching
+
+**IMPORTANT:** Before switching git branches, always use:
+```bash
+npx sticky-note switch <branch>
+```
+This auto-stashes `.sticky-note/` data before switching and restores it
+after. A raw `git checkout` or `git switch` will fail if sticky-note
+files have uncommitted changes. The alias `git sw <branch>` also works
+if set up by `npx sticky-note init`.
+
 ## Team conventions
 
 Check `.sticky-note/sticky-note-config.json` for team conventions,

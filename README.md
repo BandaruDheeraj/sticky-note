@@ -281,6 +281,7 @@ npx sticky-note resume <id>    # Resume a previous thread
 npx sticky-note resume --clear # Cancel active resume
 npx sticky-note audit          # Query merged audit trail (all users)
 npx sticky-note who            # Show active and recent team members
+npx sticky-note switch <branch> # Safe branch switch (auto-stashes data)
 npx sticky-note gc             # Tombstone expired threads
 npx sticky-note reset          # Wipe all threads (--force, --keep-audit)
 npx sticky-note --version      # Show version
@@ -356,6 +357,27 @@ Threads have unique UUIDs, so concurrent pushes merge cleanly.
 Per-user audit logs (`audit/<username>.jsonl`) and presence files
 (`presence/<username>.json`) are written by one user at a time, so they
 never conflict.
+
+### Branch Switching
+
+Sticky-note data (audit logs, presence, thread state) is **branch-independent** —
+it's metadata about the repo, not part of the source code. However, because
+these files are git-tracked and updated on every tool call, a raw
+`git checkout` or `git switch` will fail if there are uncommitted changes.
+
+Use one of these approaches:
+
+```bash
+# Recommended: sticky-note CLI wrapper
+npx sticky-note switch <branch>
+
+# Or: git alias (set up by npx sticky-note init)
+git sw <branch>
+```
+
+Both auto-stash `.sticky-note/` before switching and restore it after.
+See [docs/branch-switching.md](docs/branch-switching.md) for the full
+design discussion.
 
 ---
 
