@@ -370,8 +370,10 @@ async function cmdInit() {
   const conventions = conventionsRaw
     ? conventionsRaw.split(",").map((s) => s.trim()).filter(Boolean)
     : [];
-  const staleDaysNum = parseInt(staleDays, 10) || 14;
-  const injectTokenBudgetNum = parseInt(injectTokenBudget, 10) || 1000;
+  const staleDaysNum = parseInt(staleDays, 10);
+  const injectTokenBudgetNum = parseInt(injectTokenBudget, 10);
+  const staleDaysResolved = Number.isNaN(staleDaysNum) ? 14 : staleDaysNum;
+  const injectTokenBudgetResolved = Number.isNaN(injectTokenBudgetNum) ? 1000 : injectTokenBudgetNum;
 
   print("\n  📁 Creating files...\n");
 
@@ -419,8 +421,8 @@ async function cmdInit() {
     configTemplate.mcp_servers = mcpServers;
     configTemplate.skills = skills;
     configTemplate.conventions = conventions;
-    configTemplate.stale_days = staleDaysNum;
-    configTemplate.inject_token_budget = injectTokenBudgetNum;
+    configTemplate.stale_days = staleDaysResolved;
+    configTemplate.inject_token_budget = injectTokenBudgetResolved;
     configTemplate.hook_version = VERSION;
     fs.writeFileSync(configDest, JSON.stringify(configTemplate, null, 2) + "\n");
   } else {
@@ -429,8 +431,8 @@ async function cmdInit() {
     existing.mcp_servers = mcpServers;
     existing.skills = skills;
     existing.conventions = conventions;
-    existing.stale_days = staleDaysNum;
-    existing.inject_token_budget = injectTokenBudgetNum;
+    existing.stale_days = staleDaysResolved;
+    existing.inject_token_budget = injectTokenBudgetResolved;
     existing.hook_version = VERSION;
     fs.writeFileSync(configDest, JSON.stringify(existing, null, 2) + "\n");
   }
@@ -696,6 +698,19 @@ function cmdStatus() {
 }
 
 // ──────────────────────────────────────────────
+// Helpers (shared formatting)
+// ──────────────────────────────────────────────
+
+function statusIcon(status) {
+  switch (status) {
+    case "stuck": return "[STUCK]";
+    case "open": return "[OPEN]";
+    case "stale": return "[STALE]";
+    default: return "[CLOSED]";
+  }
+}
+
+// ──────────────────────────────────────────────
 // THREADS command
 // ──────────────────────────────────────────────
 
@@ -719,7 +734,7 @@ function cmdThreads() {
 
   print("");
   for (const t of live) {
-    const icon = t.status === "stuck" ? "[STUCK]" : t.status === "open" ? "[OPEN]" : t.status === "stale" ? "[STALE]" : "[CLOSED]";
+    const icon = statusIcon(t.status);
     const user = t.user || t.author || "?";
     const files = (t.files_touched || []).slice(0, 3).join(", ");
     const branch = t.branch ? ` (${t.branch})` : "";
@@ -783,7 +798,7 @@ function cmdResume() {
 
     print("\n  Resumable threads:\n");
     for (const t of resumable) {
-      const icon = t.status === "stuck" ? "[STUCK]" : t.status === "open" ? "[OPEN]" : t.status === "stale" ? "[STALE]" : "[CLOSED]";
+      const icon = statusIcon(t.status);
       const user = t.user || t.author || "?";
       const files = (t.files_touched || []).slice(0, 3).join(", ");
       const branch = t.branch ? ` (${t.branch})` : "";
@@ -827,7 +842,7 @@ function cmdResume() {
   // Write the resume signal file
   fs.writeFileSync(resumePath, match.id + "\n");
 
-  const icon = match.status === "stuck" ? "[STUCK]" : match.status === "open" ? "[OPEN]" : "[CLOSED]";
+  const icon = statusIcon(match.status);
   print(`\n  [OK] Resume signal set for thread ${match.id.slice(0, 8)}`);
   print(`  ${icon} [${match.status}] ${match.user || "?"} (${match.branch || "no branch"})`);
   if (match.last_note) {
@@ -903,7 +918,7 @@ function cmdReset() {
   const args = process.argv.slice(3);
   const force = args.includes("--force");
 
-  const memory = JSON.parse(fs.readFileSync(memoryPath, "utf-8"));
+  const memory = readJsonSafe(memoryPath, { version: "2", threads: [] });
   const threadCount = (memory.threads || []).length;
 
   if (threadCount === 0) {
@@ -962,19 +977,22 @@ function cmdAudit() {
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
       case "--file":
-        filterFile = args[++i];
+        if (i + 1 < args.length) filterFile = args[++i];
         break;
       case "--user":
-        filterUser = args[++i];
+        if (i + 1 < args.length) filterUser = args[++i];
         break;
       case "--since":
-        filterSince = args[++i];
+        if (i + 1 < args.length) filterSince = args[++i];
         break;
       case "--session":
-        filterSession = args[++i];
+        if (i + 1 < args.length) filterSession = args[++i];
         break;
       case "--limit":
-        limit = parseInt(args[++i], 10) || 50;
+        if (i + 1 < args.length) {
+          const parsed = parseInt(args[++i], 10);
+          limit = Number.isNaN(parsed) ? 50 : parsed;
+        }
         break;
     }
   }
@@ -1060,13 +1078,11 @@ function cmdGc() {
       const user = thread.user || thread.author || "unknown";
       const closedAt = thread.closed_at || tsField;
 
-      // Strip payload
+      // Replace thread data with minimal tombstone
+      const tombstone = { id, status: "expired", user, closed_at: closedAt };
       const keys = Object.keys(thread);
       for (const k of keys) delete thread[k];
-      thread.id = id;
-      thread.status = "expired";
-      thread.user = user;
-      thread.closed_at = closedAt;
+      Object.assign(thread, tombstone);
       tombstoned++;
     }
   }

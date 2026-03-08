@@ -52,18 +52,23 @@ const {
 
 function getRecentlyModifiedFiles() {
   const files = new Set();
-  try {
-    const result = execSync("git diff --name-only HEAD~5", {
-      encoding: "utf-8",
-      timeout: 5000,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    for (const f of result.trim().split("\n")) {
-      const trimmed = f.trim();
-      if (trimmed) files.add(trimmed);
+  // Try HEAD~5 first; fall back to HEAD~1 for shallow repos
+  const diffTargets = ["HEAD~5", "HEAD~1"];
+  for (const target of diffTargets) {
+    try {
+      const result = execSync(`git diff --name-only ${target}`, {
+        encoding: "utf-8",
+        timeout: 5000,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      for (const f of result.trim().split("\n")) {
+        const trimmed = f.trim();
+        if (trimmed) files.add(trimmed);
+      }
+      break;
+    } catch (_) {
+      // target doesn't exist, try next
     }
-  } catch (_) {
-    // ignore
   }
   try {
     const result = execSync("git diff --name-only", {

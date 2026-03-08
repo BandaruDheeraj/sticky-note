@@ -2,7 +2,7 @@
 # sticky-codex.sh — Codex wrapper for Sticky Note V2
 #
 # Captures Codex stdout/stderr to a temp session log.
-# On exit: calls session-end.py with the transcript for
+# On exit: calls session-end.js with the transcript for
 # narrative + failed_approaches extraction.
 #
 # Usage:
@@ -32,7 +32,7 @@ echo "📌 Sticky Note — injecting context for Codex session $SESSION_ID"
 echo ""
 
 if [ -f "$STICKY_DIR/sticky-note.json" ]; then
-    python3 "$SCRIPT_DIR/session-start.py" <<EOF 2>/dev/null || true
+    node "$SCRIPT_DIR/session-start.js" <<EOF 2>/dev/null || true
 {"session_id": "$SESSION_ID"}
 EOF
 fi
@@ -49,14 +49,14 @@ echo "────────────────────────�
 echo "📌 Sticky Note — processing Codex session..."
 
 # Parse transcript for narrative + failed_approaches
-PARSED=$(python3 "$SCRIPT_DIR/parse-transcript.py" "$TRANSCRIPT_FILE" 2>/dev/null || echo '{"narrative":"","failed_approaches":[]}')
+PARSED=$(node "$SCRIPT_DIR/parse-transcript.js" "$TRANSCRIPT_FILE" 2>/dev/null || echo '{"narrative":"","failed_approaches":[]}')
 
-# Call session-end.py with the transcript info + parsed data
-python3 "$SCRIPT_DIR/session-end.py" <<EOF 2>/dev/null || true
+# Call session-end.js with the transcript info + parsed data
+node "$SCRIPT_DIR/session-end.js" <<EOF 2>/dev/null || true
 {
     "session_id": "$SESSION_ID",
     "transcript_path": "$TRANSCRIPT_FILE",
-    "parsed_transcript": $PARSED,
+    "parsed_transcript": ${PARSED},
     "hook_event_name": "sessionEnd",
     "reason": "codex_exit"
 }

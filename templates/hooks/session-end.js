@@ -11,7 +11,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 
 function _safeExit() {
   try {
@@ -204,8 +204,8 @@ function getGitFilesTouched() {
   const savedSha = readHeadSha();
 
   try {
-    if (savedSha) {
-      const result = execSync(`git diff --name-only ${savedSha} HEAD`, {
+    if (savedSha && /^[0-9a-f]+$/i.test(savedSha)) {
+      const result = execFileSync("git", ["diff", "--name-only", savedSha, "HEAD"], {
         encoding: "utf-8",
         timeout: 5000,
         stdio: ["pipe", "pipe", "pipe"],
@@ -216,7 +216,7 @@ function getGitFilesTouched() {
       }
     }
 
-    const unstaged = execSync("git diff --name-only", {
+    const unstaged = execFileSync("git", ["diff", "--name-only"], {
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
@@ -226,7 +226,7 @@ function getGitFilesTouched() {
       if (trimmed) files.add(trimmed);
     }
 
-    const staged = execSync("git diff --cached --name-only", {
+    const staged = execFileSync("git", ["diff", "--cached", "--name-only"], {
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
@@ -653,12 +653,15 @@ function tombstoneSweep(threads, staleDays) {
         const user = thread.user || thread.author || "unknown";
         const threadId = thread.id || "";
 
-        // Clear all keys, keep only minimal tombstone data
+        // Replace thread data with minimal tombstone
+        const tombstone = {
+          id: threadId,
+          status: "expired",
+          user,
+          closed_at: closedAt,
+        };
         for (const key of Object.keys(thread)) delete thread[key];
-        thread.id = threadId;
-        thread.status = "expired";
-        thread.user = user;
-        thread.closed_at = closedAt;
+        Object.assign(thread, tombstone);
         count++;
       }
     } catch (_) {

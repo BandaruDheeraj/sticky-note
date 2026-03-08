@@ -115,7 +115,8 @@ function updatePresence(user, filePath) {
       if (!active.includes(filePath)) {
         active.push(filePath);
       }
-      entry.active_files = active.slice(-10);
+      // Deduplicate and keep last 10
+      entry.active_files = [...new Set(active)].slice(-10);
     }
 
     entry.last_seen = new Date().toISOString();
