@@ -31,11 +31,11 @@ Just shared files in your repo.
 
 ## What's New in V2
 
-- **Two-file split**: Threads in `sticky-note.json`, audit trail in `sticky-note-audit.jsonl`
+- **Per-user audit & presence**: Audit logs and presence in per-user files under `audit/` and `presence/` — committed and shared with the team
 - **Relevance scoring**: Context injected based on file overlap, branch match, and recency
 - **Richer threads**: Narrative summaries, failed approaches, work type, activities
 - **Tombstone expiry**: Old threads are automatically cleaned up via `gc`
-- **Presence tracking**: See who's currently active in the repo
+- **Presence tracking**: See who's currently active with `npx sticky-note who`
 - **Codex support**: Wrapper script for post-session capture
 - **Separate config**: Team settings in `sticky-note-config.json`
 
@@ -168,8 +168,8 @@ silently in the background:
 ### Tool Tracking (`track-work.js`)
 
 Runs after every tool use. Appends a JSONL audit entry with the tool
-name, file path, and session ID. Also updates `.sticky-presence.json`
-with a heartbeat so `session-start.js` can show who's active.
+name, file path, and session ID. Also updates the user's presence file
+(`presence/<username>.json`) so `session-start.js` can show who's active.
 
 ### Session End (`session-end.js`)
 
@@ -259,8 +259,10 @@ CLAUDE.md                         # AI instructions for Claude Code
 .sticky-note/
 ├── sticky-note.json          # Shared threads (git-tracked)
 ├── sticky-note-config.json   # Team config (git-tracked)
-├── sticky-note-audit.jsonl   # Audit trail (local only)
-├── .sticky-presence.json     # Active users (local only)
+├── audit/                    # Per-user audit logs (git-tracked)
+│   └── <username>.jsonl      # One file per team member
+├── presence/                 # Per-user presence (git-tracked)
+│   └── <username>.json       # One file per team member
 └── .sticky-resume            # Resume signal (local only)
 ```
 
@@ -277,8 +279,10 @@ npx sticky-note threads        # List threads with status icons
 npx sticky-note resume         # List resumable threads
 npx sticky-note resume <id>    # Resume a previous thread
 npx sticky-note resume --clear # Cancel active resume
-npx sticky-note audit          # Query audit trail
+npx sticky-note audit          # Query merged audit trail (all users)
+npx sticky-note who            # Show active and recent team members
 npx sticky-note gc             # Tombstone expired threads
+npx sticky-note reset          # Wipe all threads (--force, --keep-audit)
 npx sticky-note --version      # Show version
 npx sticky-note --help         # Show help
 ```
@@ -349,8 +353,9 @@ All tools call the same JavaScript hooks and share the same data files.
 This tells git to **keep lines from both sides** instead of conflicting.
 Threads have unique UUIDs, so concurrent pushes merge cleanly.
 
-The audit trail (`sticky-note-audit.jsonl`) is local-only and never
-committed, so it never conflicts.
+Per-user audit logs (`audit/<username>.jsonl`) and presence files
+(`presence/<username>.json`) are written by one user at a time, so they
+never conflict.
 
 ---
 

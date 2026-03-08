@@ -38,18 +38,7 @@ function main() {
   let hookInput = {};
   try {
     if (!process.stdin.isTTY) {
-      const chunks = [];
-      const fd = require("fs").openSync("/dev/stdin", "r");
-      const buf = Buffer.alloc(4096);
-      let bytesRead;
-      try {
-        while ((bytesRead = require("fs").readSync(fd, buf, 0, buf.length)) > 0) {
-          chunks.push(buf.slice(0, bytesRead));
-        }
-      } finally {
-        require("fs").closeSync(fd);
-      }
-      const raw = Buffer.concat(chunks).toString("utf-8").trim();
+      const raw = require("fs").readFileSync(0, "utf-8").trim();
       if (raw) {
         hookInput = JSON.parse(raw);
       }

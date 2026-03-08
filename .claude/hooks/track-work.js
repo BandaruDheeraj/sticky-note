@@ -28,7 +28,7 @@ try {
 
 const {
   getConfigPath,
-  getPresencePath,
+  getUserPresencePath,
   loadJson,
   saveJson,
   appendAuditLine,
@@ -105,22 +105,20 @@ function extractFilePath(hookInput) {
 }
 
 function updatePresence(user, filePath) {
-  const presencePath = getPresencePath();
+  const presencePath = getUserPresencePath(user);
   try {
-    const data = loadJson(presencePath, {});
-    const entry = data[user] || { active_files: [], last_seen: "" };
+    const entry = loadJson(presencePath, { active_files: [], last_seen: "" });
 
     if (filePath) {
       const active = entry.active_files || [];
       if (!active.includes(filePath)) {
         active.push(filePath);
       }
-      entry.active_files = active.slice(-10);
+      entry.active_files = [...new Set(active)].slice(-10);
     }
 
     entry.last_seen = new Date().toISOString();
-    data[user] = entry;
-    saveJson(presencePath, data);
+    saveJson(presencePath, entry);
   } catch (_) {
     // ignore
   }

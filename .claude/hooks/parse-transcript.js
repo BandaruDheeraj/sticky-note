@@ -55,6 +55,7 @@ function main() {
 
   const transcriptPath = process.argv[2];
   if (!fs.existsSync(transcriptPath)) {
+    process.stderr.write(`Warning: transcript file not found: ${transcriptPath}\n`);
     console.log(JSON.stringify({ narrative: "", failed_approaches: [] }));
     return;
   }

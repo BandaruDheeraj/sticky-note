@@ -11,7 +11,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { execSync } = require("child_process");
+const { execFileSync } = require("child_process");
 
 function _safeExit() {
   try {
@@ -32,8 +32,8 @@ try {
 const {
   getMemoryPath,
   getConfigPath,
-  getAuditPath,
-  getPresencePath,
+  getUserPresencePath,
+  getAllAuditPaths,
   loadJson,
   saveJson,
   appendAuditLine,
@@ -62,16 +62,18 @@ const WRITE_TOOLS = new Set([
   "write", "edit", "multi_edit",
 ]);
 
-const STICKY_FILES = new Set([
+const STICKY_FILES_PREFIX = [
   ".sticky-note/sticky-note.json",
   ".sticky-note/sticky-note-audit.jsonl",
+  ".sticky-note/audit/",
+  ".sticky-note/presence/",
   ".sticky-note/.sticky-session",
   ".sticky-note/.sticky-head",
   ".sticky-note/.sticky-resume",
   ".sticky-note/.sticky-debug.jsonl",
   ".sticky-note/sticky-note-config.json",
-  ".sticky-note/presence.json",
-]);
+  ".sticky-note/.sticky-presence.json",
+];
 
 // ── Transcript helpers ────────────────────────────────────
 
@@ -168,11 +170,10 @@ function extractFilesTouched(hookInput) {
     }
   }
 
-  // Check audit trail for this session
+  // Check audit trail for this session (search all per-user audit files)
   const sessionId = hookInput.session_id;
   if (sessionId) {
-    const auditPath = getAuditPath();
-    if (fs.existsSync(auditPath)) {
+    for (const auditPath of getAllAuditPaths()) {
       try {
         const raw = fs.readFileSync(auditPath, "utf-8");
         for (const line of raw.split("\n")) {
@@ -204,8 +205,8 @@ function getGitFilesTouched() {
   const savedSha = readHeadSha();
 
   try {
-    if (savedSha) {
-      const result = execSync(`git diff --name-only ${savedSha} HEAD`, {
+    if (savedSha && /^[0-9a-f]+$/i.test(savedSha)) {
+      const result = execFileSync("git", ["diff", "--name-only", savedSha, "HEAD"], {
         encoding: "utf-8",
         timeout: 5000,
         stdio: ["pipe", "pipe", "pipe"],
@@ -216,7 +217,7 @@ function getGitFilesTouched() {
       }
     }
 
-    const unstaged = execSync("git diff --name-only", {
+    const unstaged = execFileSync("git", ["diff", "--name-only"], {
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
@@ -226,7 +227,7 @@ function getGitFilesTouched() {
       if (trimmed) files.add(trimmed);
     }
 
-    const staged = execSync("git diff --cached --name-only", {
+    const staged = execFileSync("git", ["diff", "--cached", "--name-only"], {
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
@@ -241,7 +242,7 @@ function getGitFilesTouched() {
 
   return Array.from(files).filter((f) => {
     const normalized = f.replace(/\\/g, "/");
-    return !STICKY_FILES.has(normalized) && !normalized.startsWith(".sticky-note/.sticky-");
+    return !STICKY_FILES_PREFIX.some((p) => normalized === p || normalized.startsWith(p));
   });
 }
 
@@ -653,12 +654,15 @@ function tombstoneSweep(threads, staleDays) {
         const user = thread.user || thread.author || "unknown";
         const threadId = thread.id || "";
 
-        // Clear all keys, keep only minimal tombstone data
+        // Replace thread data with minimal tombstone
+        const tombstone = {
+          id: threadId,
+          status: "expired",
+          user,
+          closed_at: closedAt,
+        };
         for (const key of Object.keys(thread)) delete thread[key];
-        thread.id = threadId;
-        thread.status = "expired";
-        thread.user = user;
-        thread.closed_at = closedAt;
+        Object.assign(thread, tombstone);
         count++;
       }
     } catch (_) {
@@ -672,12 +676,10 @@ function tombstoneSweep(threads, staleDays) {
 // ── Presence cleanup ──────────────────────────────────────
 
 function clearPresence(user) {
-  const presencePath = getPresencePath();
+  const presencePath = getUserPresencePath(user);
   try {
-    const data = loadJson(presencePath, {});
-    if (user in data) {
-      delete data[user];
-      saveJson(presencePath, data);
+    if (fs.existsSync(presencePath)) {
+      fs.unlinkSync(presencePath);
     }
   } catch (_) {
     // ignore

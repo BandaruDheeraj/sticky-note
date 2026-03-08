@@ -9,6 +9,7 @@
  */
 
 const crypto = require("crypto");
+const path = require("path");
 
 function _safeExit() {
   try {
@@ -29,7 +30,8 @@ try {
 const {
   getMemoryPath,
   getConfigPath,
-  getPresencePath,
+  getAllPresencePaths,
+  migrateAuditAndPresence,
   loadJson,
   saveJson,
   appendAuditLine,
@@ -144,6 +146,22 @@ function formatConfigForInjection(config) {
   return lines.length ? lines.join("\n") : "";
 }
 
+function loadAllPresence() {
+  const data = {};
+  for (const filePath of getAllPresencePaths()) {
+    try {
+      const basename = path.basename(filePath, ".json");
+      const info = loadJson(filePath, null);
+      if (info && info.last_seen) {
+        data[basename] = info;
+      }
+    } catch (_) {
+      continue;
+    }
+  }
+  return data;
+}
+
 function formatPresence(presenceData) {
   const now = Date.now();
   const active = [];
@@ -171,19 +189,7 @@ function main() {
   let hookInput = {};
   try {
     if (!process.stdin.isTTY) {
-      const chunks = [];
-      const fd = require("fs").openSync("/dev/stdin", "r");
-      const buf = Buffer.alloc(4096);
-      let bytesRead;
-      try {
-        while ((bytesRead = require("fs").readSync(fd, buf, 0, buf.length)) > 0) {
-          chunks.push(buf.slice(0, bytesRead));
-        }
-      } catch (_) {
-        // done reading
-      }
-      require("fs").closeSync(fd);
-      const raw = Buffer.concat(chunks).toString("utf-8").trim();
+      const raw = require("fs").readFileSync(0, "utf-8").trim();
       if (raw) hookInput = JSON.parse(raw);
     }
   } catch (_) {
@@ -196,6 +202,9 @@ function main() {
   }
   saveSessionId(sessionId);
   saveHeadSha();
+
+  // Migrate legacy single-file audit/presence to per-user dirs
+  migrateAuditAndPresence();
 
   const memoryPath = getMemoryPath();
   const memory = loadJson(memoryPath, {
@@ -240,7 +249,7 @@ function main() {
   // ── Build context pieces ──────────────────────────────
   const threadContext = formatThreadsForInjection(memory.threads || []);
   const configContext = formatConfigForInjection(config);
-  const presenceData = loadJson(getPresencePath(), {});
+  const presenceData = loadAllPresence();
   const presenceContext = formatPresence(presenceData);
 
   appendAuditLine({

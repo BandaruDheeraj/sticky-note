@@ -52,18 +52,23 @@ const {
 
 function getRecentlyModifiedFiles() {
   const files = new Set();
-  try {
-    const result = execSync("git diff --name-only HEAD~5", {
-      encoding: "utf-8",
-      timeout: 5000,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    for (const f of result.trim().split("\n")) {
-      const trimmed = f.trim();
-      if (trimmed) files.add(trimmed);
+  // Try HEAD~5 first; fall back to HEAD~1 for shallow repos
+  const diffTargets = ["HEAD~5", "HEAD~1"];
+  for (const target of diffTargets) {
+    try {
+      const result = execSync(`git diff --name-only ${target}`, {
+        encoding: "utf-8",
+        timeout: 5000,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      for (const f of result.trim().split("\n")) {
+        const trimmed = f.trim();
+        if (trimmed) files.add(trimmed);
+      }
+      break;
+    } catch (_) {
+      // target doesn't exist, try next
     }
-  } catch (_) {
-    // ignore
   }
   try {
     const result = execSync("git diff --name-only", {
@@ -418,7 +423,12 @@ function main() {
 
   const config = loadJson(getConfigPath(), {});
   const MAX_TOKENS = config.inject_token_budget || 1000;
-  let tokenCount = 10;
+  const _estimateTokens = (str) => Math.floor(str.length / 4);
+
+  // Reserve budget for the scoring debug block and header overhead
+  const scoringTokens = _estimateTokens(scoringBlock);
+  const HEADER_RESERVE = 15; // "[STICKY NOTE -- N relevant thread(s)]"
+  let tokenCount = HEADER_RESERVE + scoringTokens;
 
   const outputLines = [];
   let threadsShown = 0;
@@ -427,14 +437,17 @@ function main() {
     const [score, thread] = scored[i];
     const block =
       i === 0 ? formatThread(thread, true) : formatThread(thread, false);
-    tokenCount += Math.floor(block.length / 4);
-    if (tokenCount > MAX_TOKENS) {
+    const blockTokens = _estimateTokens(block);
+    if (tokenCount + blockTokens > MAX_TOKENS) {
       const remaining = scored.length - i;
       if (remaining > 0) {
-        outputLines.push("... and " + remaining + " more relevant threads");
+        const overflowMsg = "... and " + remaining + " more relevant threads";
+        tokenCount += _estimateTokens(overflowMsg);
+        outputLines.push(overflowMsg);
       }
       break;
     }
+    tokenCount += blockTokens;
     outputLines.push(block);
     threadsShown++;
   }

@@ -38,9 +38,11 @@ templates/gitignore-additions.txt   # Entries added to .gitignore on init
 .sticky-note/
   sticky-note.json          # Thread store (version: "2", mutable)
   sticky-note-config.json   # Config (stale_days, mcp_servers, conventions)
-  sticky-note-audit.jsonl   # Audit log (append-only JSONL, gitignored)
-  .sticky-presence.json     # Presence heartbeat (gitignored)
-.claude/hooks/              # Hook scripts (Python)
+  audit/                    # Per-user audit logs (git-tracked)
+    <username>.jsonl         # One file per team member
+  presence/                 # Per-user presence (git-tracked)
+    <username>.json          # One file per team member
+.claude/hooks/              # Hook scripts (JavaScript)
 .github/hooks/hooks.json    # Copilot CLI hook config
 ```
 
