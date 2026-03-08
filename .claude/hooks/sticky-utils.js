@@ -506,6 +506,78 @@ function migrateAuditAndPresence() {
   }
 }
 
+// ── Injected-this-session tracking (V2.5) ─────────────────
+
+const _injectedPaths = {
+  injected: ".sticky-injected",
+};
+const _injectedP = (key) => path.join(_stickyDir(), _injectedPaths[key]);
+
+function getInjectedPath() { return _injectedP("injected"); }
+
+function loadInjectedSet() {
+  try {
+    const data = loadJson(getInjectedPath(), { thread_ids: [], session_id: null });
+    return data;
+  } catch (_) {
+    return { thread_ids: [], session_id: null };
+  }
+}
+
+function saveInjectedSet(data) {
+  saveJson(getInjectedPath(), data);
+}
+
+function clearInjectedSet() {
+  try {
+    fs.unlinkSync(getInjectedPath());
+  } catch (_) {
+    // ignore
+  }
+}
+
+function isThreadInjected(threadId) {
+  const data = loadInjectedSet();
+  return (data.thread_ids || []).includes(threadId);
+}
+
+function markThreadInjected(threadId, sessionId) {
+  const data = loadInjectedSet();
+  data.session_id = sessionId || data.session_id;
+  if (!(data.thread_ids || []).includes(threadId)) {
+    data.thread_ids = data.thread_ids || [];
+    data.thread_ids.push(threadId);
+  }
+  saveInjectedSet(data);
+}
+
+// ── Active resumed thread tracking (V2.5) ─────────────────
+
+const _activeResumePath = () => path.join(_stickyDir(), ".sticky-active-resume");
+
+function getActiveResumeThreadId() {
+  try {
+    const raw = fs.readFileSync(_activeResumePath(), "utf-8").trim();
+    return raw || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function setActiveResumeThreadId(threadId) {
+  const filePath = _activeResumePath();
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, threadId + "\n", "utf-8");
+}
+
+function clearActiveResumeThreadId() {
+  try {
+    fs.unlinkSync(_activeResumePath());
+  } catch (_) {
+    // ignore
+  }
+}
+
 // ── Exports ───────────────────────────────────────────────
 
 module.exports = {
@@ -550,4 +622,15 @@ module.exports = {
   extractFailedFromText,
   extractSessionFromAudit,
   migrateAuditAndPresence,
+  // V2.5: injected-this-session tracking
+  getInjectedPath,
+  loadInjectedSet,
+  saveInjectedSet,
+  clearInjectedSet,
+  isThreadInjected,
+  markThreadInjected,
+  // V2.5: active resumed thread
+  getActiveResumeThreadId,
+  setActiveResumeThreadId,
+  clearActiveResumeThreadId,
 };

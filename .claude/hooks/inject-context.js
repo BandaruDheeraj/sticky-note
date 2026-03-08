@@ -46,6 +46,7 @@ const {
   getMemoryPath, loadJson, saveJson, getUser, getBranch,
   getResumeThreadId, findThreadById, getSessionId,
   appendAuditLine, detectTool, getConfigPath,
+  isThreadInjected, markThreadInjected,
 } = utils;
 
 // ── Git helpers ───────────────────────────────────────────
@@ -354,6 +355,9 @@ function main() {
   // Score threads
   const scored = [];
   for (const t of live) {
+    // V2.5: Skip threads already injected this session by PreToolUse or session-start
+    if (isThreadInjected(t.id)) continue;
+
     let s = scoreThread(t, recentlyModified, currentBranch, currentUser, keywords);
     if (resumeThreadId && t.id === resumeThreadId) {
       s = Math.max(s, 0) + 10;
@@ -450,6 +454,9 @@ function main() {
     tokenCount += blockTokens;
     outputLines.push(block);
     threadsShown++;
+
+    // V2.5: Mark as injected so PreToolUse won't re-inject
+    try { markThreadInjected(thread.id, sessionId); } catch (_) {}
   }
 
   const header =

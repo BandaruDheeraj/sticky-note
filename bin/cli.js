@@ -21,7 +21,7 @@ const { execSync } = require("child_process");
 // Constants
 // ──────────────────────────────────────────────
 
-const VERSION = "2.0.0";
+const VERSION = "2.5.0";
 
 const HOOK_FILES = [
   "sticky-utils.js",
@@ -32,6 +32,9 @@ const HOOK_FILES = [
   "on-stop.js",
   "on-error.js",
   "parse-transcript.js",
+  "pre-tool-use.js",
+  "sticky-git-notes.js",
+  "sticky-attribution.js",
 ];
 
 const TEMPLATES_DIR = path.join(__dirname, "..", "templates");
@@ -773,6 +776,33 @@ function cmdStatus() {
     `    ${isGitRepo() ? "[OK]" : "[ERR]"} Git repository`
   );
 
+  // V2.5: Attribution engine health
+  print("\n  Attribution Engine (V2.5):");
+  const attrPath = path.join(process.cwd(), ".claude", "hooks", "sticky-attribution.js");
+  const notesPath = path.join(process.cwd(), ".claude", "hooks", "sticky-git-notes.js");
+  const preToolPath = path.join(process.cwd(), ".claude", "hooks", "pre-tool-use.js");
+  print(`    ${fs.existsSync(attrPath) ? "[OK]" : "[--]"} sticky-attribution.js`);
+  print(`    ${fs.existsSync(notesPath) ? "[OK]" : "[--]"} sticky-git-notes.js`);
+  print(`    ${fs.existsSync(preToolPath) ? "[OK]" : "[--]"} pre-tool-use.js`);
+
+  // Check Git Notes configuration
+  let notesConfigured = false;
+  try {
+    const ref = execSync("git config --get notes.rewriteRef", { encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"] }).trim();
+    notesConfigured = ref.includes("sticky-note");
+  } catch (_) { /* not configured */ }
+  print(`    ${notesConfigured ? "[OK]" : "[--]"} Git Notes rewrite configured`);
+  print(`    Injection mode: two-tier (eager stuck + lazy file via git blame)`);
+  // Injected-this-session info
+  const injectedPath = path.join(stickyDir, ".sticky-injected");
+  if (fs.existsSync(injectedPath)) {
+    const injData = readJsonSafe(injectedPath, {});
+    const ids = injData.thread_ids || [];
+    if (ids.length > 0) {
+      print(`    Injected this session: ${ids.length} thread(s)`);
+    }
+  }
+
   print("");
 }
 
@@ -1323,6 +1353,401 @@ function cmdSwitch() {
 }
 
 // ──────────────────────────────────────────────
+// Resume Thread command (V2.5 — MCP-style)
+// ──────────────────────────────────────────────
+
+function cmdResumeThread() {
+  const args = process.argv.slice(3);
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+
+  if (!fs.existsSync(memoryPath)) {
+    print("  [ERR] No sticky-note.json found. Run `npx sticky-note init` first.");
+    process.exit(1);
+  }
+
+  // Parse flags
+  let query = null;
+  let user = null;
+  let file = null;
+  let jsonOutput = false;
+
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case "--query":
+      case "-q":
+        if (i + 1 < args.length) query = args[++i];
+        break;
+      case "--user":
+      case "-u":
+        if (i + 1 < args.length) user = args[++i];
+        break;
+      case "--file":
+      case "-f":
+        if (i + 1 < args.length) file = args[++i];
+        break;
+      case "--json":
+        jsonOutput = true;
+        break;
+      default:
+        // Positional argument is treated as query
+        if (!args[i].startsWith("-") && !query) {
+          query = args.slice(i).join(" ");
+          i = args.length; // consume all remaining
+        }
+        break;
+    }
+  }
+
+  if (!query && !user && !file) {
+    print("  Usage: npx sticky-note resume-thread [--query <text>] [--user <name>] [--file <path>] [--json]");
+    print("  Or:    npx sticky-note resume-thread \"pick up auth refresh work\"");
+    process.exit(1);
+  }
+
+  const memory = readJsonSafe(memoryPath, { threads: [] });
+  const threads = (memory.threads || []).filter((t) => t.status !== "expired");
+
+  // Load attribution engine for search
+  let attribution;
+  try {
+    attribution = require(path.join(__dirname, "..", "templates", "hooks", "sticky-attribution.js"));
+  } catch (_) {
+    try {
+      attribution = require(path.join(process.cwd(), ".claude", "hooks", "sticky-attribution.js"));
+    } catch (_) {
+      attribution = null;
+    }
+  }
+
+  let candidates;
+  if (attribution) {
+    candidates = attribution.findThreadToResume(threads, { query, user, file });
+  } else {
+    // Fallback: simple text matching without attribution engine
+    candidates = simpleThreadSearch(threads, query, user);
+  }
+
+  if (candidates.length === 0) {
+    const msg = "No matching threads found.";
+    if (jsonOutput) {
+      print(JSON.stringify({ error: msg, candidates: [] }));
+    } else {
+      print(`  [ERR] ${msg}`);
+      if (query) print(`  Query: "${query}"`);
+      if (user) print(`  User: "${user}"`);
+    }
+    process.exit(1);
+  }
+
+  // If top 2 are close in score, show both and let user choose
+  const top = candidates[0];
+  const showConfirmation = candidates.length > 1 &&
+    (top.score - candidates[1].score) < 0.5 &&
+    top.score > 0;
+
+  if (jsonOutput) {
+    const result = {
+      best_match: formatThreadResult(top),
+      alternatives: showConfirmation
+        ? candidates.slice(1, 3).map(formatThreadResult)
+        : [],
+    };
+    print(JSON.stringify(result, null, 2));
+    // Set active resume
+    setActiveResume(stickyDir, top.thread.id);
+    return;
+  }
+
+  printBanner();
+
+  if (showConfirmation) {
+    print("  Found multiple close matches:\n");
+    for (let i = 0; i < Math.min(candidates.length, 3); i++) {
+      const c = candidates[i];
+      const t = c.thread;
+      const icon = statusIcon(t.status);
+      const shortId = t.id.slice(0, 8);
+      print(`  ${i + 1}. ${icon} ${shortId} [${t.status}] ${t.user || "?"} (${t.branch || "no branch"}) — score: ${c.score.toFixed(1)}`);
+      if (t.narrative) print(`     ${t.narrative.slice(0, 100)}`);
+      if (c.match_reasons && c.match_reasons.length) {
+        print(`     Matched by: ${c.match_reasons.join(", ")}`);
+      }
+    }
+    print("\n  Selecting best match (#1)...\n");
+  }
+
+  // Set active resume thread
+  const match = top.thread;
+  setActiveResume(stickyDir, match.id);
+
+  const icon = statusIcon(match.status);
+  print(`  [OK] Resuming thread ${match.id.slice(0, 8)}`);
+  print(`  ${icon} [${match.status}] ${match.user || "?"} (${match.branch || "no branch"})`);
+  if (match.narrative) print(`  📖 ${match.narrative.slice(0, 200)}`);
+  if (match.handoff_summary) print(`  🤝 ${match.handoff_summary.slice(0, 200)}`);
+
+  const contributors = match.contributors || [match.user || "unknown"];
+  if (contributors.length > 1) {
+    print(`  👥 Contributors: ${contributors.join(", ")}`);
+  }
+
+  const failed = match.failed_approaches || [];
+  if (failed.length > 0) {
+    print(`  ⚠️ ${failed.length} failed approach(es)`);
+  }
+
+  print(`\n  Thread context will be injected into your next AI session.`);
+  print("");
+}
+
+function simpleThreadSearch(threads, query, user) {
+  const results = [];
+
+  for (const thread of threads) {
+    let score = 0;
+
+    if (user && (thread.user || "").toLowerCase() !== user.toLowerCase()) continue;
+    if (user) score += 1;
+
+    if (query) {
+      const queryLower = query.toLowerCase();
+      const fields = [
+        thread.narrative || "",
+        thread.last_note || "",
+        thread.handoff_summary || "",
+        (thread.files_touched || []).join(" "),
+        (thread.failed_approaches || []).map((f) => f.description || "").join(" "),
+      ].join(" ").toLowerCase();
+
+      const words = queryLower.split(/\s+/).filter((w) => w.length >= 2);
+      let matches = 0;
+      for (const w of words) {
+        if (fields.includes(w)) matches++;
+      }
+      score += words.length > 0 ? (matches / words.length) * 3 : 0;
+    }
+
+    if (score > 0 || (!query && user)) {
+      results.push({ thread, score, match_reasons: [] });
+    }
+  }
+
+  results.sort((a, b) => b.score - a.score);
+  return results;
+}
+
+function formatThreadResult(candidate) {
+  const t = candidate.thread;
+  return {
+    id: t.id,
+    user: t.user || "unknown",
+    status: t.status,
+    branch: t.branch || "",
+    narrative: (t.narrative || "").substring(0, 300),
+    files_touched: (t.files_touched || []).slice(0, 10),
+    score: Math.round(candidate.score * 10) / 10,
+    match_reasons: candidate.match_reasons || [],
+    contributors: t.contributors || [t.user || "unknown"],
+  };
+}
+
+function setActiveResume(stickyDir, threadId) {
+  const resumePath = path.join(stickyDir, ".sticky-active-resume");
+  const signalPath = path.join(stickyDir, ".sticky-resume");
+  fs.writeFileSync(resumePath, threadId + "\n");
+  fs.writeFileSync(signalPath, threadId + "\n");
+}
+
+// ──────────────────────────────────────────────
+// Get Line Attribution command (V2.5)
+// ──────────────────────────────────────────────
+
+function cmdGetLineAttribution() {
+  const args = process.argv.slice(3);
+
+  // Parse flags
+  let file = null;
+  let lineRange = null;
+  let since = null;
+  let jsonOutput = true; // always JSON for this command
+
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case "--file":
+      case "-f":
+        if (i + 1 < args.length) file = args[++i];
+        break;
+      case "--line-range":
+      case "--lines":
+        if (i + 1 < args.length) {
+          const parts = args[++i].split(/[-:,]/);
+          if (parts.length === 2) {
+            lineRange = [parseInt(parts[0], 10), parseInt(parts[1], 10)];
+          }
+        }
+        break;
+      case "--since":
+        if (i + 1 < args.length) since = args[++i];
+        break;
+      default:
+        if (!args[i].startsWith("-") && !file) file = args[i];
+        break;
+    }
+  }
+
+  if (!file) {
+    print(JSON.stringify({ error: "Usage: npx sticky-note get-line-attribution --file <path> [--line-range start:end] [--since ISO-date]" }));
+    process.exit(1);
+  }
+
+  // Load attribution engine
+  let attribution;
+  try {
+    attribution = require(path.join(__dirname, "..", "templates", "hooks", "sticky-attribution.js"));
+  } catch (_) {
+    try {
+      attribution = require(path.join(process.cwd(), ".claude", "hooks", "sticky-attribution.js"));
+    } catch (_) {
+      attribution = null;
+    }
+  }
+
+  if (!attribution) {
+    print(JSON.stringify({ error: "Attribution engine not found. Run npx sticky-note update." }));
+    process.exit(1);
+  }
+
+  const options = {};
+  if (lineRange) options.lineRange = lineRange;
+  if (since) options.since = since;
+
+  const result = attribution.getFileAttribution(file, options);
+
+  const output = {
+    file,
+    threads: result.threads.map((t) => ({
+      id: t.thread.id,
+      user: t.thread.user,
+      status: t.thread.status,
+      branch: t.thread.branch,
+      narrative: (t.thread.narrative || "").substring(0, 200),
+      files_touched: (t.thread.files_touched || []).slice(0, 10),
+      contributors: t.thread.contributors || [t.thread.user || "unknown"],
+      lines: t.lines,
+      line_ranges: t.line_ranges,
+      tier: t.tier,
+    })),
+    line_map: result.line_map,
+  };
+
+  print(JSON.stringify(output, null, 2));
+}
+
+// ──────────────────────────────────────────────
+// Checkpoint command (V2.5)
+// ──────────────────────────────────────────────
+
+function cmdCheckpoint() {
+  const args = process.argv.slice(3);
+  let topic = null;
+  let clear = false;
+  let show = false;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--topic" || args[i] === "-t") {
+      topic = args[i + 1] || null;
+      i++;
+    } else if (args[i] === "--clear") {
+      clear = true;
+    } else if (args[i] === "--show") {
+      show = true;
+    } else if (!args[i].startsWith("-")) {
+      // Positional argument = topic
+      topic = args.slice(i).join(" ");
+      break;
+    }
+  }
+
+  // Load git-notes module
+  let gitNotes;
+  try {
+    gitNotes = require(path.join(__dirname, "..", "templates", "hooks", "sticky-git-notes.js"));
+  } catch (_) {
+    try {
+      gitNotes = require(path.join(process.cwd(), ".claude", "hooks", "sticky-git-notes.js"));
+    } catch (_) {
+      print("[ERR] Git notes module not found. Run npx sticky-note update.");
+      process.exit(1);
+    }
+  }
+
+  if (clear) {
+    gitNotes.clearCheckpoint();
+    print("  Checkpoint cleared.");
+    return;
+  }
+
+  if (show) {
+    const cp = gitNotes.getCurrentCheckpoint();
+    if (cp) {
+      print(`  Current checkpoint: ${cp.topic}`);
+      print(`  Set at: ${cp.ts}`);
+      if (cp.session_id) print(`  Session: ${cp.session_id}`);
+    } else {
+      print("  No active checkpoint.");
+    }
+    return;
+  }
+
+  if (!topic) {
+    print("Usage: npx sticky-note checkpoint <topic>");
+    print("       npx sticky-note checkpoint --topic \"fixing auth token expiry\"");
+    print("       npx sticky-note checkpoint --show");
+    print("       npx sticky-note checkpoint --clear");
+    process.exit(1);
+  }
+
+  // Load utils for session/user info
+  let utils;
+  try {
+    utils = require(path.join(__dirname, "..", "templates", "hooks", "sticky-utils.js"));
+  } catch (_) {
+    try {
+      utils = require(path.join(process.cwd(), ".claude", "hooks", "sticky-utils.js"));
+    } catch (_) {
+      utils = null;
+    }
+  }
+
+  const user = utils ? utils.getUser() : (process.env.USER || process.env.USERNAME || "unknown");
+  const sessionId = utils ? utils.readSessionIdFromFile() : null;
+  const now = new Date().toISOString();
+
+  const checkpoint = {
+    topic,
+    user,
+    ts: now,
+    session_id: sessionId || null,
+  };
+  gitNotes.saveCheckpoint(checkpoint);
+
+  // Also write to audit
+  if (utils) {
+    utils.appendAuditLine({
+      type: "checkpoint",
+      user,
+      ts: now,
+      session_id: sessionId,
+      topic,
+    });
+  }
+
+  print(`  ✓ Checkpoint set: "${topic}"`);
+  print(`  Subsequent AI edits will be tagged with this topic.`);
+}
+
+// ──────────────────────────────────────────────
 // GC command (manual tombstone sweep)
 // ──────────────────────────────────────────────
 
@@ -1416,6 +1841,15 @@ async function main() {
     case "reset":
       cmdReset();
       break;
+    case "resume-thread":
+      cmdResumeThread();
+      break;
+    case "get-line-attribution":
+      cmdGetLineAttribution();
+      break;
+    case "checkpoint":
+      cmdCheckpoint();
+      break;
     case "--version":
     case "-v":
       print(`sticky-note v${VERSION}`);
@@ -1426,16 +1860,19 @@ async function main() {
       printBanner();
       print("  Usage: npx sticky-note <command>\n");
       print("  Commands:");
-      print("    init      Interactive setup — creates V2 hooks and config");
-      print("    update    Update hook scripts (preserves data)");
-      print("    status    Diagnostic report: threads, audit, health");
-      print("    threads   List open/stuck threads");
-      print("    resume    Resume a previous thread (--list, --clear, <id>)");
-      print("    audit     Query audit trail (--file, --user, --since, --session)");
-      print("    who       Show active and recent team members");
-      print("    switch    Safe branch switching (auto-stashes .sticky-note/)");
-      print("    gc        Manual tombstone sweep for expired threads");
-      print("    reset     Wipe all threads and start fresh (--force, --keep-audit)");
+      print("    init               Interactive setup — creates V2.5 hooks and config");
+      print("    update             Update hook scripts (preserves data)");
+      print("    status             Diagnostic report: threads, audit, attribution health");
+      print("    threads            List open/stuck threads");
+      print("    resume             Resume a previous thread (--list, --clear, <id>)");
+      print("    resume-thread      Smart thread resume (--query, --user, --file, --json)");
+      print("    audit              Query audit trail (--file, --user, --since, --session)");
+      print("    who                Show active and recent team members");
+      print("    switch             Safe branch switching (auto-stashes .sticky-note/)");
+      print("    gc                 Manual tombstone sweep for expired threads");
+      print("    reset              Wipe all threads and start fresh (--force, --keep-audit)");
+      print("    get-line-attribution  File→thread attribution with line ranges (--file, --lines)");
+      print("    checkpoint         Set work-topic checkpoint for attribution (--topic, --show, --clear)");
       print("");
       print("  Options:");
       print("    --version  Show version");

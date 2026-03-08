@@ -53,6 +53,9 @@ const {
   clearSessionFile,
   readHeadSha,
   clearHeadFile,
+  getActiveResumeThreadId,
+  clearActiveResumeThreadId,
+  clearInjectedSet,
 } = utils;
 
 // ── Constants ─────────────────────────────────────────────
@@ -73,6 +76,8 @@ const STICKY_FILES_PREFIX = [
   ".sticky-note/.sticky-debug.jsonl",
   ".sticky-note/sticky-note-config.json",
   ".sticky-note/.sticky-presence.json",
+  ".sticky-note/.sticky-injected",
+  ".sticky-note/.sticky-active-resume",
 ];
 
 // ── Transcript helpers ────────────────────────────────────
@@ -199,6 +204,36 @@ function extractFilesTouched(hookInput) {
 }
 
 // ── Git diff helpers ──────────────────────────────────────
+
+/**
+ * V2.5: Collect commit SHAs created between session start HEAD and current HEAD.
+ * These are the commits made during this session — the join key for attribution engine.
+ */
+function getSessionCommitShas() {
+  const savedSha = readHeadSha();
+  if (!savedSha || !/^[0-9a-f]+$/i.test(savedSha)) return [];
+
+  try {
+    const result = execFileSync("git", ["log", "--format=%H", savedSha + "..HEAD"], {
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return result.trim().split("\n").filter((s) => s.trim()).map((s) => s.trim());
+  } catch (_) {
+    // Fallback: just return current HEAD
+    try {
+      const head = execFileSync("git", ["rev-parse", "HEAD"], {
+        encoding: "utf-8",
+        timeout: 5000,
+        stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
+      return head !== savedSha ? [head] : [];
+    } catch (_) {
+      return [];
+    }
+  }
+}
 
 function getGitFilesTouched() {
   const files = new Set();
@@ -731,8 +766,11 @@ function main() {
   memory.threads = threads;
   let existing = null;
 
-  // Check for resumed thread
-  const resumeThreadId = getResumeThreadId();
+  // V2.5: Check for active resumed thread (set by resume-thread command)
+  const activeResumeId = getActiveResumeThreadId();
+
+  // Check for resumed thread (V2 resume signal or V2.5 active resume)
+  const resumeThreadId = getResumeThreadId() || activeResumeId;
   if (resumeThreadId) {
     existing = findThreadById(threads, resumeThreadId);
     if (existing) {
@@ -759,8 +797,22 @@ function main() {
           resumed_from: prevSession,
         });
       }
+
+      // V2.5: Update contributors and resume metadata
+      const contributors = existing.contributors || [];
+      if (!contributors.includes(user)) {
+        contributors.push(user);
+      }
+      existing.contributors = contributors;
+      existing.resumed_by = user;
+      existing.resumed_at = now;
+
+      const resumeHistory = existing.resume_history || [];
+      resumeHistory.push({ user, at: now, session_id: sessionId });
+      existing.resume_history = resumeHistory;
     }
     clearResumeSignal();
+    clearActiveResumeThreadId();
   }
 
   // Fallback: find by session_id
@@ -830,12 +882,18 @@ function main() {
       activities: sessionAnalysis.activities,
       tool_calls: sessionAnalysis.tool_calls || {},
       prompts: storedPrompts,
+      // V2.5 fields
+      contributors: [user],
+      resume_history: [],
     });
   }
 
+  // V2.5: Capture commit SHAs for attribution engine
+  const commitShas = getSessionCommitShas();
+
   // Housekeeping
   tombstoneSweep(threads, staleDays);
-  appendAuditLine({
+  const auditEntry = {
     type: "session_end",
     user,
     ts: now,
@@ -843,10 +901,26 @@ function main() {
     status: "closed",
     files_touched: filesTouched,
     work_type: sessionAnalysis.work_type,
-  });
+  };
+  if (commitShas.length > 0) {
+    auditEntry.commit_shas = commitShas;
+  }
+  appendAuditLine(auditEntry);
+
+  // V2.5: Also write individual commit_sha audit entries for bridge lookup
+  for (const sha of commitShas) {
+    appendAuditLine({
+      type: "commit",
+      user,
+      ts: now,
+      session_id: sessionId,
+      commit_sha: sha,
+    });
+  }
   clearPresence(user);
   clearSessionFile();
   clearHeadFile();
+  clearInjectedSet();
   saveJson(memoryPath, memory);
 
   process.stdout.write(JSON.stringify({ output: "" }) + "\n");
