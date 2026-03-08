@@ -99,6 +99,11 @@ function readJsonSafe(filePath, fallback) {
   }
 }
 
+function parseIntOr(str, fallback) {
+  const n = parseInt(str, 10);
+  return Number.isNaN(n) ? fallback : n;
+}
+
 const SECTION_START = "<!-- sticky-note:start";
 const SECTION_END = "<!-- sticky-note:end -->";
 
@@ -370,10 +375,8 @@ async function cmdInit() {
   const conventions = conventionsRaw
     ? conventionsRaw.split(",").map((s) => s.trim()).filter(Boolean)
     : [];
-  const staleDaysNum = parseInt(staleDays, 10);
-  const injectTokenBudgetNum = parseInt(injectTokenBudget, 10);
-  const staleDaysResolved = Number.isNaN(staleDaysNum) ? 14 : staleDaysNum;
-  const injectTokenBudgetResolved = Number.isNaN(injectTokenBudgetNum) ? 1000 : injectTokenBudgetNum;
+  const staleDaysResolved = parseIntOr(staleDays, 14);
+  const injectTokenBudgetResolved = parseIntOr(injectTokenBudget, 1000);
 
   print("\n  📁 Creating files...\n");
 
@@ -989,10 +992,7 @@ function cmdAudit() {
         if (i + 1 < args.length) filterSession = args[++i];
         break;
       case "--limit":
-        if (i + 1 < args.length) {
-          const parsed = parseInt(args[++i], 10);
-          limit = Number.isNaN(parsed) ? 50 : parsed;
-        }
+        if (i + 1 < args.length) limit = parseIntOr(args[++i], 50);
         break;
     }
   }

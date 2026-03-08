@@ -1,5 +1,128 @@
 {
   "version": "2",
   "project": "",
-  "threads": []
+  "threads": [
+    {
+      "id": "9c2a2b01-95b1-4932-97b6-6d7063903870",
+      "user": "dbandaru",
+      "project": "",
+      "status": "open",
+      "branch": "feature/v2",
+      "created_at": "2026-03-08T01:24:55.250Z",
+      "closed_at": "2026-03-08T01:50:30.463Z",
+      "last_activity_at": "2026-03-08T01:52:13.096Z",
+      "files_touched": [
+        "bin/cli.js",
+        "templates/hooks/inject-context.js",
+        "templates/hooks/on-error.js",
+        "templates/hooks/parse-transcript.js",
+        "templates/hooks/session-end.js",
+        "templates/hooks/session-start.js",
+        "templates/hooks/sticky-codex.sh",
+        "templates/hooks/track-work.js"
+      ],
+      "last_note": "go ahead and show me all the threads on this repo ... (5 prompts total) ... perfect committed and pushed?",
+      "narrative": "go ahead and show me all the threads on this repo ... (5 prompts total) ... perfect committed and pushed?",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [
+        "bf5fa294-6acb-4dcd-8dad-6a8474dc33b3"
+      ],
+      "resume_chain": [
+        {
+          "session_id": "bf5fa294-6acb-4dcd-8dad-6a8474dc33b3",
+          "tool": "claude-code",
+          "started_at": "2026-03-08T01:52:13.096Z",
+          "ended_at": null,
+          "resumed_from": "1ea1b418-569b-41e7-8cff-65604d4d8e85"
+        }
+      ],
+      "tool": "copilot-cli",
+      "session_id": "1ea1b418-569b-41e7-8cff-65604d4d8e85",
+      "work_type": "general",
+      "activities": [
+        "5 prompt(s)"
+      ],
+      "tool_calls": {
+        "report_intent": 17,
+        "powershell": 14,
+        "view": 70,
+        "task": 7,
+        "sql": 22,
+        "edit": 42,
+        "grep": 8
+      },
+      "prompts": [
+        "go ahead and show me all the threads on this repo",
+        "go ahead and show me all the threads on this repo",
+        "can you audit this repo for any dead code or bad practices",
+        "go ahead and show me all the threads on this repo",
+        "can you audit this repo for any dead code or bad practices",
+        "continue",
+        "go ahead and show me all the threads on this repo",
+        "can you audit this repo for any dead code or bad practices",
+        "continue",
+        "fix all of them",
+        "go ahead and show me all the threads on this repo",
+        "can you audit this repo for any dead code or bad practices",
+        "continue",
+        "fix all of them",
+        "perfect committed and pushed?"
+      ]
+    },
+    {
+      "id": "467f75cc-65c1-48bb-b4f5-922c645e1abd",
+      "user": "dbandaru",
+      "project": "",
+      "status": "closed",
+      "branch": "feature/v2",
+      "created_at": "2026-03-08T01:51:20.546Z",
+      "closed_at": "2026-03-08T01:51:20.546Z",
+      "last_activity_at": "2026-03-08T01:51:20.546Z",
+      "files_touched": [],
+      "last_note": "Session stopped",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "Session stopped -- no summary available",
+      "related_session_ids": [],
+      "tool": "claude-code",
+      "session_id": "bf5fa294-6acb-4dcd-8dad-6a8474dc33b3"
+    },
+    {
+      "id": "8f2aee38-da7b-4aaf-8a06-365d34bfa852",
+      "user": "dbandaru",
+      "project": "",
+      "status": "closed",
+      "branch": "feature/v2",
+      "created_at": "2026-03-08T01:51:56.814Z",
+      "closed_at": "2026-03-08T01:51:56.814Z",
+      "last_activity_at": "2026-03-08T01:51:56.814Z",
+      "files_touched": [],
+      "last_note": "Session stopped",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "Session stopped -- no summary available",
+      "related_session_ids": [],
+      "tool": "claude-code",
+      "session_id": "bf5fa294-6acb-4dcd-8dad-6a8474dc33b3"
+    },
+    {
+      "id": "fa38a550-c155-4b16-b8cd-831dc8ba8a22",
+      "user": "dbandaru",
+      "project": "",
+      "status": "closed",
+      "branch": "feature/v2",
+      "created_at": "2026-03-08T01:56:53.167Z",
+      "closed_at": "2026-03-08T01:56:53.167Z",
+      "last_activity_at": "2026-03-08T01:56:53.167Z",
+      "files_touched": [],
+      "last_note": "Session stopped",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "Session stopped -- no summary available",
+      "related_session_ids": [],
+      "tool": "claude-code",
+      "session_id": "bf5fa294-6acb-4dcd-8dad-6a8474dc33b3"
+    }
+  ]
 }
