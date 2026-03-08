@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 
 /**
- * sticky-note CLI
+ * sticky-note CLI — V2
  *
  * Commands:
- *   npx sticky-note init      Interactive setup, creates all hook files
- *   npx sticky-note update    Update scripts only, never touches data
- *   npx sticky-note status    Diagnostic: threads, audit count, hook health
+ *   npx sticky-note init      Interactive setup, creates V2 hook files
+ *   npx sticky-note update    Update scripts only
+ *   npx sticky-note status    Diagnostic: threads, audit, hook health
+ *   npx sticky-note threads   List open/stuck threads
+ *   npx sticky-note audit     Query audit trail (JSONL)
+ *   npx sticky-note gc        Manual tombstone sweep
  */
 
 const fs = require("fs");
@@ -18,15 +21,17 @@ const { execSync } = require("child_process");
 // Constants
 // ──────────────────────────────────────────────
 
-const VERSION = "1.0.0";
+const VERSION = "2.0.0";
 
 const HOOK_FILES = [
-  "session-start.py",
-  "session-end.py",
-  "inject-context.py",
-  "track-work.py",
-  "on-stop.py",
-  "on-error.py",
+  "sticky-utils.js",
+  "session-start.js",
+  "session-end.js",
+  "inject-context.js",
+  "track-work.js",
+  "on-stop.js",
+  "on-error.js",
+  "parse-transcript.js",
 ];
 
 const TEMPLATES_DIR = path.join(__dirname, "..", "templates");
@@ -41,7 +46,7 @@ function print(msg) {
 
 function printBanner() {
   print("");
-  print("  📌 sticky-note v" + VERSION);
+  print(`  📌 sticky-note v${VERSION}`);
   print("  Human-to-human handoff for AI coding assistants");
   print("");
 }
@@ -53,28 +58,6 @@ function isGitRepo() {
   } catch {
     return false;
   }
-}
-
-function hasPython() {
-  const cmds = ["python3", "python"];
-  for (const cmd of cmds) {
-    try {
-      const version = execSync(`${cmd} --version`, { stdio: "pipe" })
-        .toString()
-        .trim();
-      const match = version.match(/Python (\d+)\.(\d+)/);
-      if (match) {
-        const major = parseInt(match[1], 10);
-        const minor = parseInt(match[2], 10);
-        if (major >= 3 && minor >= 10) {
-          return { cmd, version };
-        }
-      }
-    } catch {
-      // try next
-    }
-  }
-  return null;
 }
 
 function mkdirSafe(dir) {
@@ -108,6 +91,67 @@ function ask(rl, question, defaultVal) {
   });
 }
 
+function readJsonSafe(filePath, fallback) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+  } catch {
+    return fallback;
+  }
+}
+
+function parseIntOr(str, fallback) {
+  const n = parseInt(str, 10);
+  return Number.isNaN(n) ? fallback : n;
+}
+
+const SECTION_START = "<!-- sticky-note:start";
+const SECTION_END = "<!-- sticky-note:end -->";
+
+/**
+ * Update the sticky-note section in a deployed instruction file.
+ * If markers exist, replaces content between them.
+ * If no markers but a known sticky-note heading exists, replaces from that heading onward.
+ * If neither, appends the template content.
+ * Returns true if the file was modified.
+ */
+function updateInstructionSection(destPath, templateContent, heading) {
+  if (!fs.existsSync(destPath)) {
+    fs.writeFileSync(destPath, templateContent);
+    return true;
+  }
+
+  const existing = fs.readFileSync(destPath, "utf-8");
+  const startIdx = existing.indexOf(SECTION_START);
+  const endIdx = existing.indexOf(SECTION_END);
+
+  if (startIdx !== -1 && endIdx !== -1) {
+    // Replace between markers (inclusive)
+    const before = existing.slice(0, startIdx);
+    const after = existing.slice(endIdx + SECTION_END.length);
+    fs.writeFileSync(destPath, before + templateContent.trim() + after);
+  } else if (heading && existing.includes(heading)) {
+    // Migration: old file without markers — replace from known heading onward
+    const headingIdx = existing.indexOf(heading);
+    const before = existing.slice(0, headingIdx);
+    fs.writeFileSync(destPath, before + templateContent);
+  } else {
+    // No markers, no known heading — append with a blank line separator
+    const sep = existing.endsWith("\n") ? "\n" : "\n\n";
+    fs.writeFileSync(destPath, existing + sep + templateContent);
+  }
+  return true;
+}
+
+function countJsonlLines(filePath) {
+  if (!fs.existsSync(filePath)) return 0;
+  try {
+    const content = fs.readFileSync(filePath, "utf-8");
+    return content.split("\n").filter((l) => l.trim()).length;
+  } catch {
+    return 0;
+  }
+}
+
 // ──────────────────────────────────────────────
 // Auto-detection
 // ──────────────────────────────────────────────
@@ -115,24 +159,26 @@ function ask(rl, question, defaultVal) {
 function detectMcpServers() {
   const servers = new Map();
 
-  // 1. Check .mcp.json (standard MCP config)
   const mcpJsonPath = path.join(process.cwd(), ".mcp.json");
   if (fs.existsSync(mcpJsonPath)) {
     try {
       const mcpJson = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8"));
       const mcpServers = mcpJson.mcpServers || {};
       for (const [name, config] of Object.entries(mcpServers)) {
-        servers.set(name, {
+        const entry = {
           name,
           type: config.type || config.transport || "unknown",
-          url: config.url || "",
           source: ".mcp.json",
-        });
+        };
+        if (config.command) entry.command = config.command;
+        if (config.args) entry.args = config.args;
+        if (config.env) entry.env = config.env;
+        if (config.url) entry.url = config.url;
+        servers.set(name, entry);
       }
     } catch { /* skip */ }
   }
 
-  // 2. Check .claude/settings.local.json for mcp__ permissions
   const localSettingsPath = path.join(process.cwd(), ".claude", "settings.local.json");
   if (fs.existsSync(localSettingsPath)) {
     try {
@@ -162,7 +208,6 @@ function detectMcpServers() {
 function detectSkills() {
   const skills = new Set();
 
-  // Check .claude/settings.local.json for Skill() permissions
   const localSettingsPath = path.join(process.cwd(), ".claude", "settings.local.json");
   if (fs.existsSync(localSettingsPath)) {
     try {
@@ -186,6 +231,70 @@ function detectSkills() {
 }
 
 // ──────────────────────────────────────────────
+// MCP Sync from Sticky Note
+// ──────────────────────────────────────────────
+
+async function syncMcpFromStickyNote(rl) {
+  // V2: config is in a separate file
+  const configPath = path.join(process.cwd(), ".sticky-note", "sticky-note-config.json");
+  let config;
+  if (fs.existsSync(configPath)) {
+    config = readJsonSafe(configPath, {});
+  } else {
+    return;
+  }
+
+  const teamServers = config.mcp_servers || [];
+  const provisionable = teamServers.filter(
+    (s) => typeof s === "object" && (s.command || s.url)
+  );
+  if (provisionable.length === 0) return;
+
+  const mcpJsonPath = path.join(process.cwd(), ".mcp.json");
+  let existingServers = {};
+  if (fs.existsSync(mcpJsonPath)) {
+    try {
+      existingServers = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8")).mcpServers || {};
+    } catch { /* skip */ }
+  }
+
+  const missing = provisionable.filter((s) => !existingServers[s.name]);
+  if (missing.length === 0) return;
+
+  print(`\n  🔄 Teammate MCP servers found in sticky-note:`);
+  for (const s of missing) {
+    const detail = s.command ? `${s.command} ${(s.args || []).join(" ")}` : s.url;
+    print(`     • ${s.name} (${detail})`);
+  }
+
+  const answer = await ask(rl, "Add these to your .mcp.json?", "yes");
+  if (answer.toLowerCase() !== "yes" && answer.toLowerCase() !== "y") {
+    print("  ⏭️  Skipped MCP sync");
+    return;
+  }
+
+  let mcpJson = { mcpServers: {} };
+  if (fs.existsSync(mcpJsonPath)) {
+    try {
+      mcpJson = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8"));
+      mcpJson.mcpServers = mcpJson.mcpServers || {};
+    } catch { /* start fresh */ }
+  }
+
+  for (const s of missing) {
+    const config = { type: s.type || "stdio" };
+    if (s.command) config.command = s.command;
+    if (s.args) config.args = s.args;
+    if (s.env) config.env = s.env;
+    if (s.url) config.url = s.url;
+    mcpJson.mcpServers[s.name] = config;
+    print(`  [OK] Added ${s.name} to .mcp.json`);
+  }
+
+  fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2) + "\n");
+}
+
+// ──────────────────────────────────────────────
 // INIT command
 // ──────────────────────────────────────────────
 
@@ -196,17 +305,10 @@ async function cmdInit() {
   print("  Preflight checks...");
 
   if (!isGitRepo()) {
-    print("  ❌ Not a git repository. Run `git init` first.");
+    print("  [ERR] Not a git repository. Run `git init` first.");
     process.exit(1);
   }
-  print("  ✅ Git repository detected");
-
-  const python = hasPython();
-  if (!python) {
-    print("  ❌ Python 3.10+ not found. Install Python and try again.");
-    process.exit(1);
-  }
-  print(`  ✅ ${python.version} (${python.cmd})`);
+  print("  [OK] Git repository detected");
   print("");
 
   // Auto-detect MCP servers and skills
@@ -251,7 +353,11 @@ async function cmdInit() {
     "Team conventions (comma-separated)",
     ""
   );
-  const staleDays = await ask(rl, "Stale thread age in days", "3");
+  const staleDays = await ask(rl, "Stale thread age in days", "14");
+  const injectTokenBudget = await ask(rl, "Inject context token budget", "1000");
+
+  // Sync MCP servers from teammate's sticky-note config
+  await syncMcpFromStickyNote(rl);
 
   rl.close();
 
@@ -264,13 +370,13 @@ async function cmdInit() {
     return detected || { name, source: "manual" };
   });
 
-  // Build skills list: merge detected + any extras from conventions
   const skills = [...detectedSkills];
 
   const conventions = conventionsRaw
     ? conventionsRaw.split(",").map((s) => s.trim()).filter(Boolean)
     : [];
-  const staleDaysNum = parseInt(staleDays, 10) || 3;
+  const staleDaysResolved = parseIntOr(staleDays, 14);
+  const injectTokenBudgetResolved = parseIntOr(injectTokenBudget, 1000);
 
   print("\n  📁 Creating files...\n");
 
@@ -288,70 +394,108 @@ async function cmdInit() {
     const dest = path.join(claudeHooksDir, file);
     copyFile(src, dest);
     makeExecutable(dest);
-    print(`  ✅ .claude/hooks/${file}`);
+    print(`  [OK] .claude/hooks/${file}`);
   }
 
   // Create settings.json (Claude Code)
   const settingsTemplate = JSON.parse(readTemplate("settings.json"));
-  // Update python command if python3 is the available command
-  if (python.cmd === "python3") {
-    for (const [, hookArr] of Object.entries(settingsTemplate.hooks)) {
-      for (const hookEntry of hookArr) {
-        for (const h of hookEntry.hooks) {
-          h.command = h.command.replace("python ", "python3 ");
-        }
-      }
-    }
-  }
   const settingsDest = path.join(process.cwd(), ".claude", "settings.json");
   fs.writeFileSync(settingsDest, JSON.stringify(settingsTemplate, null, 2) + "\n");
-  print("  ✅ .claude/settings.json");
+  print("  [OK] .claude/settings.json");
 
   // Create hooks.json (Copilot CLI)
   const hooksTemplate = JSON.parse(readTemplate("hooks.json"));
-  if (python.cmd === "python3") {
-    for (const [, hookArr] of Object.entries(hooksTemplate.hooks)) {
-      for (const hookEntry of hookArr) {
-        for (const h of hookEntry.hooks) {
-          h.command = h.command.replace("python ", "python3 ");
-        }
-      }
-    }
-  }
   const hooksDest = path.join(githubHooksDir, "hooks.json");
   fs.writeFileSync(hooksDest, JSON.stringify(hooksTemplate, null, 2) + "\n");
-  print("  ✅ .github/hooks/hooks.json");
+  print("  [OK] .github/hooks/hooks.json");
 
-  // Create sticky-note.json
-  const memoryTemplate = JSON.parse(readTemplate("sticky-note.json"));
-  memoryTemplate.config.mcp_servers = mcpServers;
-  memoryTemplate.config.skills = skills;
-  memoryTemplate.config.conventions = conventions;
-  memoryTemplate.config.stale_days = staleDaysNum;
-  memoryTemplate.config.hook_version = VERSION;
+  // Create sticky-note.json (V2 — no audit array)
+  const memoryDest = path.join(stickyNoteDir, "sticky-note.json");
+  if (!fs.existsSync(memoryDest)) {
+    const memoryTemplate = JSON.parse(readTemplate("sticky-note.json"));
+    fs.writeFileSync(memoryDest, JSON.stringify(memoryTemplate, null, 2) + "\n");
+  }
+  print("  [OK] .sticky-note/sticky-note.json (v2)");
 
-  const memoryDest = path.join(process.cwd(), ".sticky-note", "sticky-note.json");
-  fs.writeFileSync(memoryDest, JSON.stringify(memoryTemplate, null, 2) + "\n");
-  print("  ✅ .sticky-note/sticky-note.json");
+  // Create per-user audit and presence directories
+  const auditDir = path.join(stickyNoteDir, "audit");
+  const presenceDir = path.join(stickyNoteDir, "presence");
+  fs.mkdirSync(auditDir, { recursive: true });
+  fs.mkdirSync(presenceDir, { recursive: true });
+  print("  [OK] .sticky-note/audit/ (per-user audit logs)");
+  print("  [OK] .sticky-note/presence/ (per-user presence)");
+
+  // Migrate legacy single-file audit/presence if they exist
+  const legacyAuditPath = path.join(stickyNoteDir, "sticky-note-audit.jsonl");
+  const legacyPresencePath = path.join(stickyNoteDir, ".sticky-presence.json");
+  if (fs.existsSync(legacyAuditPath)) {
+    const user = process.env.USER || process.env.USERNAME || "unknown";
+    const dest = path.join(auditDir, user + ".jsonl");
+    if (fs.existsSync(dest)) {
+      fs.appendFileSync(dest, fs.readFileSync(legacyAuditPath, "utf-8"));
+    } else {
+      fs.renameSync(legacyAuditPath, dest);
+    }
+    try { if (fs.existsSync(legacyAuditPath)) fs.unlinkSync(legacyAuditPath); } catch (_) {}
+    print("  [OK] Migrated legacy audit log to audit/" + (process.env.USER || process.env.USERNAME || "unknown") + ".jsonl");
+  }
+  if (fs.existsSync(legacyPresencePath)) {
+    const data = readJsonSafe(legacyPresencePath, {});
+    for (const [u, info] of Object.entries(data)) {
+      const dest = path.join(presenceDir, u + ".json");
+      fs.writeFileSync(dest, JSON.stringify(info, null, 2) + "\n");
+    }
+    fs.unlinkSync(legacyPresencePath);
+    print("  [OK] Migrated legacy presence to per-user files");
+  }
+
+  // Create sticky-note-config.json
+  const configDest = path.join(stickyNoteDir, "sticky-note-config.json");
+  if (!fs.existsSync(configDest)) {
+    const configTemplate = JSON.parse(readTemplate("sticky-note-config.json"));
+    configTemplate.mcp_servers = mcpServers;
+    configTemplate.skills = skills;
+    configTemplate.conventions = conventions;
+    configTemplate.stale_days = staleDaysResolved;
+    configTemplate.inject_token_budget = injectTokenBudgetResolved;
+    configTemplate.hook_version = VERSION;
+    fs.writeFileSync(configDest, JSON.stringify(configTemplate, null, 2) + "\n");
+  } else {
+    // Update existing config with new settings
+    const existing = readJsonSafe(configDest, {});
+    existing.mcp_servers = mcpServers;
+    existing.skills = skills;
+    existing.conventions = conventions;
+    existing.stale_days = staleDaysResolved;
+    existing.inject_token_budget = injectTokenBudgetResolved;
+    existing.hook_version = VERSION;
+    fs.writeFileSync(configDest, JSON.stringify(existing, null, 2) + "\n");
+  }
+  print("  [OK] .sticky-note/sticky-note-config.json");
 
   // Update .gitignore
   const gitignorePath = path.join(process.cwd(), ".gitignore");
-  const ignoreEntry = ".claude/settings.local.json";
+  const ignoreAdditions = fs
+    .readFileSync(path.join(TEMPLATES_DIR, "gitignore-additions.txt"), "utf-8")
+    .trim()
+    .split("\n")
+    .filter((l) => l.trim() && !l.startsWith("#"));
+
   let gitignoreContent = "";
   if (fs.existsSync(gitignorePath)) {
     gitignoreContent = fs.readFileSync(gitignorePath, "utf-8");
   }
-  if (!gitignoreContent.includes(ignoreEntry)) {
-    const addition = gitignoreContent.endsWith("\n") || gitignoreContent === ""
-      ? `\n# Sticky Note - local overrides\n${ignoreEntry}\n`
-      : `\n\n# Sticky Note - local overrides\n${ignoreEntry}\n`;
-    fs.appendFileSync(gitignorePath, addition);
-    print("  ✅ .gitignore updated");
+
+  const missingEntries = ignoreAdditions.filter((e) => !gitignoreContent.includes(e.trim()));
+  if (missingEntries.length > 0) {
+    const block = "\n# Sticky Note\n" + missingEntries.join("\n") + "\n";
+    fs.appendFileSync(gitignorePath, block);
+    print("  [OK] .gitignore updated");
   } else {
     print("  ⏭️  .gitignore already configured");
   }
 
-  // Add .gitattributes merge strategy for sticky-note.json
+  // Add .gitattributes merge strategy
   const gitattrsPath = path.join(process.cwd(), ".gitattributes");
   const mergeRule = ".sticky-note/sticky-note.json merge=union";
   let gitattrsContent = "";
@@ -363,19 +507,50 @@ async function cmdInit() {
       ? `\n# Sticky Note - auto-merge threads from both sides\n${mergeRule}\n`
       : `\n\n# Sticky Note - auto-merge threads from both sides\n${mergeRule}\n`;
     fs.appendFileSync(gitattrsPath, addition);
-    print("  ✅ .gitattributes updated (merge=union)");
+    print("  [OK] .gitattributes updated (merge=union)");
   } else {
     print("  ⏭️  .gitattributes already configured");
   }
 
+  // Deploy AI instruction files (CLAUDE.md + .github/copilot-instructions.md)
+  const claudeMdDest = path.join(process.cwd(), "CLAUDE.md");
+  if (!fs.existsSync(claudeMdDest)) {
+    copyFile(path.join(TEMPLATES_DIR, "CLAUDE.md"), claudeMdDest);
+    print("  [OK] CLAUDE.md (AI instructions for Claude Code)");
+  } else {
+    print("  ⏭️  CLAUDE.md already exists");
+  }
+
+  const copilotInstrDest = path.join(githubHooksDir, "..", "copilot-instructions.md");
+  if (!fs.existsSync(copilotInstrDest)) {
+    copyFile(path.join(TEMPLATES_DIR, "copilot-instructions.md"), copilotInstrDest);
+    print("  [OK] .github/copilot-instructions.md (AI instructions for Copilot CLI)");
+  } else {
+    print("  ⏭️  .github/copilot-instructions.md already exists");
+  }
+
+  // Install Codex wrapper if --codex flag
+  const wantCodex = process.argv.includes("--codex");
+  if (wantCodex) {
+    const codexSrc = path.join(TEMPLATES_DIR, "hooks", "sticky-codex.sh");
+    const codexDest = path.join(claudeHooksDir, "sticky-codex.sh");
+    copyFile(codexSrc, codexDest);
+    makeExecutable(codexDest);
+    print("  [OK] .claude/hooks/sticky-codex.sh");
+    print(`\n  🔧 Codex wrapper installed!`);
+    print(`  Add this alias to your shell profile:`);
+    print(`    alias sticky-codex="${codexDest}"`);
+    print("");
+  }
+
   // Done!
-  print("\n  ✨ Sticky Note initialized!\n");
+  print("\n  ✨ Sticky Note V2 initialized!\n");
   print("  Next steps:");
-  print("  ┌──────────────────────────────────────────────────────────┐");
-  print("  │  git add .claude .github .sticky-note .gitignore .gitattributes │");
-  print("  │  git commit -m \"feat: add sticky-note hooks\"             │");
-  print("  │  git push                                                │");
-  print("  └──────────────────────────────────────────────────────────┘");
+  print("  ┌──────────────────────────────────────────────────────────────┐");
+  print("  │  git add .claude .github .sticky-note .gitignore .gitattributes CLAUDE.md  │");
+  print("  │  git commit -m \"feat: add sticky-note v2 hooks\"                  │");
+  print("  │  git push                                                        │");
+  print("  └──────────────────────────────────────────────────────────────┘");
   print("");
   print("  Teammates just need to `git pull` — no extra setup.");
   print("");
@@ -389,14 +564,9 @@ function cmdUpdate() {
   printBanner();
 
   const claudeHooksDir = path.join(process.cwd(), ".claude", "hooks");
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
   if (!fs.existsSync(claudeHooksDir)) {
-    print("  ❌ No .claude/hooks/ directory found. Run `npx sticky-note init` first.");
-    process.exit(1);
-  }
-
-  const python = hasPython();
-  if (!python) {
-    print("  ❌ Python 3.10+ not found.");
+    print("  [ERR] No .claude/hooks/ directory found. Run `npx sticky-note init` first.");
     process.exit(1);
   }
 
@@ -407,56 +577,51 @@ function cmdUpdate() {
     const dest = path.join(claudeHooksDir, file);
     copyFile(src, dest);
     makeExecutable(dest);
-    print(`  ✅ .claude/hooks/${file}`);
+    print(`  [OK] .claude/hooks/${file}`);
   }
 
-  // Update settings.json hooks (preserve any custom settings)
+  // Update settings.json hooks
   const settingsPath = path.join(process.cwd(), ".claude", "settings.json");
   if (fs.existsSync(settingsPath)) {
     const settingsTemplate = JSON.parse(readTemplate("settings.json"));
-    if (python.cmd === "python3") {
-      for (const [, hookArr] of Object.entries(settingsTemplate.hooks)) {
-        for (const hookEntry of hookArr) {
-          for (const h of hookEntry.hooks) {
-            h.command = h.command.replace("python ", "python3 ");
-          }
-        }
-      }
-    }
     const existing = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
     existing.hooks = settingsTemplate.hooks;
     fs.writeFileSync(settingsPath, JSON.stringify(existing, null, 2) + "\n");
-    print("  ✅ .claude/settings.json (hooks updated)");
+    print("  [OK] .claude/settings.json (hooks updated)");
   }
 
   // Update hooks.json
   const hooksPath = path.join(process.cwd(), ".github", "hooks", "hooks.json");
   if (fs.existsSync(hooksPath)) {
     const hooksTemplate = JSON.parse(readTemplate("hooks.json"));
-    if (python.cmd === "python3") {
-      for (const [, hookArr] of Object.entries(hooksTemplate.hooks)) {
-        for (const hookEntry of hookArr) {
-          for (const h of hookEntry.hooks) {
-            h.command = h.command.replace("python ", "python3 ");
-          }
-        }
-      }
-    }
     fs.writeFileSync(hooksPath, JSON.stringify(hooksTemplate, null, 2) + "\n");
-    print("  ✅ .github/hooks/hooks.json (updated)");
+    print("  [OK] .github/hooks/hooks.json (updated)");
   }
 
-  // Update hook_version in sticky-note.json
-  const memoryPath = path.join(process.cwd(), ".sticky-note", "sticky-note.json");
-  if (fs.existsSync(memoryPath)) {
-    const memory = JSON.parse(fs.readFileSync(memoryPath, "utf-8"));
-    memory.config = memory.config || {};
-    memory.config.hook_version = VERSION;
-    fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2) + "\n");
+  // Update hook_version in config
+  const configPath = path.join(stickyDir, "sticky-note-config.json");
+  if (fs.existsSync(configPath)) {
+    const config = readJsonSafe(configPath, {});
+    config.hook_version = VERSION;
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
   }
 
-  print("\n  ✨ Scripts updated to v" + VERSION);
-  print("  ⚠️  Data in sticky-note.json was NOT modified.\n");
+  print(`\n  ✨ Scripts updated to v${VERSION}`);
+
+  // Update instruction files (section-based: only replaces between markers)
+  const claudeMdDest = path.join(process.cwd(), "CLAUDE.md");
+  const claudeMdTemplate = readTemplate("CLAUDE.md");
+  if (updateInstructionSection(claudeMdDest, claudeMdTemplate, "# Sticky Note")) {
+    print("  [OK] CLAUDE.md (sticky-note section updated)");
+  }
+
+  const copilotInstrDest = path.join(process.cwd(), ".github", "copilot-instructions.md");
+  const copilotTemplate = readTemplate("copilot-instructions.md");
+  if (updateInstructionSection(copilotInstrDest, copilotTemplate, "# Sticky Note")) {
+    print("  [OK] .github/copilot-instructions.md (sticky-note section updated)");
+  }
+
+  print("  ⚠️  Thread data was NOT modified.\n");
 }
 
 // ──────────────────────────────────────────────
@@ -466,9 +631,9 @@ function cmdUpdate() {
 function cmdStatus() {
   printBanner();
 
-  // Check hooks directory
   const claudeHooksDir = path.join(process.cwd(), ".claude", "hooks");
   const hooksExist = fs.existsSync(claudeHooksDir);
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
 
   print("  📊 Diagnostic Report\n");
 
@@ -478,73 +643,643 @@ function cmdStatus() {
     for (const file of HOOK_FILES) {
       const filePath = path.join(claudeHooksDir, file);
       if (fs.existsSync(filePath)) {
-        print(`    ✅ ${file}`);
+        print(`    [OK] ${file}`);
       } else {
-        print(`    ❌ ${file} (missing)`);
+        print(`    [ERR] ${file} (missing)`);
       }
     }
   } else {
-    print("    ❌ .claude/hooks/ directory not found");
+    print("    [ERR] .claude/hooks/ directory not found");
   }
 
-  // Settings files
+  // Config files
   print("\n  Config Files:");
   const settingsPath = path.join(process.cwd(), ".claude", "settings.json");
   const hooksJsonPath = path.join(process.cwd(), ".github", "hooks", "hooks.json");
   print(
-    `    ${fs.existsSync(settingsPath) ? "✅" : "❌"} .claude/settings.json`
+    `    ${fs.existsSync(settingsPath) ? "[OK]" : "[ERR]"} .claude/settings.json`
   );
   print(
-    `    ${fs.existsSync(hooksJsonPath) ? "✅" : "❌"} .github/hooks/hooks.json`
+    `    ${fs.existsSync(hooksJsonPath) ? "[OK]" : "[ERR]"} .github/hooks/hooks.json`
   );
 
-  // Sticky Note data
-  const memoryPath = path.join(process.cwd(), ".sticky-note", "sticky-note.json");
+  // Sticky Note data — V2 format
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+  const configPath = path.join(stickyDir, "sticky-note-config.json");
+
   print("\n  Sticky Note Data:");
   if (fs.existsSync(memoryPath)) {
     try {
       const memory = JSON.parse(fs.readFileSync(memoryPath, "utf-8"));
       const threads = memory.threads || [];
-      const audit = memory.audit || [];
-      const config = memory.config || {};
+      const schemaVersion = memory.version || "2";
 
       const openThreads = threads.filter((t) => t.status === "open").length;
       const stuckThreads = threads.filter((t) => t.status === "stuck").length;
       const staleThreads = threads.filter((t) => t.status === "stale").length;
       const closedThreads = threads.filter((t) => t.status === "closed").length;
+      const expiredThreads = threads.filter((t) => t.status === "expired").length;
 
-      print(`    ✅ sticky-note.json (v${config.hook_version || "?"})`);
+      print(`    [OK] sticky-note.json (schema v${schemaVersion})`);
       print(`    📝 Threads: ${threads.length} total`);
-      print(`       open=${openThreads}  stuck=${stuckThreads}  stale=${staleThreads}  closed=${closedThreads}`);
-      print(`    📋 Audit entries: ${audit.length} / 500`);
-
-      if (config.mcp_servers && config.mcp_servers.length > 0) {
-        print(`    🔌 MCP servers: ${config.mcp_servers.length} configured`);
-      }
-      if (config.conventions && config.conventions.length > 0) {
-        print(`    📋 Conventions: ${config.conventions.length} defined`);
-      }
-      print(`    ⏰ Stale after: ${config.stale_days || "?"} days`);
+      print(`       open=${openThreads}  stuck=${stuckThreads}  stale=${staleThreads}  closed=${closedThreads}  expired=${expiredThreads}`);
     } catch {
-      print("    ❌ sticky-note.json (invalid JSON)");
+      print("    [ERR] sticky-note.json (invalid JSON)");
     }
   } else {
-    print("    ❌ sticky-note.json not found");
+    print("    [ERR] sticky-note.json not found");
   }
 
-  // Python check
-  print("\n  Environment:");
-  const python = hasPython();
-  if (python) {
-    print(`    ✅ ${python.version} (${python.cmd})`);
+  // Config
+  if (fs.existsSync(configPath)) {
+    const config = readJsonSafe(configPath, {});
+    print(`    [OK] sticky-note-config.json (v${config.hook_version || "?"})`);
+    if (config.mcp_servers && config.mcp_servers.length > 0) {
+      print(`    🔌 MCP servers: ${config.mcp_servers.length} configured`);
+    }
+    if (config.conventions && config.conventions.length > 0) {
+      print(`    📋 Conventions: ${config.conventions.length} defined`);
+    }
+    print(`    Stale after: ${config.stale_days ?? "?"} days`);
+    print(`    Inject token budget: ${config.inject_token_budget ?? 1000}`);
   } else {
-    print("    ❌ Python 3.10+ not found");
+    print("    [ERR] sticky-note-config.json not found");
   }
+
+  // Audit (per-user)
+  const auditDir = path.join(stickyDir, "audit");
+  if (fs.existsSync(auditDir)) {
+    const auditFiles = fs.readdirSync(auditDir).filter((f) => f.endsWith(".jsonl"));
+    let totalEntries = 0;
+    const perUser = [];
+    for (const f of auditFiles) {
+      const count = countJsonlLines(path.join(auditDir, f));
+      totalEntries += count;
+      perUser.push(`${path.basename(f, ".jsonl")}(${count})`);
+    }
+    if (totalEntries > 0) {
+      print(`    [OK] audit/ (${totalEntries} entries across ${auditFiles.length} user(s))`);
+      print(`         ${perUser.join(", ")}`);
+    } else {
+      print("    ⏭️  audit/ (empty)");
+    }
+  } else {
+    // Check for legacy single file
+    const legacyAuditPath = path.join(stickyDir, "sticky-note-audit.jsonl");
+    const auditCount = countJsonlLines(legacyAuditPath);
+    if (auditCount > 0) {
+      print(`    ⚠️  sticky-note-audit.jsonl (${auditCount} entries, legacy — run init to migrate)`);
+    } else {
+      print("    ⏭️  No audit data (run init to set up per-user audit)");
+    }
+  }
+
+  // Presence (per-user)
+  const presenceDir = path.join(stickyDir, "presence");
+  if (fs.existsSync(presenceDir)) {
+    const presenceFiles = fs.readdirSync(presenceDir).filter((f) => f.endsWith(".json"));
+    const now = Date.now();
+    const activeUsers = [];
+    for (const f of presenceFiles) {
+      const info = readJsonSafe(path.join(presenceDir, f), {});
+      const lastSeen = info.last_seen || "";
+      if (lastSeen) {
+        const ts = new Date(lastSeen).getTime();
+        if (!isNaN(ts) && now - ts < 15 * 60 * 1000) {
+          activeUsers.push(path.basename(f, ".json"));
+        }
+      }
+    }
+    print(`    👥 Presence: ${activeUsers.length > 0 ? activeUsers.join(", ") + " (active)" : "no active users"}`);
+  } else {
+    print("    ⏭️  No presence data (run init to set up per-user presence)");
+  }
+
+  print("\n  Environment:");
 
   print(
-    `    ${isGitRepo() ? "✅" : "❌"} Git repository`
+    `    ${isGitRepo() ? "[OK]" : "[ERR]"} Git repository`
   );
 
+  print("");
+}
+
+// ──────────────────────────────────────────────
+// Helpers (shared formatting)
+// ──────────────────────────────────────────────
+
+function statusIcon(status) {
+  switch (status) {
+    case "stuck": return "[STUCK]";
+    case "open": return "[OPEN]";
+    case "stale": return "[STALE]";
+    default: return "[CLOSED]";
+  }
+}
+
+// ──────────────────────────────────────────────
+// THREADS command
+// ──────────────────────────────────────────────
+
+function cmdThreads() {
+  const memoryPath = path.join(process.cwd(), ".sticky-note", "sticky-note.json");
+  if (!fs.existsSync(memoryPath)) {
+    print("  [ERR] No sticky-note.json found. Run `npx sticky-note init` first.");
+    process.exit(1);
+  }
+
+  const memory = readJsonSafe(memoryPath, { threads: [] });
+  const threads = memory.threads || [];
+
+  // Filter: show open, stuck, closed (not expired)
+  const live = threads.filter((t) => ["open", "stuck", "closed", "stale"].includes(t.status));
+
+  if (live.length === 0) {
+    print("  No active threads.");
+    return;
+  }
+
+  print("");
+  for (const t of live) {
+    const icon = statusIcon(t.status);
+    const user = t.user || t.author || "?";
+    const files = (t.files_touched || []).slice(0, 3).join(", ");
+    const branch = t.branch ? ` (${t.branch})` : "";
+    const note = t.last_note ? ` — ${t.last_note.slice(0, 60)}` : "";
+
+    print(`  ${icon} [${t.status}] ${user}${branch}: ${files}${note}`);
+    if (t.narrative) {
+      print(`     📖 ${t.narrative.slice(0, 100)}`);
+    }
+    if (t.failed_approaches && t.failed_approaches.length > 0) {
+      print(`     ⚠️  ${t.failed_approaches.length} failed approach(es)`);
+    }
+  }
+  print("");
+}
+
+// ──────────────────────────────────────────────
+// RESUME command
+// ──────────────────────────────────────────────
+
+function cmdResume() {
+  const args = process.argv.slice(3);
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+  const resumePath = path.join(stickyDir, ".sticky-resume");
+
+  if (!fs.existsSync(memoryPath)) {
+    print("  [ERR] No sticky-note.json found. Run `npx sticky-note init` first.");
+    process.exit(1);
+  }
+
+  // resume --clear: remove the resume signal
+  if (args.includes("--clear")) {
+    if (fs.existsSync(resumePath)) {
+      fs.unlinkSync(resumePath);
+      print("  [OK] Resume signal cleared.");
+    } else {
+      print("  ℹ️  No active resume signal.");
+    }
+    return;
+  }
+
+  // resume --list: show resumable threads
+  if (args.includes("--list") || args.length === 0) {
+    const memory = readJsonSafe(memoryPath, { threads: [] });
+    const threads = memory.threads || [];
+    const resumable = threads.filter((t) =>
+      ["closed", "stuck", "open", "stale"].includes(t.status)
+    );
+
+    if (resumable.length === 0) {
+      print("  No resumable threads.");
+      return;
+    }
+
+    // Show current resume signal if active
+    if (fs.existsSync(resumePath)) {
+      const activeId = fs.readFileSync(resumePath, "utf-8").trim();
+      print(`\n  🔄 Active resume: ${activeId}\n`);
+    }
+
+    print("\n  Resumable threads:\n");
+    for (const t of resumable) {
+      const icon = statusIcon(t.status);
+      const user = t.user || t.author || "?";
+      const files = (t.files_touched || []).slice(0, 3).join(", ");
+      const branch = t.branch ? ` (${t.branch})` : "";
+      const note = t.last_note ? ` — ${t.last_note.slice(0, 60)}` : "";
+      const shortId = t.id.slice(0, 8);
+
+      print(`  ${icon} ${shortId} [${t.status}] ${user}${branch}: ${files}${note}`);
+      const prompts = t.prompts || [];
+      if (prompts.length > 0) {
+        const preview = prompts.slice(0, 3).map((p, i) => `     ${i + 1}. ${p.slice(0, 60)}`).join("\n");
+        print(preview);
+        if (prompts.length > 3) print(`     ... and ${prompts.length - 3} more prompt(s)`);
+      }
+    }
+    print(`\n  Usage: npx sticky-note resume <thread-id>`);
+    print("  You can use the first 8 characters of the ID.\n");
+    return;
+  }
+
+  // resume <thread-id>: set the resume signal
+  const threadId = args[0];
+  const memory = readJsonSafe(memoryPath, { threads: [] });
+  const threads = memory.threads || [];
+
+  // Support partial ID matching (first 8 chars)
+  const match = threads.find((t) =>
+    t.id === threadId || t.id.startsWith(threadId)
+  );
+
+  if (!match) {
+    print(`  [ERR] No thread found matching "${threadId}".`);
+    print("  Run `npx sticky-note resume --list` to see available threads.");
+    process.exit(1);
+  }
+
+  if (match.status === "expired") {
+    print(`  [ERR] Thread ${match.id.slice(0, 8)} is expired and cannot be resumed.`);
+    process.exit(1);
+  }
+
+  // Write the resume signal file
+  fs.writeFileSync(resumePath, match.id + "\n");
+
+  const icon = statusIcon(match.status);
+  print(`\n  [OK] Resume signal set for thread ${match.id.slice(0, 8)}`);
+  print(`  ${icon} [${match.status}] ${match.user || "?"} (${match.branch || "no branch"})`);
+  if (match.last_note) {
+    print(`     ${match.last_note.slice(0, 80)}`);
+  }
+
+  // Output full thread context so AI assistants can use it immediately
+  print(`\n  ── Thread context ──────────────────────────────────`);
+  print(`  ID:       ${match.id}`);
+  print(`  Author:   ${match.user || match.author || "unknown"}`);
+  print(`  Tool:     ${match.tool || "unknown"}`);
+  print(`  Branch:   ${match.branch || "none"}`);
+  print(`  Status:   ${match.status}`);
+  print(`  Created:  ${match.created_at || "?"}`);
+
+  if (match.work_type && match.work_type !== "general") {
+    print(`  Type:     ${match.work_type}`);
+  }
+
+  const files = match.files_touched || [];
+  if (files.length > 0) {
+    print(`  Files:    ${files.join(", ")}`);
+  }
+
+  if (match.narrative) {
+    print(`\n  📖 Narrative:`);
+    print(`  ${match.narrative.slice(0, 500)}`);
+  }
+
+  if (match.handoff_summary && match.handoff_summary !== "Session stopped — no summary available") {
+    print(`\n  🤝 Handoff:`);
+    print(`  ${match.handoff_summary.slice(0, 300)}`);
+  }
+
+  const failed = match.failed_approaches || [];
+  if (failed.length > 0) {
+    print(`\n  ⚠️  Failed approaches (${failed.length}):`);
+    for (const f of failed.slice(0, 5)) {
+      const desc = typeof f === "string" ? f : f.description || JSON.stringify(f);
+      print(`     • ${desc.slice(0, 120)}`);
+    }
+  }
+
+  const prompts = match.prompts || [];
+  if (prompts.length > 0) {
+    print(`\n  💬 Conversation (${prompts.length} prompt(s)):`);
+    for (const [i, p] of prompts.slice(0, 8).entries()) {
+      print(`     ${i + 1}. ${p.slice(0, 120)}`);
+    }
+    if (prompts.length > 8) {
+      print(`     ... and ${prompts.length - 8} more`);
+    }
+  }
+
+  print(`  ────────────────────────────────────────────────────`);
+  print(`\n  Your next prompt will pick up this thread's context automatically.`);
+  print("  Run `npx sticky-note resume --clear` to cancel.\n");
+}
+
+// ──────────────────────────────────────────────
+// AUDIT command
+// ──────────────────────────────────────────────
+
+function cmdReset() {
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+
+  if (!fs.existsSync(memoryPath)) {
+    print("  [ERR] No sticky-note.json found. Run 'npx sticky-note init' first.");
+    process.exit(1);
+  }
+
+  const args = process.argv.slice(3);
+  const force = args.includes("--force");
+
+  const memory = readJsonSafe(memoryPath, { version: "2", threads: [] });
+  const threadCount = (memory.threads || []).length;
+
+  if (threadCount === 0) {
+    print("  Nothing to reset -- 0 threads.");
+    return;
+  }
+
+  if (!force) {
+    print(`  This will permanently delete ${threadCount} thread(s) from sticky-note.json.`);
+    print("  Run with --force to confirm, or --keep-audit to preserve the audit log.");
+    return;
+  }
+
+  const keepAudit = args.includes("--keep-audit");
+
+  memory.threads = [];
+  fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2));
+  print(`  [OK] Cleared ${threadCount} thread(s) from sticky-note.json`);
+
+  if (!keepAudit) {
+    // Delete per-user audit directory
+    const auditDir = path.join(stickyDir, "audit");
+    if (fs.existsSync(auditDir)) {
+      for (const f of fs.readdirSync(auditDir)) {
+        fs.unlinkSync(path.join(auditDir, f));
+      }
+      print("  [OK] Deleted all per-user audit logs");
+    }
+    // Also clean legacy single file if present
+    const legacyAudit = path.join(stickyDir, "sticky-note-audit.jsonl");
+    if (fs.existsSync(legacyAudit)) {
+      fs.unlinkSync(legacyAudit);
+      print("  [OK] Deleted legacy audit log");
+    }
+  } else {
+    print("  [OK] Audit logs preserved (--keep-audit)");
+  }
+
+  // Clean up presence directory
+  const presenceDir = path.join(stickyDir, "presence");
+  if (fs.existsSync(presenceDir)) {
+    for (const f of fs.readdirSync(presenceDir)) {
+      fs.unlinkSync(path.join(presenceDir, f));
+    }
+  }
+
+  // Clean up signal files and legacy presence
+  for (const f of [".sticky-resume", ".sticky-session", ".sticky-head", ".sticky-presence.json"]) {
+    const p = path.join(stickyDir, f);
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+  }
+  print("  [OK] Cleared session signal files");
+  print("");
+  print("  Fresh start. Next session will create a new thread.");
+}
+
+function cmdAudit() {
+  const args = process.argv.slice(3);
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const auditDir = path.join(stickyDir, "audit");
+
+  // Collect all audit file paths (per-user + legacy)
+  const auditPaths = [];
+  if (fs.existsSync(auditDir)) {
+    for (const f of fs.readdirSync(auditDir)) {
+      if (f.endsWith(".jsonl")) auditPaths.push(path.join(auditDir, f));
+    }
+  }
+  const legacyPath = path.join(stickyDir, "sticky-note-audit.jsonl");
+  if (fs.existsSync(legacyPath)) auditPaths.push(legacyPath);
+
+  if (auditPaths.length === 0) {
+    print("  [ERR] No audit files found. Run 'npx sticky-note init' first.");
+    process.exit(1);
+  }
+
+  // Parse flags
+  let filterFile = null;
+  let filterUser = null;
+  let filterSince = null;
+  let filterSession = null;
+  let limit = 50;
+
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case "--file":
+        if (i + 1 < args.length) filterFile = args[++i];
+        break;
+      case "--user":
+        if (i + 1 < args.length) filterUser = args[++i];
+        break;
+      case "--since":
+        if (i + 1 < args.length) filterSince = args[++i];
+        break;
+      case "--session":
+        if (i + 1 < args.length) filterSession = args[++i];
+        break;
+      case "--limit":
+        if (i + 1 < args.length) limit = parseIntOr(args[++i], 50);
+        break;
+    }
+  }
+
+  // Read and filter all JSONL files, merge entries
+  const matches = [];
+
+  for (const auditPath of auditPaths) {
+    try {
+      const content = fs.readFileSync(auditPath, "utf-8");
+      const lines = content.split("\n").filter((l) => l.trim());
+      for (const line of lines) {
+        let entry;
+        try {
+          entry = JSON.parse(line);
+        } catch {
+          continue;
+        }
+
+        if (filterFile && !(entry.file || "").includes(filterFile)) continue;
+        if (filterUser && entry.user !== filterUser) continue;
+        if (filterSession && entry.session_id !== filterSession) continue;
+        if (filterSince) {
+          const ts = entry.ts || entry.timestamp || "";
+          if (ts < filterSince) continue;
+        }
+
+        matches.push(entry);
+      }
+    } catch (_) {
+      // skip unreadable files
+    }
+  }
+
+  // Sort by timestamp, show most recent first
+  matches.sort((a, b) => {
+    const ta = a.ts || a.timestamp || "";
+    const tb = b.ts || b.timestamp || "";
+    return ta < tb ? -1 : ta > tb ? 1 : 0;
+  });
+
+  const display = matches.slice(-limit).reverse();
+
+  if (display.length === 0) {
+    print("  No matching audit entries.");
+    return;
+  }
+
+  print(`\n  ${display.length} matching entries (of ${matches.length} total):\n`);
+  for (const e of display) {
+    const ts = (e.ts || e.timestamp || "").slice(0, 16);
+    const user = e.user || "?";
+    const type = e.type || "?";
+    const file = e.file ? ` ${e.file}` : "";
+    const tool = e.tool ? ` [${e.tool}]` : "";
+    print(`  ${ts}  ${user}  ${type}${tool}${file}`);
+  }
+  print("");
+}
+
+// ──────────────────────────────────────────────
+// WHO command — show active users
+// ──────────────────────────────────────────────
+
+function cmdWho() {
+  printBanner();
+
+  const presenceDir = path.join(process.cwd(), ".sticky-note", "presence");
+
+  if (!fs.existsSync(presenceDir)) {
+    // Check legacy
+    const legacyPath = path.join(process.cwd(), ".sticky-note", ".sticky-presence.json");
+    if (fs.existsSync(legacyPath)) {
+      print("  ⚠️  Legacy presence file found. Run 'npx sticky-note init' to migrate.\n");
+      const data = readJsonSafe(legacyPath, {});
+      const now = Date.now();
+      for (const [user, info] of Object.entries(data)) {
+        const lastSeen = info.last_seen || "";
+        const ts = lastSeen ? new Date(lastSeen).getTime() : 0;
+        const active = !isNaN(ts) && now - ts < 15 * 60 * 1000;
+        const ago = lastSeen ? _relativeTime(lastSeen) : "unknown";
+        const files = (info.active_files || []).slice(0, 5).join(", ");
+        const marker = active ? "[ACTIVE]" : "[IDLE]";
+        print(`  ${marker} ${user}  (${ago})`);
+        if (files) print(`         files: ${files}`);
+      }
+    } else {
+      print("  No presence data. Run 'npx sticky-note init' to set up.\n");
+    }
+    return;
+  }
+
+  const presenceFiles = fs.readdirSync(presenceDir).filter((f) => f.endsWith(".json"));
+  if (presenceFiles.length === 0) {
+    print("  No users tracked yet.\n");
+    return;
+  }
+
+  const now = Date.now();
+  const users = [];
+  for (const f of presenceFiles) {
+    const user = path.basename(f, ".json");
+    const info = readJsonSafe(path.join(presenceDir, f), {});
+    const lastSeen = info.last_seen || "";
+    const ts = lastSeen ? new Date(lastSeen).getTime() : 0;
+    const active = !isNaN(ts) && now - ts < 15 * 60 * 1000;
+    users.push({ user, info, lastSeen, active });
+  }
+
+  // Sort: active first, then by last_seen descending
+  users.sort((a, b) => {
+    if (a.active !== b.active) return a.active ? -1 : 1;
+    return (b.lastSeen || "") > (a.lastSeen || "") ? 1 : -1;
+  });
+
+  print("  Team Activity:\n");
+  for (const { user, info, lastSeen, active } of users) {
+    const ago = lastSeen ? _relativeTime(lastSeen) : "unknown";
+    const files = (info.active_files || []).slice(0, 5).join(", ");
+    const marker = active ? "[ACTIVE]" : "[IDLE]";
+    print(`  ${marker} ${user}  (${ago})`);
+    if (files) print(`         files: ${files}`);
+  }
+  print("");
+}
+
+function _relativeTime(tsStr) {
+  try {
+    const ts = new Date(tsStr);
+    if (isNaN(ts.getTime())) return "unknown";
+    const now = new Date();
+    const deltaMs = now - ts;
+    const mins = Math.floor(deltaMs / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return mins + "m ago";
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + "h ago";
+    return Math.floor(hours / 24) + "d ago";
+  } catch (_) {
+    return "unknown";
+  }
+}
+
+// ──────────────────────────────────────────────
+// GC command (manual tombstone sweep)
+// ──────────────────────────────────────────────
+
+function cmdGc() {
+  printBanner();
+
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+  const configPath = path.join(stickyDir, "sticky-note-config.json");
+
+  if (!fs.existsSync(memoryPath)) {
+    print("  [ERR] No sticky-note.json found.");
+    process.exit(1);
+  }
+
+  const memory = readJsonSafe(memoryPath, { version: "2", threads: [] });
+  const config = readJsonSafe(configPath, { stale_days: 14 });
+  const staleDays = config.stale_days ?? 14;
+  const threads = memory.threads || [];
+  const now = new Date();
+
+  let tombstoned = 0;
+  for (const thread of threads) {
+    if (thread.status !== "closed") continue;
+
+    const tsField = thread.last_activity_at || thread.closed_at || thread.updated_at || "";
+    if (!tsField) continue;
+
+    const ts = new Date(tsField);
+    const daysAgo = (now - ts) / (1000 * 60 * 60 * 24);
+
+    if (daysAgo >= staleDays) {
+      const id = thread.id;
+      const user = thread.user || thread.author || "unknown";
+      const closedAt = thread.closed_at || tsField;
+
+      // Replace thread data with minimal tombstone
+      const tombstone = { id, status: "expired", user, closed_at: closedAt };
+      const keys = Object.keys(thread);
+      for (const k of keys) delete thread[k];
+      Object.assign(thread, tombstone);
+      tombstoned++;
+    }
+  }
+
+  if (tombstoned > 0) {
+    fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2) + "\n");
+    print(`  🗑️  Tombstoned ${tombstoned} closed thread(s) older than ${staleDays} days.`);
+  } else {
+    print(`  [OK] No threads to tombstone (stale_days=${staleDays}).`);
+  }
   print("");
 }
 
@@ -552,19 +1287,37 @@ function cmdStatus() {
 // Main
 // ──────────────────────────────────────────────
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
 
   switch (command) {
     case "init":
-      cmdInit();
+      await cmdInit();
       break;
     case "update":
       cmdUpdate();
       break;
     case "status":
       cmdStatus();
+      break;
+    case "threads":
+      cmdThreads();
+      break;
+    case "resume":
+      cmdResume();
+      break;
+    case "audit":
+      cmdAudit();
+      break;
+    case "who":
+      cmdWho();
+      break;
+    case "gc":
+      cmdGc();
+      break;
+    case "reset":
+      cmdReset();
       break;
     case "--version":
     case "-v":
@@ -576,9 +1329,15 @@ function main() {
       printBanner();
       print("  Usage: npx sticky-note <command>\n");
       print("  Commands:");
-      print("    init      Interactive setup — creates hooks and config");
-      print("    update    Update hook scripts only (preserves data)");
+      print("    init      Interactive setup — creates V2 hooks and config");
+      print("    update    Update hook scripts (preserves data)");
       print("    status    Diagnostic report: threads, audit, health");
+      print("    threads   List open/stuck threads");
+      print("    resume    Resume a previous thread (--list, --clear, <id>)");
+      print("    audit     Query audit trail (--file, --user, --since, --session)");
+      print("    who       Show active and recent team members");
+      print("    gc        Manual tombstone sweep for expired threads");
+      print("    reset     Wipe all threads and start fresh (--force, --keep-audit)");
       print("");
       print("  Options:");
       print("    --version  Show version");
@@ -586,10 +1345,13 @@ function main() {
       print("");
       break;
     default:
-      print(`  ❌ Unknown command: ${command}`);
+      print(`  [ERR] Unknown command: ${command}`);
       print(`  Run 'npx sticky-note --help' for usage.`);
       process.exit(1);
   }
 }
 
-main();
+main().catch(err => {
+  process.stderr.write(`Fatal error: ${err.message}\n`);
+  process.exit(1);
+});

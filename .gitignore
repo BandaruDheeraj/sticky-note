@@ -1,14 +1,19 @@
+
 # Sticky Note - local overrides
 .claude/settings.local.json
 
-# Sticky Note - transient session/resume signals
-.sticky-note/.sticky-session
-.sticky-note/.sticky-resume
-.sticky-note/.sticky-head
+# Python bytecode
+__pycache__/
+*.pyc
 
 # Sticky Note - debug log
 .sticky-note/hook-debug.log
 .sticky-note/.sticky-debug.jsonl
+
+# Sticky Note - transient session/resume signals
+.sticky-note/.sticky-resume
+.sticky-note/.sticky-session
+.sticky-note/.sticky-head
 
 # Sticky Note - legacy single files (migrated to per-user dirs)
 .sticky-note/sticky-note-audit.jsonl

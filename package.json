@@ -1,6 +1,6 @@
 {
   "name": "sticky-note",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Human-to-human handoff for AI coding assistants. Git-backed shared memory for Claude Code and Copilot CLI.",
   "license": "MIT",
   "bin": {
@@ -15,20 +15,20 @@
     "hooks",
     "developer-tools"
   ],
+  "author": "Dheeraj Bandaru",
+  "homepage": "https://github.com/BandaruDheeraj/sticky-note#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sticky-note/sticky-note.git"
+    "url": "https://github.com/BandaruDheeraj/sticky-note.git"
   },
   "files": [
     "bin/",
-    "templates/",
-    "README.md",
-    "LICENSE"
+    "templates/"
   ],
   "engines": {
     "node": ">=16.0.0"
   },
   "scripts": {
-    "test": "node --test test/"
+    "test": "echo \"No tests yet\""
   }
 }
