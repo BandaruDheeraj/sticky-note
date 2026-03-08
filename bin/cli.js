@@ -512,6 +512,18 @@ async function cmdInit() {
     print("  ⏭️  .gitattributes already configured");
   }
 
+  // Add git aliases for safe branch switching
+  try {
+    const swAlias = '!f() { npx sticky-note switch "$@"; }; f';
+    execSync(`git config alias.sw '${swAlias}'`, {
+      cwd: process.cwd(),
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    print("  [OK] git alias: git sw <branch> (safe switch with auto-stash)");
+  } catch (_) {
+    print("  ⏭️  Could not set git alias (non-fatal)");
+  }
+
   // Deploy AI instruction files (CLAUDE.md + .github/copilot-instructions.md)
   const claudeMdDest = path.join(process.cwd(), "CLAUDE.md");
   if (!fs.existsSync(claudeMdDest)) {
@@ -1229,6 +1241,88 @@ function _relativeTime(tsStr) {
 }
 
 // ──────────────────────────────────────────────
+// SWITCH command — safe branch switching
+// ──────────────────────────────────────────────
+
+function cmdSwitch() {
+  const args = process.argv.slice(3);
+  const branch = args.filter((a) => !a.startsWith("-"))[0];
+
+  if (!branch) {
+    print("  Usage: npx sticky-note switch <branch>");
+    print("  Safely switches git branches by auto-stashing .sticky-note/ data.\n");
+    process.exit(1);
+  }
+
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  if (!fs.existsSync(stickyDir)) {
+    print("  No .sticky-note/ directory. Running plain git switch.");
+    try {
+      execSync(`git switch ${branch}`, { stdio: "inherit" });
+    } catch (_) {
+      process.exit(1);
+    }
+    return;
+  }
+
+  // Step 1: Stash .sticky-note/ changes
+  let stashed = false;
+  try {
+    const result = execSync(
+      'git stash push -m "sticky-note-auto" -- .sticky-note/',
+      { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
+    );
+    stashed = result.includes("Saved working directory");
+    if (stashed) {
+      print("  [OK] Stashed .sticky-note/ changes");
+    }
+  } catch (_) {
+    // Nothing to stash, that's fine
+  }
+
+  // Step 2: Switch branch
+  let switchOk = false;
+  try {
+    execSync(`git switch ${branch}`, { stdio: "inherit" });
+    switchOk = true;
+    print(`  [OK] Switched to ${branch}`);
+  } catch (_) {
+    print(`  [ERR] Failed to switch to ${branch}`);
+    // Try to restore stash if we made one
+    if (stashed) {
+      try {
+        execSync("git stash pop", { stdio: ["pipe", "pipe", "pipe"] });
+        print("  [OK] Restored stashed .sticky-note/ changes");
+      } catch (_2) {
+        print("  [WARN] Stash exists but could not pop. Run 'git stash pop' manually.");
+      }
+    }
+    process.exit(1);
+  }
+
+  // Step 3: Pop stash to restore .sticky-note/ data
+  if (stashed) {
+    try {
+      execSync("git stash pop", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
+      print("  [OK] Restored .sticky-note/ data");
+    } catch (_) {
+      // Conflicts — force our version (sticky-note data is branch-independent)
+      try {
+        execSync("git checkout --theirs -- .sticky-note/", {
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+        execSync("git stash drop", { stdio: ["pipe", "pipe", "pipe"] });
+        print("  [OK] Restored .sticky-note/ data (resolved conflicts)");
+      } catch (_2) {
+        print("  [WARN] Could not auto-resolve. Run 'git stash pop' and resolve manually.");
+      }
+    }
+  }
+
+  print("");
+}
+
+// ──────────────────────────────────────────────
 // GC command (manual tombstone sweep)
 // ──────────────────────────────────────────────
 
@@ -1313,6 +1407,9 @@ async function main() {
     case "who":
       cmdWho();
       break;
+    case "switch":
+      cmdSwitch();
+      break;
     case "gc":
       cmdGc();
       break;
@@ -1336,6 +1433,7 @@ async function main() {
       print("    resume    Resume a previous thread (--list, --clear, <id>)");
       print("    audit     Query audit trail (--file, --user, --since, --session)");
       print("    who       Show active and recent team members");
+      print("    switch    Safe branch switching (auto-stashes .sticky-note/)");
       print("    gc        Manual tombstone sweep for expired threads");
       print("    reset     Wipe all threads and start fresh (--force, --keep-audit)");
       print("");
