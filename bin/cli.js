@@ -891,6 +891,58 @@ function cmdResume() {
 // AUDIT command
 // ──────────────────────────────────────────────
 
+function cmdReset() {
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+
+  if (!fs.existsSync(memoryPath)) {
+    print("  [ERR] No sticky-note.json found. Run 'npx sticky-note init' first.");
+    process.exit(1);
+  }
+
+  const args = process.argv.slice(3);
+  const force = args.includes("--force");
+
+  const memory = JSON.parse(fs.readFileSync(memoryPath, "utf-8"));
+  const threadCount = (memory.threads || []).length;
+
+  if (threadCount === 0) {
+    print("  Nothing to reset -- 0 threads.");
+    return;
+  }
+
+  if (!force) {
+    print(`  This will permanently delete ${threadCount} thread(s) from sticky-note.json.`);
+    print("  Run with --force to confirm, or --keep-audit to preserve the audit log.");
+    return;
+  }
+
+  const keepAudit = args.includes("--keep-audit");
+
+  memory.threads = [];
+  fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2));
+  print(`  [OK] Cleared ${threadCount} thread(s) from sticky-note.json`);
+
+  if (!keepAudit) {
+    const auditPath = path.join(stickyDir, "sticky-note-audit.jsonl");
+    if (fs.existsSync(auditPath)) {
+      fs.unlinkSync(auditPath);
+      print("  [OK] Deleted sticky-note-audit.jsonl");
+    }
+  } else {
+    print("  [OK] Audit log preserved (--keep-audit)");
+  }
+
+  // Clean up signal files
+  for (const f of [".sticky-resume", ".sticky-session", ".sticky-head", ".sticky-presence.json"]) {
+    const p = path.join(stickyDir, f);
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+  }
+  print("  [OK] Cleared session signal files");
+  print("");
+  print("  Fresh start. Next session will create a new thread.");
+}
+
 function cmdAudit() {
   const args = process.argv.slice(3);
   const auditPath = path.join(process.cwd(), ".sticky-note", "sticky-note-audit.jsonl");
@@ -1058,6 +1110,9 @@ async function main() {
     case "gc":
       cmdGc();
       break;
+    case "reset":
+      cmdReset();
+      break;
     case "--version":
     case "-v":
       print(`sticky-note v${VERSION}`);
@@ -1075,6 +1130,7 @@ async function main() {
       print("    resume    Resume a previous thread (--list, --clear, <id>)");
       print("    audit     Query audit trail (--file, --user, --since, --session)");
       print("    gc        Manual tombstone sweep for expired threads");
+      print("    reset     Wipe all threads and start fresh (--force, --keep-audit)");
       print("");
       print("  Options:");
       print("    --version  Show version");
