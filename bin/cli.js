@@ -24,14 +24,14 @@ const { execSync } = require("child_process");
 const VERSION = "2.0.0";
 
 const HOOK_FILES = [
-  "sticky_utils.py",
-  "session-start.py",
-  "session-end.py",
-  "inject-context.py",
-  "track-work.py",
-  "on-stop.py",
-  "on-error.py",
-  "parse-transcript.py",
+  "sticky-utils.js",
+  "session-start.js",
+  "session-end.js",
+  "inject-context.js",
+  "track-work.js",
+  "on-stop.js",
+  "on-error.js",
+  "parse-transcript.js",
 ];
 
 const TEMPLATES_DIR = path.join(__dirname, "..", "templates");
@@ -58,28 +58,6 @@ function isGitRepo() {
   } catch {
     return false;
   }
-}
-
-function hasPython() {
-  const cmds = ["python3", "python"];
-  for (const cmd of cmds) {
-    try {
-      const version = execSync(`${cmd} --version`, { stdio: "pipe" })
-        .toString()
-        .trim();
-      const match = version.match(/Python (\d+)\.(\d+)/);
-      if (match) {
-        const major = parseInt(match[1], 10);
-        const minor = parseInt(match[2], 10);
-        if (major >= 3 && minor >= 10) {
-          return { cmd, version };
-        }
-      }
-    } catch {
-      // try next
-    }
-  }
-  return null;
 }
 
 function mkdirSafe(dir) {
@@ -312,29 +290,6 @@ async function syncMcpFromStickyNote(rl) {
 }
 
 // ──────────────────────────────────────────────
-// Python command helper for hook templates
-// ──────────────────────────────────────────────
-
-function patchPythonCmd(template, pythonCmd) {
-  if (pythonCmd === "python3") {
-    for (const [, hookArr] of Object.entries(template.hooks)) {
-      for (const hookEntry of hookArr) {
-        // Claude Code format: nested matcher/hooks with "command" key
-        if (hookEntry.hooks) {
-          for (const h of hookEntry.hooks) {
-            if (h.command) h.command = h.command.replace("python ", "python3 ");
-          }
-        }
-        // Copilot CLI format: flat objects with "bash"/"powershell" keys
-        if (hookEntry.bash) hookEntry.bash = hookEntry.bash.replace("python ", "python3 ");
-        if (hookEntry.powershell) hookEntry.powershell = hookEntry.powershell.replace("python ", "python3 ");
-      }
-    }
-  }
-  return template;
-}
-
-// ──────────────────────────────────────────────
 // INIT command
 // ──────────────────────────────────────────────
 
@@ -349,13 +304,6 @@ async function cmdInit() {
     process.exit(1);
   }
   print("  [OK] Git repository detected");
-
-  const python = hasPython();
-  if (!python) {
-    print("  [ERR] Python 3.10+ not found. Install Python and try again.");
-    process.exit(1);
-  }
-  print(`  [OK] ${python.version} (${python.cmd})`);
   print("");
 
   // Auto-detect MCP servers and skills
@@ -445,19 +393,13 @@ async function cmdInit() {
   }
 
   // Create settings.json (Claude Code)
-  const settingsTemplate = patchPythonCmd(
-    JSON.parse(readTemplate("settings.json")),
-    python.cmd
-  );
+  const settingsTemplate = JSON.parse(readTemplate("settings.json"));
   const settingsDest = path.join(process.cwd(), ".claude", "settings.json");
   fs.writeFileSync(settingsDest, JSON.stringify(settingsTemplate, null, 2) + "\n");
   print("  [OK] .claude/settings.json");
 
   // Create hooks.json (Copilot CLI)
-  const hooksTemplate = patchPythonCmd(
-    JSON.parse(readTemplate("hooks.json")),
-    python.cmd
-  );
+  const hooksTemplate = JSON.parse(readTemplate("hooks.json"));
   const hooksDest = path.join(githubHooksDir, "hooks.json");
   fs.writeFileSync(hooksDest, JSON.stringify(hooksTemplate, null, 2) + "\n");
   print("  [OK] .github/hooks/hooks.json");
@@ -591,12 +533,6 @@ function cmdUpdate() {
     process.exit(1);
   }
 
-  const python = hasPython();
-  if (!python) {
-    print("  [ERR] Python 3.10+ not found.");
-    process.exit(1);
-  }
-
   print("  Updating hook scripts...\n");
 
   for (const file of HOOK_FILES) {
@@ -610,10 +546,7 @@ function cmdUpdate() {
   // Update settings.json hooks
   const settingsPath = path.join(process.cwd(), ".claude", "settings.json");
   if (fs.existsSync(settingsPath)) {
-    const settingsTemplate = patchPythonCmd(
-      JSON.parse(readTemplate("settings.json")),
-      python.cmd
-    );
+    const settingsTemplate = JSON.parse(readTemplate("settings.json"));
     const existing = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
     existing.hooks = settingsTemplate.hooks;
     fs.writeFileSync(settingsPath, JSON.stringify(existing, null, 2) + "\n");
@@ -623,10 +556,7 @@ function cmdUpdate() {
   // Update hooks.json
   const hooksPath = path.join(process.cwd(), ".github", "hooks", "hooks.json");
   if (fs.existsSync(hooksPath)) {
-    const hooksTemplate = patchPythonCmd(
-      JSON.parse(readTemplate("hooks.json")),
-      python.cmd
-    );
+    const hooksTemplate = JSON.parse(readTemplate("hooks.json"));
     fs.writeFileSync(hooksPath, JSON.stringify(hooksTemplate, null, 2) + "\n");
     print("  [OK] .github/hooks/hooks.json (updated)");
   }
@@ -756,14 +686,7 @@ function cmdStatus() {
     print(`    👥 Presence: ${users.length > 0 ? users.join(", ") : "no active users"}`);
   }
 
-  // Python check
   print("\n  Environment:");
-  const python = hasPython();
-  if (python) {
-    print(`    [OK] ${python.version} (${python.cmd})`);
-  } else {
-    print("    [ERR] Python 3.10+ not found");
-  }
 
   print(
     `    ${isGitRepo() ? "[OK]" : "[ERR]"} Git repository`

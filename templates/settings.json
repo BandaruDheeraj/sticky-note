@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/session-start.py"
+            "command": "node .claude/hooks/session-start.js"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/session-end.py"
+            "command": "node .claude/hooks/session-end.js"
           }
         ]
       }
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/inject-context.py"
+            "command": "node .claude/hooks/inject-context.js"
           }
         ]
       }
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/track-work.py"
+            "command": "node .claude/hooks/track-work.js"
           }
         ]
       }
@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/on-stop.py"
+            "command": "node .claude/hooks/on-stop.js"
           }
         ]
       }
@@ -61,7 +61,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/on-error.py"
+            "command": "node .claude/hooks/on-error.js"
           }
         ]
       }

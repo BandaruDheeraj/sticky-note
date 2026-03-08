@@ -4,36 +4,36 @@
     "sessionStart": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 python3 .claude/hooks/session-start.py --copilot-cli",
-        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/session-start.py --copilot-cli"
+        "bash": "COPILOT_CLI=1 node .claude/hooks/session-start.js --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; node .claude/hooks/session-start.js --copilot-cli"
       }
     ],
     "sessionEnd": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 python3 .claude/hooks/session-end.py --copilot-cli",
-        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/session-end.py --copilot-cli"
+        "bash": "COPILOT_CLI=1 node .claude/hooks/session-end.js --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; node .claude/hooks/session-end.js --copilot-cli"
       }
     ],
     "userPromptSubmitted": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 python3 .claude/hooks/inject-context.py --copilot-cli",
-        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/inject-context.py --copilot-cli"
+        "bash": "COPILOT_CLI=1 node .claude/hooks/inject-context.js --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; node .claude/hooks/inject-context.js --copilot-cli"
       }
     ],
     "postToolUse": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 python3 .claude/hooks/track-work.py --copilot-cli",
-        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/track-work.py --copilot-cli"
+        "bash": "COPILOT_CLI=1 node .claude/hooks/track-work.js --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; node .claude/hooks/track-work.js --copilot-cli"
       }
     ],
     "errorOccurred": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 python3 .claude/hooks/on-error.py --copilot-cli",
-        "powershell": "$env:COPILOT_CLI='1'; python3 .claude/hooks/on-error.py --copilot-cli"
+        "bash": "COPILOT_CLI=1 node .claude/hooks/on-error.js --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; node .claude/hooks/on-error.js --copilot-cli"
       }
     ]
   }

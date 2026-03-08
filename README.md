@@ -50,7 +50,7 @@ npx sticky-note init
 ```
 
 This runs an interactive setup that:
-- [OK] Checks for git and Python 3.10+
+- [OK] Checks for git and Node.js 16+
 - 📋 Asks for team config (MCP servers, conventions, stale days)
 - 📁 Creates all hook scripts and config files
 
@@ -100,7 +100,7 @@ instructions, display formats, and query examples. They're wrapped in
 `<!-- sticky-note:start/end -->` markers so `npx sticky-note update` can
 refresh them without overwriting your own content.
 
-### 2. Session Start Hook (`session-start.py`)
+### 2. Session Start Hook (`session-start.js`)
 
 Runs once when a session begins. Injects up to four blocks of context:
 
@@ -117,7 +117,7 @@ Runs once when a session begins. Injects up to four blocks of context:
 The hook also snapshots `HEAD` (for git-diff at session end), generates a
 stable session ID, and ages stale threads (14+ days → `stale`).
 
-### 3. Per-Prompt Injection (`inject-context.py`)
+### 3. Per-Prompt Injection (`inject-context.js`)
 
 Runs on **every user prompt**. Scores all live threads by relevance and
 injects the top 3–5 (max 300 tokens) as additional context:
@@ -147,11 +147,11 @@ npx sticky-note resume <thread-id>
 1. Writes the thread UUID to a `.sticky-resume` signal file.
 2. Outputs the thread's full context to the terminal (narrative, files,
    failed approaches, conversation prompts).
-3. On the next session start, `session-start.py` detects the signal,
+3. On the next session start, `session-start.js` detects the signal,
    reopens the thread as `open`, and injects the complete payload.
-4. `inject-context.py` gives the resumed thread a +10 score boost on
+4. `inject-context.js` gives the resumed thread a +10 score boost on
    every prompt for the duration of the session.
-5. `session-end.py` clears the signal file and updates the thread's
+5. `session-end.js` clears the signal file and updates the thread's
    `resume_chain` with the new session.
 
 This means a thread started in Claude Code can be resumed in Copilot CLI
@@ -165,13 +165,13 @@ conversation prompts.
 The injection hooks above are fed by four **collection hooks** that run
 silently in the background:
 
-### Tool Tracking (`track-work.py`)
+### Tool Tracking (`track-work.js`)
 
 Runs after every tool use. Appends a JSONL audit entry with the tool
 name, file path, and session ID. Also updates `.sticky-presence.json`
-with a heartbeat so `session-start.py` can show who's active.
+with a heartbeat so `session-start.js` can show who's active.
 
-### Session End (`session-end.py`)
+### Session End (`session-end.js`)
 
 Runs when a session ends. Captures the full thread record:
 
@@ -187,14 +187,14 @@ Runs when a session ends. Captures the full thread record:
 Also runs a lazy tombstone sweep: closed threads older than `stale_days`
 are expired to minimal footprint.
 
-### Error Capture (`on-error.py`)
+### Error Capture (`on-error.js`)
 
 Runs when a tool execution fails. Creates or updates the session thread
 with status `stuck` and appends the error to `failed_approaches`. Next
-session's `inject-context.py` ranks stuck threads higher so teammates
+session's `inject-context.js` ranks stuck threads higher so teammates
 see them.
 
-### Stop Handler (`on-stop.py`, Claude Code only)
+### Stop Handler (`on-stop.js`, Claude Code only)
 
 Runs when the user stops a session. Builds a structured handoff summary
 (what was done, what failed, current status, next steps) and saves it to
@@ -241,14 +241,14 @@ CLAUDE.md                         # AI instructions for Claude Code
 .claude/
 ├── settings.json             # Claude Code hook config
 └── hooks/
-    ├── sticky_utils.py       # Shared utilities
-    ├── session-start.py      # Load & inject teammate context
-    ├── session-end.py        # Capture session thread
-    ├── inject-context.py     # Per-prompt relevance scoring
-    ├── track-work.py         # JSONL audit + presence heartbeat
-    ├── parse-transcript.py   # Narrative + failed approach extraction
-    ├── on-stop.py            # Handoff summary on stop
-    ├── on-error.py           # Stuck thread on error
+    ├── sticky-utils.js       # Shared utilities
+    ├── session-start.js      # Load & inject teammate context
+    ├── session-end.js        # Capture session thread
+    ├── inject-context.js     # Per-prompt relevance scoring
+    ├── track-work.js         # JSONL audit + presence heartbeat
+    ├── parse-transcript.js   # Narrative + failed approach extraction
+    ├── on-stop.js            # Handoff summary on stop
+    ├── on-error.js           # Stuck thread on error
     └── sticky-codex.sh       # Optional Codex wrapper
 
 .github/
@@ -321,8 +321,7 @@ Edit `.sticky-note/sticky-note-config.json`:
 ## Requirements
 
 - **Git** repository (any host)
-- **Python 3.10+** (for hook scripts)
-- **Node.js 16+** (for `npx` installer only)
+- **Node.js 16+** (for hook scripts and `npx` CLI)
 - **Claude Code**, **Copilot CLI**, and/or **Codex**
 
 ---
@@ -335,7 +334,7 @@ Edit `.sticky-note/sticky-note-config.json`:
 | Copilot CLI | `.github/hooks/hooks.json`  | Full — all hooks                |
 | Codex       | `sticky-codex.sh` wrapper   | Post-session capture            |
 
-All tools call the same Python scripts and share the same data files.
+All tools call the same JavaScript hooks and share the same data files.
 
 ---
 
