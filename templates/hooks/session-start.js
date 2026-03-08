@@ -9,6 +9,7 @@
  */
 
 const crypto = require("crypto");
+const path = require("path");
 
 function _safeExit() {
   try {
@@ -29,7 +30,8 @@ try {
 const {
   getMemoryPath,
   getConfigPath,
-  getPresencePath,
+  getAllPresencePaths,
+  migrateAuditAndPresence,
   loadJson,
   saveJson,
   appendAuditLine,
@@ -144,6 +146,22 @@ function formatConfigForInjection(config) {
   return lines.length ? lines.join("\n") : "";
 }
 
+function loadAllPresence() {
+  const data = {};
+  for (const filePath of getAllPresencePaths()) {
+    try {
+      const basename = path.basename(filePath, ".json");
+      const info = loadJson(filePath, null);
+      if (info && info.last_seen) {
+        data[basename] = info;
+      }
+    } catch (_) {
+      continue;
+    }
+  }
+  return data;
+}
+
 function formatPresence(presenceData) {
   const now = Date.now();
   const active = [];
@@ -184,6 +202,9 @@ function main() {
   }
   saveSessionId(sessionId);
   saveHeadSha();
+
+  // Migrate legacy single-file audit/presence to per-user dirs
+  migrateAuditAndPresence();
 
   const memoryPath = getMemoryPath();
   const memory = loadJson(memoryPath, {
@@ -228,7 +249,7 @@ function main() {
   // ── Build context pieces ──────────────────────────────
   const threadContext = formatThreadsForInjection(memory.threads || []);
   const configContext = formatConfigForInjection(config);
-  const presenceData = loadJson(getPresencePath(), {});
+  const presenceData = loadAllPresence();
   const presenceContext = formatPresence(presenceData);
 
   appendAuditLine({

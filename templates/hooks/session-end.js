@@ -32,8 +32,8 @@ try {
 const {
   getMemoryPath,
   getConfigPath,
-  getAuditPath,
-  getPresencePath,
+  getUserPresencePath,
+  getAllAuditPaths,
   loadJson,
   saveJson,
   appendAuditLine,
@@ -62,16 +62,18 @@ const WRITE_TOOLS = new Set([
   "write", "edit", "multi_edit",
 ]);
 
-const STICKY_FILES = new Set([
+const STICKY_FILES_PREFIX = [
   ".sticky-note/sticky-note.json",
   ".sticky-note/sticky-note-audit.jsonl",
+  ".sticky-note/audit/",
+  ".sticky-note/presence/",
   ".sticky-note/.sticky-session",
   ".sticky-note/.sticky-head",
   ".sticky-note/.sticky-resume",
   ".sticky-note/.sticky-debug.jsonl",
   ".sticky-note/sticky-note-config.json",
-  ".sticky-note/presence.json",
-]);
+  ".sticky-note/.sticky-presence.json",
+];
 
 // ── Transcript helpers ────────────────────────────────────
 
@@ -168,11 +170,10 @@ function extractFilesTouched(hookInput) {
     }
   }
 
-  // Check audit trail for this session
+  // Check audit trail for this session (search all per-user audit files)
   const sessionId = hookInput.session_id;
   if (sessionId) {
-    const auditPath = getAuditPath();
-    if (fs.existsSync(auditPath)) {
+    for (const auditPath of getAllAuditPaths()) {
       try {
         const raw = fs.readFileSync(auditPath, "utf-8");
         for (const line of raw.split("\n")) {
@@ -241,7 +242,7 @@ function getGitFilesTouched() {
 
   return Array.from(files).filter((f) => {
     const normalized = f.replace(/\\/g, "/");
-    return !STICKY_FILES.has(normalized) && !normalized.startsWith(".sticky-note/.sticky-");
+    return !STICKY_FILES_PREFIX.some((p) => normalized === p || normalized.startsWith(p));
   });
 }
 
@@ -675,12 +676,10 @@ function tombstoneSweep(threads, staleDays) {
 // ── Presence cleanup ──────────────────────────────────────
 
 function clearPresence(user) {
-  const presencePath = getPresencePath();
+  const presencePath = getUserPresencePath(user);
   try {
-    const data = loadJson(presencePath, {});
-    if (user in data) {
-      delete data[user];
-      saveJson(presencePath, data);
+    if (fs.existsSync(presencePath)) {
+      fs.unlinkSync(presencePath);
     }
   } catch (_) {
     // ignore

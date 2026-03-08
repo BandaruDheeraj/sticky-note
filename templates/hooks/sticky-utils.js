@@ -37,8 +37,11 @@ function _stickyDir() {
 const _paths = {
   memory: "sticky-note.json",
   config: "sticky-note-config.json",
-  audit: "sticky-note-audit.jsonl",
-  presence: ".sticky-presence.json",
+  auditDir: "audit",
+  presenceDir: "presence",
+  // Legacy single-file paths (for migration only)
+  legacyAudit: "sticky-note-audit.jsonl",
+  legacyPresence: ".sticky-presence.json",
   resume: ".sticky-resume",
   session: ".sticky-session",
   head: ".sticky-head",
@@ -47,8 +50,46 @@ const _p = (key) => path.join(_stickyDir(), _paths[key]);
 
 function getMemoryPath() { return _p("memory"); }
 function getConfigPath() { return _p("config"); }
-function getAuditPath() { return _p("audit"); }
-function getPresencePath() { return _p("presence"); }
+function getAuditDir() { return _p("auditDir"); }
+function getPresenceDir() { return _p("presenceDir"); }
+function getLegacyAuditPath() { return _p("legacyAudit"); }
+function getLegacyPresencePath() { return _p("legacyPresence"); }
+
+function getUserAuditPath(user) {
+  if (!user) user = getUser();
+  return path.join(getAuditDir(), user + ".jsonl");
+}
+
+function getUserPresencePath(user) {
+  if (!user) user = getUser();
+  return path.join(getPresenceDir(), user + ".json");
+}
+
+function getAllAuditPaths() {
+  const dir = getAuditDir();
+  try {
+    return fs.readdirSync(dir)
+      .filter((f) => f.endsWith(".jsonl"))
+      .map((f) => path.join(dir, f));
+  } catch (_) {
+    return [];
+  }
+}
+
+function getAllPresencePaths() {
+  const dir = getPresenceDir();
+  try {
+    return fs.readdirSync(dir)
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => path.join(dir, f));
+  } catch (_) {
+    return [];
+  }
+}
+
+// Backwards-compatible aliases (read from all per-user files)
+function getAuditPath() { return getUserAuditPath(); }
+function getPresencePath() { return getUserPresencePath(); }
 function getResumePath() { return _p("resume"); }
 function getSessionFilePath() { return _p("session"); }
 function getHeadFilePath() { return _p("head"); }
@@ -157,7 +198,7 @@ function saveJson(filePath, data) {
 }
 
 function appendAuditLine(entry) {
-  const filePath = getAuditPath();
+  const filePath = getUserAuditPath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.appendFileSync(filePath, JSON.stringify(entry) + "\n", "utf-8");
 }
@@ -376,51 +417,93 @@ function extractSessionFromAudit(sessionId) {
   const result = { prompts: [], tools: {}, files: [], first_prompt: null };
   if (!sessionId || sessionId === "unknown") return result;
 
-  const auditPath = getAuditPath();
-  try {
-    if (!fs.existsSync(auditPath)) return result;
-  } catch (_) {
-    return result;
-  }
+  const auditPaths = getAllAuditPaths();
+  if (auditPaths.length === 0) return result;
 
-  try {
-    const raw = fs.readFileSync(auditPath, "utf-8");
-    for (const line of raw.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      let entry;
-      try {
-        entry = JSON.parse(trimmed);
-      } catch (_) {
-        continue;
-      }
-      if (entry.session_id !== sessionId) continue;
+  for (const auditPath of auditPaths) {
+    try {
+      const raw = fs.readFileSync(auditPath, "utf-8");
+      for (const line of raw.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        let entry;
+        try {
+          entry = JSON.parse(trimmed);
+        } catch (_) {
+          continue;
+        }
+        if (entry.session_id !== sessionId) continue;
 
-      const entryType = entry.type || "";
-      if (entryType === "user_prompt") {
-        const prompt = (entry.prompt || "").trim();
-        if (prompt) {
-          result.prompts.push(prompt);
-          if (result.first_prompt === null) {
-            result.first_prompt = prompt;
+        const entryType = entry.type || "";
+        if (entryType === "user_prompt") {
+          const prompt = (entry.prompt || "").trim();
+          if (prompt) {
+            result.prompts.push(prompt);
+            if (result.first_prompt === null) {
+              result.first_prompt = prompt;
+            }
+          }
+        } else if (entryType === "tool_use") {
+          const toolName = entry.tool || "";
+          if (toolName) {
+            result.tools[toolName] = (result.tools[toolName] || 0) + 1;
+          }
+          const filePath = entry.file || "";
+          if (filePath && !result.files.includes(filePath)) {
+            result.files.push(filePath);
           }
         }
-      } else if (entryType === "tool_use") {
-        const toolName = entry.tool || "";
-        if (toolName) {
-          result.tools[toolName] = (result.tools[toolName] || 0) + 1;
-        }
-        const filePath = entry.file || "";
-        if (filePath && !result.files.includes(filePath)) {
-          result.files.push(filePath);
-        }
       }
+    } catch (_) {
+      // ignore individual file failures
     }
-  } catch (_) {
-    // ignore
   }
 
   return result;
+}
+
+// ── Migration: single-file → per-user ─────────────────────
+
+function migrateAuditAndPresence() {
+  const user = getUser();
+
+  // Migrate legacy audit file
+  const legacyAudit = getLegacyAuditPath();
+  try {
+    if (fs.existsSync(legacyAudit)) {
+      const dest = getUserAuditPath(user);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      if (fs.existsSync(dest)) {
+        // Append legacy content to existing per-user file
+        const content = fs.readFileSync(legacyAudit, "utf-8");
+        fs.appendFileSync(dest, content);
+      } else {
+        fs.renameSync(legacyAudit, dest);
+      }
+      // Clean up if rename didn't delete it
+      try { if (fs.existsSync(legacyAudit)) fs.unlinkSync(legacyAudit); } catch (_) {}
+    }
+  } catch (_) {
+    // ignore migration failures
+  }
+
+  // Migrate legacy presence file
+  const legacyPresence = getLegacyPresencePath();
+  try {
+    if (fs.existsSync(legacyPresence)) {
+      const data = loadJson(legacyPresence, {});
+      const presenceDir = getPresenceDir();
+      fs.mkdirSync(presenceDir, { recursive: true });
+      // Split presence data: each key is a username
+      for (const [u, info] of Object.entries(data)) {
+        const dest = getUserPresencePath(u);
+        saveJson(dest, info);
+      }
+      fs.unlinkSync(legacyPresence);
+    }
+  } catch (_) {
+    // ignore migration failures
+  }
 }
 
 // ── Exports ───────────────────────────────────────────────
@@ -432,7 +515,15 @@ module.exports = {
   getMemoryPath,
   getConfigPath,
   getAuditPath,
+  getAuditDir,
+  getUserAuditPath,
+  getAllAuditPaths,
   getPresencePath,
+  getPresenceDir,
+  getUserPresencePath,
+  getAllPresencePaths,
+  getLegacyAuditPath,
+  getLegacyPresencePath,
   getResumePath,
   getSessionFilePath,
   saveSessionId,
@@ -458,4 +549,5 @@ module.exports = {
   extractFailedFromEntries,
   extractFailedFromText,
   extractSessionFromAudit,
+  migrateAuditAndPresence,
 };

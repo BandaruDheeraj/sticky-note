@@ -417,6 +417,38 @@ async function cmdInit() {
   }
   print("  [OK] .sticky-note/sticky-note.json (v2)");
 
+  // Create per-user audit and presence directories
+  const auditDir = path.join(stickyNoteDir, "audit");
+  const presenceDir = path.join(stickyNoteDir, "presence");
+  fs.mkdirSync(auditDir, { recursive: true });
+  fs.mkdirSync(presenceDir, { recursive: true });
+  print("  [OK] .sticky-note/audit/ (per-user audit logs)");
+  print("  [OK] .sticky-note/presence/ (per-user presence)");
+
+  // Migrate legacy single-file audit/presence if they exist
+  const legacyAuditPath = path.join(stickyNoteDir, "sticky-note-audit.jsonl");
+  const legacyPresencePath = path.join(stickyNoteDir, ".sticky-presence.json");
+  if (fs.existsSync(legacyAuditPath)) {
+    const user = process.env.USER || process.env.USERNAME || "unknown";
+    const dest = path.join(auditDir, user + ".jsonl");
+    if (fs.existsSync(dest)) {
+      fs.appendFileSync(dest, fs.readFileSync(legacyAuditPath, "utf-8"));
+    } else {
+      fs.renameSync(legacyAuditPath, dest);
+    }
+    try { if (fs.existsSync(legacyAuditPath)) fs.unlinkSync(legacyAuditPath); } catch (_) {}
+    print("  [OK] Migrated legacy audit log to audit/" + (process.env.USER || process.env.USERNAME || "unknown") + ".jsonl");
+  }
+  if (fs.existsSync(legacyPresencePath)) {
+    const data = readJsonSafe(legacyPresencePath, {});
+    for (const [u, info] of Object.entries(data)) {
+      const dest = path.join(presenceDir, u + ".json");
+      fs.writeFileSync(dest, JSON.stringify(info, null, 2) + "\n");
+    }
+    fs.unlinkSync(legacyPresencePath);
+    print("  [OK] Migrated legacy presence to per-user files");
+  }
+
   // Create sticky-note-config.json
   const configDest = path.join(stickyNoteDir, "sticky-note-config.json");
   if (!fs.existsSync(configDest)) {
@@ -634,8 +666,6 @@ function cmdStatus() {
   // Sticky Note data — V2 format
   const memoryPath = path.join(stickyDir, "sticky-note.json");
   const configPath = path.join(stickyDir, "sticky-note-config.json");
-  const auditPath = path.join(stickyDir, "sticky-note-audit.jsonl");
-  const presencePath = path.join(stickyDir, ".sticky-presence.json");
 
   print("\n  Sticky Note Data:");
   if (fs.existsSync(memoryPath)) {
@@ -676,19 +706,53 @@ function cmdStatus() {
     print("    [ERR] sticky-note-config.json not found");
   }
 
-  // Audit
-  const auditCount = countJsonlLines(auditPath);
-  if (auditCount > 0) {
-    print(`    [OK] sticky-note-audit.jsonl (${auditCount} entries)`);
+  // Audit (per-user)
+  const auditDir = path.join(stickyDir, "audit");
+  if (fs.existsSync(auditDir)) {
+    const auditFiles = fs.readdirSync(auditDir).filter((f) => f.endsWith(".jsonl"));
+    let totalEntries = 0;
+    const perUser = [];
+    for (const f of auditFiles) {
+      const count = countJsonlLines(path.join(auditDir, f));
+      totalEntries += count;
+      perUser.push(`${path.basename(f, ".jsonl")}(${count})`);
+    }
+    if (totalEntries > 0) {
+      print(`    [OK] audit/ (${totalEntries} entries across ${auditFiles.length} user(s))`);
+      print(`         ${perUser.join(", ")}`);
+    } else {
+      print("    ⏭️  audit/ (empty)");
+    }
   } else {
-    print(`    ⏭️  sticky-note-audit.jsonl (empty or missing)`);
+    // Check for legacy single file
+    const legacyAuditPath = path.join(stickyDir, "sticky-note-audit.jsonl");
+    const auditCount = countJsonlLines(legacyAuditPath);
+    if (auditCount > 0) {
+      print(`    ⚠️  sticky-note-audit.jsonl (${auditCount} entries, legacy — run init to migrate)`);
+    } else {
+      print("    ⏭️  No audit data (run init to set up per-user audit)");
+    }
   }
 
-  // Presence
-  if (fs.existsSync(presencePath)) {
-    const presence = readJsonSafe(presencePath, {});
-    const users = Object.keys(presence);
-    print(`    👥 Presence: ${users.length > 0 ? users.join(", ") : "no active users"}`);
+  // Presence (per-user)
+  const presenceDir = path.join(stickyDir, "presence");
+  if (fs.existsSync(presenceDir)) {
+    const presenceFiles = fs.readdirSync(presenceDir).filter((f) => f.endsWith(".json"));
+    const now = Date.now();
+    const activeUsers = [];
+    for (const f of presenceFiles) {
+      const info = readJsonSafe(path.join(presenceDir, f), {});
+      const lastSeen = info.last_seen || "";
+      if (lastSeen) {
+        const ts = new Date(lastSeen).getTime();
+        if (!isNaN(ts) && now - ts < 15 * 60 * 1000) {
+          activeUsers.push(path.basename(f, ".json"));
+        }
+      }
+    }
+    print(`    👥 Presence: ${activeUsers.length > 0 ? activeUsers.join(", ") + " (active)" : "no active users"}`);
+  } else {
+    print("    ⏭️  No presence data (run init to set up per-user presence)");
   }
 
   print("\n  Environment:");
@@ -942,16 +1006,33 @@ function cmdReset() {
   print(`  [OK] Cleared ${threadCount} thread(s) from sticky-note.json`);
 
   if (!keepAudit) {
-    const auditPath = path.join(stickyDir, "sticky-note-audit.jsonl");
-    if (fs.existsSync(auditPath)) {
-      fs.unlinkSync(auditPath);
-      print("  [OK] Deleted sticky-note-audit.jsonl");
+    // Delete per-user audit directory
+    const auditDir = path.join(stickyDir, "audit");
+    if (fs.existsSync(auditDir)) {
+      for (const f of fs.readdirSync(auditDir)) {
+        fs.unlinkSync(path.join(auditDir, f));
+      }
+      print("  [OK] Deleted all per-user audit logs");
+    }
+    // Also clean legacy single file if present
+    const legacyAudit = path.join(stickyDir, "sticky-note-audit.jsonl");
+    if (fs.existsSync(legacyAudit)) {
+      fs.unlinkSync(legacyAudit);
+      print("  [OK] Deleted legacy audit log");
     }
   } else {
-    print("  [OK] Audit log preserved (--keep-audit)");
+    print("  [OK] Audit logs preserved (--keep-audit)");
   }
 
-  // Clean up signal files
+  // Clean up presence directory
+  const presenceDir = path.join(stickyDir, "presence");
+  if (fs.existsSync(presenceDir)) {
+    for (const f of fs.readdirSync(presenceDir)) {
+      fs.unlinkSync(path.join(presenceDir, f));
+    }
+  }
+
+  // Clean up signal files and legacy presence
   for (const f of [".sticky-resume", ".sticky-session", ".sticky-head", ".sticky-presence.json"]) {
     const p = path.join(stickyDir, f);
     if (fs.existsSync(p)) fs.unlinkSync(p);
@@ -963,10 +1044,21 @@ function cmdReset() {
 
 function cmdAudit() {
   const args = process.argv.slice(3);
-  const auditPath = path.join(process.cwd(), ".sticky-note", "sticky-note-audit.jsonl");
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const auditDir = path.join(stickyDir, "audit");
 
-  if (!fs.existsSync(auditPath)) {
-    print("  [ERR] No sticky-note-audit.jsonl found.");
+  // Collect all audit file paths (per-user + legacy)
+  const auditPaths = [];
+  if (fs.existsSync(auditDir)) {
+    for (const f of fs.readdirSync(auditDir)) {
+      if (f.endsWith(".jsonl")) auditPaths.push(path.join(auditDir, f));
+    }
+  }
+  const legacyPath = path.join(stickyDir, "sticky-note-audit.jsonl");
+  if (fs.existsSync(legacyPath)) auditPaths.push(legacyPath);
+
+  if (auditPaths.length === 0) {
+    print("  [ERR] No audit files found. Run 'npx sticky-note init' first.");
     process.exit(1);
   }
 
@@ -997,31 +1089,43 @@ function cmdAudit() {
     }
   }
 
-  // Read and filter JSONL line by line
-  const content = fs.readFileSync(auditPath, "utf-8");
-  const lines = content.split("\n").filter((l) => l.trim());
+  // Read and filter all JSONL files, merge entries
   const matches = [];
 
-  for (const line of lines) {
-    let entry;
+  for (const auditPath of auditPaths) {
     try {
-      entry = JSON.parse(line);
-    } catch {
-      continue;
-    }
+      const content = fs.readFileSync(auditPath, "utf-8");
+      const lines = content.split("\n").filter((l) => l.trim());
+      for (const line of lines) {
+        let entry;
+        try {
+          entry = JSON.parse(line);
+        } catch {
+          continue;
+        }
 
-    if (filterFile && !(entry.file || "").includes(filterFile)) continue;
-    if (filterUser && entry.user !== filterUser) continue;
-    if (filterSession && entry.session_id !== filterSession) continue;
-    if (filterSince) {
-      const ts = entry.ts || entry.timestamp || "";
-      if (ts < filterSince) continue;
-    }
+        if (filterFile && !(entry.file || "").includes(filterFile)) continue;
+        if (filterUser && entry.user !== filterUser) continue;
+        if (filterSession && entry.session_id !== filterSession) continue;
+        if (filterSince) {
+          const ts = entry.ts || entry.timestamp || "";
+          if (ts < filterSince) continue;
+        }
 
-    matches.push(entry);
+        matches.push(entry);
+      }
+    } catch (_) {
+      // skip unreadable files
+    }
   }
 
-  // Show most recent first, capped
+  // Sort by timestamp, show most recent first
+  matches.sort((a, b) => {
+    const ta = a.ts || a.timestamp || "";
+    const tb = b.ts || b.timestamp || "";
+    return ta < tb ? -1 : ta > tb ? 1 : 0;
+  });
+
   const display = matches.slice(-limit).reverse();
 
   if (display.length === 0) {
@@ -1039,6 +1143,89 @@ function cmdAudit() {
     print(`  ${ts}  ${user}  ${type}${tool}${file}`);
   }
   print("");
+}
+
+// ──────────────────────────────────────────────
+// WHO command — show active users
+// ──────────────────────────────────────────────
+
+function cmdWho() {
+  printBanner();
+
+  const presenceDir = path.join(process.cwd(), ".sticky-note", "presence");
+
+  if (!fs.existsSync(presenceDir)) {
+    // Check legacy
+    const legacyPath = path.join(process.cwd(), ".sticky-note", ".sticky-presence.json");
+    if (fs.existsSync(legacyPath)) {
+      print("  ⚠️  Legacy presence file found. Run 'npx sticky-note init' to migrate.\n");
+      const data = readJsonSafe(legacyPath, {});
+      const now = Date.now();
+      for (const [user, info] of Object.entries(data)) {
+        const lastSeen = info.last_seen || "";
+        const ts = lastSeen ? new Date(lastSeen).getTime() : 0;
+        const active = !isNaN(ts) && now - ts < 15 * 60 * 1000;
+        const ago = lastSeen ? _relativeTime(lastSeen) : "unknown";
+        const files = (info.active_files || []).slice(0, 5).join(", ");
+        const marker = active ? "[ACTIVE]" : "[IDLE]";
+        print(`  ${marker} ${user}  (${ago})`);
+        if (files) print(`         files: ${files}`);
+      }
+    } else {
+      print("  No presence data. Run 'npx sticky-note init' to set up.\n");
+    }
+    return;
+  }
+
+  const presenceFiles = fs.readdirSync(presenceDir).filter((f) => f.endsWith(".json"));
+  if (presenceFiles.length === 0) {
+    print("  No users tracked yet.\n");
+    return;
+  }
+
+  const now = Date.now();
+  const users = [];
+  for (const f of presenceFiles) {
+    const user = path.basename(f, ".json");
+    const info = readJsonSafe(path.join(presenceDir, f), {});
+    const lastSeen = info.last_seen || "";
+    const ts = lastSeen ? new Date(lastSeen).getTime() : 0;
+    const active = !isNaN(ts) && now - ts < 15 * 60 * 1000;
+    users.push({ user, info, lastSeen, active });
+  }
+
+  // Sort: active first, then by last_seen descending
+  users.sort((a, b) => {
+    if (a.active !== b.active) return a.active ? -1 : 1;
+    return (b.lastSeen || "") > (a.lastSeen || "") ? 1 : -1;
+  });
+
+  print("  Team Activity:\n");
+  for (const { user, info, lastSeen, active } of users) {
+    const ago = lastSeen ? _relativeTime(lastSeen) : "unknown";
+    const files = (info.active_files || []).slice(0, 5).join(", ");
+    const marker = active ? "[ACTIVE]" : "[IDLE]";
+    print(`  ${marker} ${user}  (${ago})`);
+    if (files) print(`         files: ${files}`);
+  }
+  print("");
+}
+
+function _relativeTime(tsStr) {
+  try {
+    const ts = new Date(tsStr);
+    if (isNaN(ts.getTime())) return "unknown";
+    const now = new Date();
+    const deltaMs = now - ts;
+    const mins = Math.floor(deltaMs / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return mins + "m ago";
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + "h ago";
+    return Math.floor(hours / 24) + "d ago";
+  } catch (_) {
+    return "unknown";
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -1123,6 +1310,9 @@ async function main() {
     case "audit":
       cmdAudit();
       break;
+    case "who":
+      cmdWho();
+      break;
     case "gc":
       cmdGc();
       break;
@@ -1145,6 +1335,7 @@ async function main() {
       print("    threads   List open/stuck threads");
       print("    resume    Resume a previous thread (--list, --clear, <id>)");
       print("    audit     Query audit trail (--file, --user, --since, --session)");
+      print("    who       Show active and recent team members");
       print("    gc        Manual tombstone sweep for expired threads");
       print("    reset     Wipe all threads and start fresh (--force, --keep-audit)");
       print("");

@@ -73,21 +73,28 @@ Example format:
 **Always commit** (shared with the team):
 - `.sticky-note/sticky-note.json` — the thread memory (this is the whole point)
 - `.sticky-note/sticky-note-config.json` — team settings
+- `.sticky-note/audit/*.jsonl` — per-user audit logs (team-wide action trail)
+- `.sticky-note/presence/*.json` — per-user presence (who's active)
 
-**Never commit** (local-only, already in `.gitignore`):
-- `.sticky-note/sticky-note-audit.jsonl` — local audit log
-- `.sticky-note/.sticky-presence.json` — local presence
+**Never commit** (transient, already in `.gitignore`):
 - `.sticky-note/.sticky-resume` — transient resume signal
 - `.sticky-note/.sticky-session` — transient session ID
 - `.sticky-note/.sticky-head` — transient HEAD snapshot
 
 When a session ends or the user asks to commit, **always include
-`sticky-note.json`** so teammates see updated thread state.
+`sticky-note.json` and the `audit/` and `presence/` directories**
+so teammates see updated thread state and activity.
 
 ### Audit trail
 
-For detailed session events, read `.sticky-note/sticky-note-audit.jsonl`
-(one JSON object per line, local only).
+Per-user audit logs are stored in `.sticky-note/audit/<username>.jsonl`
+(one JSON object per line). Use `npx sticky-note audit` to query the
+merged trail across all team members.
+
+### Team presence
+
+Per-user presence is stored in `.sticky-note/presence/<username>.json`.
+Use `npx sticky-note who` to see who's active.
 
 ### Team config
 
