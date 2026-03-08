@@ -379,7 +379,7 @@ function main() {
 
   // Debug / scoring block
   const debugLines = [
-    "\n---\n[STICKY NOTE -- scoring] prompt: " + prompt.substring(0, 80),
+    "\n---\n[STICKY-NOTE] [scoring] prompt: " + prompt.substring(0, 80),
   ];
   debugLines.push(
     "  keywords: " +
@@ -460,11 +460,11 @@ function main() {
   }
 
   const header =
-    "[STICKY NOTE -- " +
+    "[STICKY-NOTE] " +
     threadsShown +
     " relevant thread" +
     (threadsShown !== 1 ? "s" : "") +
-    "]\n";
+    " injected\n";
   outputLines.unshift(header);
 
   let output = outputLines.join("\n").trim();

@@ -110,7 +110,7 @@ function formatThreadForInjection(threadData, file) {
   const lineStr = lineRanges.length > 0 ? ` [lines ${lineRanges.join(", ")}]` : "";
 
   const lines = [
-    `[sticky-note] ${statusTag} ${user}'s thread on ${file}${lineStr}${branchStr}:`,
+    `[STICKY-NOTE] ${statusTag} ${user}'s thread on ${file}${lineStr}${branchStr}:`,
   ];
 
   if (thread.narrative) {

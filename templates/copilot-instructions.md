@@ -151,6 +151,21 @@ after. A raw `git checkout` or `git switch` will fail if sticky-note
 files have uncommitted changes. The alias `git sw <branch>` also works
 if set up by `npx sticky-note init`.
 
+### `[STICKY-NOTE]` tags
+
+All sticky-note hooks prefix their output with `[STICKY-NOTE]`. When you
+see this tag in hook output, **briefly surface it to the user** so they
+know what sticky-note did. Examples:
+
+- `[STICKY-NOTE] ⚠️ Stuck Threads` → mention the stuck threads
+- `[STICKY-NOTE] 3 relevant threads injected` → note context was loaded
+- `[STICKY-NOTE] Tracked Edit on src/auth.ts (lines 40-55)` → confirm the edit was logged
+- `[STICKY-NOTE] Session closed — thread created (5 files, 3 commits)` → confirm session saved
+- `[STICKY-NOTE] Marked thread as STUCK` → acknowledge the error was recorded
+
+Do NOT hide or suppress these tags. The user expects transparency about
+when sticky-note is acting on their behalf.
+
 ### Team config
 
 Check `.sticky-note/sticky-note-config.json` for team conventions and settings.

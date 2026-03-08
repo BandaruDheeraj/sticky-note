@@ -302,7 +302,11 @@ function main() {
     }
   }
 
-  process.stdout.write(JSON.stringify({ output: "" }) + "\n");
+  // Build status message for transparency
+  const linePart = lineRanges && lineRanges.length > 0 ? ` (lines ${lineRanges.join(", ")})` : "";
+  const statusMsg = `[STICKY-NOTE] Tracked ${toolName}${filePath ? " on " + filePath : ""}${linePart}`;
+
+  process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
 }
 
 try {

@@ -923,7 +923,10 @@ function main() {
   clearInjectedSet();
   saveJson(memoryPath, memory);
 
-  process.stdout.write(JSON.stringify({ output: "" }) + "\n");
+  const fileCount = filesTouched.length;
+  const commitCount = commitShas.length;
+  const statusMsg = `[STICKY-NOTE] Session closed — thread created (${fileCount} file${fileCount !== 1 ? "s" : ""}${commitCount > 0 ? ", " + commitCount + " commit" + (commitCount !== 1 ? "s" : "") : ""})`;
+  process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
 }
 
 try {
