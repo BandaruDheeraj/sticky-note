@@ -89,6 +89,22 @@ Example format:
   Files: src/auth.js, src/middleware.js
 ```
 
+### Git commit rules for sticky-note files
+
+**Always commit** (shared with the team):
+- `.sticky-note/sticky-note.json` — the thread memory (this is the whole point)
+- `.sticky-note/sticky-note-config.json` — team settings
+
+**Never commit** (local-only, already in `.gitignore`):
+- `.sticky-note/sticky-note-audit.jsonl` — local audit log
+- `.sticky-note/.sticky-presence.json` — local presence
+- `.sticky-note/.sticky-resume` — transient resume signal
+- `.sticky-note/.sticky-session` — transient session ID
+- `.sticky-note/.sticky-head` — transient HEAD snapshot
+
+When a session ends or the user asks to commit, **always include
+`sticky-note.json`** so teammates see updated thread state.
+
 ### Audit trail
 
 For detailed session events, read `.sticky-note/sticky-note-audit.jsonl`
