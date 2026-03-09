@@ -500,3 +500,482 @@
 {"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:04:57.730Z","tool":"powershell","session_id":"115b1eaf-8db3-4f6b-b75f-00a9c8a2a707"}
 {"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:05:05.101Z","tool":"read_powershell","session_id":"115b1eaf-8db3-4f6b-b75f-00a9c8a2a707"}
 {"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:05:16.607Z","tool":"powershell","session_id":"115b1eaf-8db3-4f6b-b75f-00a9c8a2a707"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:19:54.345Z","tool":"powershell","session_id":"115b1eaf-8db3-4f6b-b75f-00a9c8a2a707"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:20:07.320Z","tool":"powershell","session_id":"115b1eaf-8db3-4f6b-b75f-00a9c8a2a707"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T21:24:45.812Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","prompt":"pick up where the last session left off with the testing of the changes"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T21:24:46.224Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","prompt":"pick up where the last session left off with the testing of the changes","result":"injected","threads_scored":5,"threads_injected":5,"top_scores":[{"id":"d0bc86eb","score":16.9},{"id":"6653f5c7","score":2.8},{"id":"fa38a550","score":2.8},{"id":"8f2aee38","score":2.8},{"id":"467f75cc","score":2.8}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T21:24:48.039Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:24:58.566Z","tool":"report_intent","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:24:59.462Z","tool":"sql","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:25:02.554Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:25:12.891Z","tool":"sql","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:25:13.715Z","tool":"sql","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:25:16.647Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:25:30.571Z","tool":"sql","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:25:38.830Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:25:51.360Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:25:55.375Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:26:06.236Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:26:11.374Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:26:21.208Z","tool":"stop_powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:26:23.244Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:26:31.634Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:26:38.938Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:26:48.374Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:27:05.406Z","tool":"sql","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:27:10.764Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:27:24.131Z","tool":"stop_powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:27:45.923Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:27:48.367Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:27:50.914Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:28:04.706Z","tool":"read_powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:28:06.336Z","tool":"read_powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:28:22.771Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:28:29.905Z","tool":"read_powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:28:44.556Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:28:58.761Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:29:15.488Z","tool":"report_intent","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:29:16.963Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-08T21:30:16.195Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","status":"closed","files_touched":[],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T21:30:25.211Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","prompt":"continue"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T21:30:26.314Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","prompt":"continue","result":"injected","threads_scored":12,"threads_injected":5,"top_scores":[{"id":"8795cf02","score":20},{"id":"779b130f","score":20},{"id":"04ef07db","score":17.9},{"id":"9c2a2b01","score":17.8},{"id":"d0bc86eb","score":14.9}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T21:30:29.128Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:30:39.655Z","tool":"report_intent","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:30:44.177Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:31:08.898Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:31:29.753Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:31:41.987Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:31:55.346Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:32:03.942Z","tool":"read_powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:32:18.742Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:32:27.188Z","tool":"read_powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-08T21:32:37.001Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","status":"closed","files_touched":[],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T21:34:29.861Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","prompt":"before we do either I want to add a behavior to sticky note, whenever sticky note takes an action whether its inject context or find the line attribution etc. I want it to show up in the response or atleast the thinking of the output with the tag [STICKY-NOTE], is that possible?"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T21:34:31.777Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","prompt":"before we do either I want to add a behavior to sticky note, whenever sticky note takes an action whether its inject con","result":"injected","threads_scored":12,"threads_injected":5,"top_scores":[{"id":"9c2a2b01","score":38.8},{"id":"779b130f","score":36},{"id":"8795cf02","score":33},{"id":"04ef07db","score":22.9},{"id":"d0bc86eb","score":16.9}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T21:34:35.238Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:34:55.251Z","tool":"report_intent","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:35:35.811Z","tool":"task","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:39:07.548Z","tool":"ask_user","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:39:24.262Z","tool":"report_intent","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:39:25.027Z","tool":"create","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:39:33.450Z","tool":"sql","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:39:44.994Z","tool":"report_intent","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:40:20.570Z","tool":"task","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:40:33.777Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:40:34.710Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:40:35.721Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:40:36.778Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:40:37.891Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:40:49.282Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:40:51.686Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:40:52.639Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:40:53.523Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:41:02.255Z","tool":"grep","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:41:03.229Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:41:09.385Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:41:19.896Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:41:20.916Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:41:21.955Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:41:33.760Z","tool":"sql","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:41:34.865Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:41:35.820Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:41:50.603Z","tool":"sql","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:41:51.998Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:41:52.945Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:41:53.917Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:42:04.517Z","tool":"sql","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:42:05.650Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:42:11.752Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:42:18.693Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:42:26.699Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:42:34.703Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:42:43.178Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:42:48.374Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:42:55.113Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:43:02.372Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:43:07.799Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:43:15.572Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:43:22.803Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:43:29.326Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:43:35.611Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:43:50.968Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:44:03.645Z","tool":"sql","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:44:24.269Z","tool":"grep","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:44:25.094Z","tool":"grep","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:44:33.865Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:44:34.797Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:44:52.586Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:44:53.562Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:45:02.647Z","tool":"view","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:45:17.666Z","tool":"edit","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:45:37.120Z","tool":"report_intent","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:45:55.001Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:46:02.635Z","tool":"read_powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:46:16.463Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:46:26.249Z","tool":"Edit","session_id":"9e0df130-6b89-44b4-98d3-632f6ef0371e","file":"src/auth.ts"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:46:27.807Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"error","user":"dbandaru","ts":"2026-03-08T21:46:36.396Z","session_id":"9e0df130-6b89-44b4-98d3-632f6ef0371e","error":"TypeError: Cannot read property of undefined","tool":"Edit"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:46:37.854Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"stop","user":"dbandaru","ts":"2026-03-08T21:46:47.848Z","session_id":"9e0df130-6b89-44b4-98d3-632f6ef0371e","reason":"User requested stop"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:46:48.820Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:47:01.257Z","tool":"sql","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:47:05.783Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:47:22.010Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-08T21:47:32.477Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","status":"closed","files_touched":["templates/CLAUDE.md","templates/copilot-instructions.md","templates/hooks/inject-context.js","templates/hooks/on-error.js","templates/hooks/on-stop.js","templates/hooks/pre-tool-use.js","templates/hooks/session-end.js","templates/hooks/session-start.js","templates/hooks/track-work.js"],"work_type":"general","commit_shas":["0c82473d0ebe1a7ccd17b22318749eb2abba64e6"]}
+{"type":"commit","user":"dbandaru","ts":"2026-03-08T21:47:32.477Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","commit_sha":"0c82473d0ebe1a7ccd17b22318749eb2abba64e6"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T21:49:09.013Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","prompt":"go ahead and push but no pr"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T21:49:09.743Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","prompt":"go ahead and push but no pr","result":"injected","threads_scored":13,"threads_injected":5,"top_scores":[{"id":"9c2a2b01","score":28.8},{"id":"779b130f","score":24},{"id":"8795cf02","score":22},{"id":"67874113","score":21},{"id":"04ef07db","score":17.9}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T21:49:13.328Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T21:49:31.435Z","tool":"powershell","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-08T21:49:38.154Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","status":"closed","files_touched":[],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T22:02:45.518Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","prompt":"give me the end to end scenario to test?"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T22:02:46.282Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","prompt":"give me the end to end scenario to test?","result":"injected","threads_scored":13,"threads_injected":5,"top_scores":[{"id":"9c2a2b01","score":29.8},{"id":"67874113","score":23},{"id":"8795cf02","score":23},{"id":"779b130f","score":23},{"id":"04ef07db","score":18.9}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T22:02:49.623Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-08T22:03:16.320Z","session_id":"c83681b2-1729-44c1-8324-70d4342efcd1","status":"closed","files_touched":[],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T22:04:35.581Z","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a","prompt":"read bin/cli.js"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T22:04:36.394Z","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a","prompt":"read bin/cli.js","result":"injected","threads_scored":13,"threads_injected":5,"top_scores":[{"id":"779b130f","score":40},{"id":"9c2a2b01","score":39.8},{"id":"8795cf02","score":38},{"id":"67874113","score":27},{"id":"04ef07db","score":20.9}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T22:04:39.197Z","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:04:49.931Z","tool":"report_intent","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:04:52.849Z","tool":"view","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:05:06.370Z","tool":"ask_user","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:05:17.591Z","tool":"report_intent","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-08T22:06:20.925Z","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a","status":"closed","files_touched":[],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T22:06:30.136Z","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a","prompt":"continue"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T22:06:30.782Z","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a","prompt":"continue","result":"injected","threads_scored":14,"threads_injected":5,"top_scores":[{"id":"67874113","score":20},{"id":"8795cf02","score":20},{"id":"779b130f","score":20},{"id":"04ef07db","score":17.9},{"id":"9c2a2b01","score":17.8}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T22:06:33.544Z","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:06:50.601Z","tool":"report_intent","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:06:52.153Z","tool":"view","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:06:55.670Z","tool":"powershell","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:06:57.679Z","tool":"powershell","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:07:07.203Z","tool":"view","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-08T22:07:20.734Z","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a","status":"closed","files_touched":[],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T22:12:53.846Z","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a","prompt":"add a comment to templates/hooks/sticky-utils.js"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T22:12:54.804Z","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a","prompt":"add a comment to templates/hooks/sticky-utils.js","result":"injected","threads_scored":14,"threads_injected":5,"top_scores":[{"id":"779b130f","score":42},{"id":"9c2a2b01","score":40.8},{"id":"8795cf02","score":40},{"id":"67874113","score":29},{"id":"04ef07db","score":21.9}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T22:12:59.307Z","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:13:13.082Z","tool":"report_intent","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:13:18.184Z","tool":"ask_user","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:13:25.475Z","tool":"view","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:13:35.089Z","tool":"edit","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-08T22:13:40.099Z","session_id":"cb59062a-a9d3-4f5f-aaed-3710fd1dbf1a","status":"closed","files_touched":["templates/hooks/sticky-utils.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T22:16:23.515Z","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48","prompt":"in a previous session I was told to open a new session and do this to test if the labels were running and I saw no [sticky note] label"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T22:16:24.444Z","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48","prompt":"in a previous session I was told to open a new session and do this to test if the labels were running and I saw no [stic","result":"injected","threads_scored":14,"threads_injected":5,"top_scores":[{"id":"779b130f","score":39},{"id":"9c2a2b01","score":36.8},{"id":"8795cf02","score":34},{"id":"67874113","score":26},{"id":"04ef07db","score":22.9}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T22:16:28.085Z","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:16:44.305Z","tool":"report_intent","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:16:45.848Z","tool":"view","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:16:47.800Z","tool":"sql","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:17:00.317Z","tool":"sql","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:17:01.813Z","tool":"view","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:17:03.143Z","tool":"view","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:17:12.406Z","tool":"view","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-08T22:18:58.944Z","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48","status":"closed","files_touched":["templates/hooks/sticky-utils.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T22:19:03.839Z","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48","prompt":"continue"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T22:19:04.705Z","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48","prompt":"continue","result":"injected","threads_scored":15,"threads_injected":5,"top_scores":[{"id":"67874113","score":20},{"id":"8795cf02","score":20},{"id":"779b130f","score":20},{"id":"04ef07db","score":17.9},{"id":"9c2a2b01","score":17.8}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T22:19:08.220Z","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:19:22.060Z","tool":"report_intent","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:19:23.435Z","tool":"view","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:19:24.918Z","tool":"view","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:19:26.217Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:19:46.609Z","tool":"view","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:19:48.101Z","tool":"view","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:19:49.595Z","tool":"view","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:20:05.690Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:20:07.606Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:20:24.041Z","tool":"view","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:20:25.594Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:20:29.072Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:20:35.052Z","tool":"view","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:20:41.227Z","tool":"view","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:21:02.428Z","tool":"edit","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:21:12.591Z","tool":"edit","session_id":"9e0df130-6b89-44b4-98d3-632f6ef0371e","file":"templates/hooks/sticky-utils.js","lines_changed":["5-8","642-642"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:21:14.488Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:21:26.896Z","tool":"edit","session_id":"9e0df130-6b89-44b4-98d3-632f6ef0371e","file":"templates/hooks/sticky-utils.js","lines_changed":["5-8","642-642"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:21:29.943Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:21:42.233Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:21:59.722Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:22:16.422Z","tool":"edit","session_id":"9e0df130-6b89-44b4-98d3-632f6ef0371e","file":"templates/hooks/sticky-utils.js","lines_changed":["5-8","642-642"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:22:19.561Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:22:32.989Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:22:57.616Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:23:12.451Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:23:32.660Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:23:48.417Z","tool":"edit","session_id":"9e0df130-6b89-44b4-98d3-632f6ef0371e","file":"templates/hooks/sticky-utils.js","lines_changed":["5-8","642-642"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:23:53.622Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:24:14.928Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:24:18.589Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:24:29.547Z","tool":"stop_powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:24:47.277Z","tool":"unknown","session_id":"9e0df130-6b89-44b4-98d3-632f6ef0371e"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:24:50.335Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:25:10.470Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:25:22.203Z","tool":"stop_powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:25:39.500Z","tool":"powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:25:49.354Z","tool":"stop_powershell","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:26:02.904Z","tool":"fetch_copilot_cli_documentation","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T22:26:19.937Z","tool":"edit","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-08T22:26:28.340Z","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48","status":"closed","files_touched":["templates/hooks/sticky-utils.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T22:34:24.933Z","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48","prompt":"is there any way to surface a note like this in copilot cli"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T22:34:25.451Z","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48","prompt":"is there any way to surface a note like this in copilot cli","result":"injected","threads_scored":15,"threads_injected":5,"top_scores":[{"id":"9c2a2b01","score":32.8},{"id":"779b130f","score":32},{"id":"8795cf02","score":27},{"id":"67874113","score":24},{"id":"04ef07db","score":22.9}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T22:34:28.846Z","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:12:33.263Z","tool":"report_intent","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:12:38.396Z","tool":"view","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:14:13.996Z","tool":"ask_user","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-08T23:14:27.503Z","session_id":"3de7a0dc-7508-4f5a-af85-58a190731e48","status":"closed","files_touched":["templates/hooks/sticky-utils.js"],"work_type":"general"}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T23:15:12.378Z","session_id":"339e2dd9-423b-4342-97bf-47931ed8acc7"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T23:15:32.870Z","session_id":"339e2dd9-423b-4342-97bf-47931ed8acc7","prompt":"add a comment to templates/hooks/sticky-utils.js just at top describing what it does"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T23:15:33.252Z","session_id":"339e2dd9-423b-4342-97bf-47931ed8acc7","prompt":"add a comment to templates/hooks/sticky-utils.js just at top describing what it does","result":"injected","threads_scored":14,"threads_injected":5,"top_scores":[{"id":"779b130f","score":43},{"id":"9c2a2b01","score":41.8},{"id":"8795cf02","score":40},{"id":"67874113","score":29},{"id":"04ef07db","score":23.9}]}
+{"type":"lazy_inject","user":"dbandaru","ts":"2026-03-08T23:15:38.302Z","session_id":"339e2dd9-423b-4342-97bf-47931ed8acc7","file":"C:\\Users\\dbandaru\\OneDrive - Microsoft\\Desktop\\Projects\\sticky-note\\templates\\hooks\\sticky-utils.js","threads_injected":1,"thread_ids":["d0bc86eb"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:15:38.942Z","tool":"Read","session_id":"339e2dd9-423b-4342-97bf-47931ed8acc7","file":"templates\\hooks\\sticky-utils.js"}
+{"type":"stop","user":"dbandaru","ts":"2026-03-08T23:15:42.801Z","session_id":"339e2dd9-423b-4342-97bf-47931ed8acc7","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T23:16:10.246Z","session_id":"339e2dd9-423b-4342-97bf-47931ed8acc7","prompt":"replace it"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T23:16:10.770Z","session_id":"339e2dd9-423b-4342-97bf-47931ed8acc7","prompt":"replace it","result":"injected","threads_scored":9,"threads_injected":5,"top_scores":[{"id":"e14975de","score":8},{"id":"d6c19e9c","score":8},{"id":"a5c262f6","score":5},{"id":"def7af08","score":2.9},{"id":"41190e16","score":2.9}]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:16:21.514Z","tool":"Edit","session_id":"339e2dd9-423b-4342-97bf-47931ed8acc7","file":"templates\\hooks\\sticky-utils.js","lines_changed":["3-5"]}
+{"type":"stop","user":"dbandaru","ts":"2026-03-08T23:16:24.244Z","session_id":"339e2dd9-423b-4342-97bf-47931ed8acc7","reason":"stop_checkpoint"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-08T23:16:34.443Z","session_id":"339e2dd9-423b-4342-97bf-47931ed8acc7","status":"closed","files_touched":["templates\\hooks\\sticky-utils.js","templates/hooks/sticky-utils.js"],"work_type":"feature-development"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T23:17:15.438Z","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd","prompt":"i thought the sticky note labels were supposed to work in claude code ● Read 1 file (ctrl+o to expand)\n  ⎿  Loaded templates\\CLAUDE.md\n\n● The file already has a JSDoc comment at lines 3–9. It's already well-described. Did you want to replace it, or add\n  something different at the very top (above the shebang)?\n\n  If you'd like a different style — for example, a simple single-line // comment above the shebang — let me know.\n  Otherwise the existing block comment already covers what the file does."}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T23:17:16.062Z","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd","prompt":"i thought the sticky note labels were supposed to work in claude code ● Read 1 file (ctrl+o to expand)\n  ⎿  Loaded templ","result":"injected","threads_scored":17,"threads_injected":5,"top_scores":[{"id":"779b130f","score":44},{"id":"9c2a2b01","score":41.8},{"id":"8795cf02","score":41},{"id":"67874113","score":29},{"id":"04ef07db","score":25.9}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T23:17:18.582Z","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:17:42.158Z","tool":"report_intent","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:17:44.189Z","tool":"view","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:17:48.180Z","tool":"view","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-08T23:19:12.315Z","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd","status":"closed","files_touched":["templates/hooks/sticky-utils.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-08T23:19:19.799Z","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd","prompt":"continue"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-08T23:19:20.543Z","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd","prompt":"continue","result":"injected","threads_scored":18,"threads_injected":5,"top_scores":[{"id":"67874113","score":20},{"id":"8795cf02","score":20},{"id":"779b130f","score":20},{"id":"04ef07db","score":17.9},{"id":"9c2a2b01","score":17.8}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-08T23:19:23.358Z","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:19:38.198Z","tool":"report_intent","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:20:44.542Z","tool":"task","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:21:46.428Z","tool":"task","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:21:59.675Z","tool":"report_intent","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:22:03.545Z","tool":"powershell","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:22:14.102Z","tool":"powershell","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-08T23:22:29.226Z","tool":"report_intent","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:04:49.563Z","tool":"ask_user","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T00:04:57.264Z","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd","status":"closed","files_touched":["templates/hooks/sticky-utils.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T00:06:14.578Z","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd","prompt":"can you run it"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T00:06:15.285Z","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd","prompt":"can you run it","result":"injected","threads_scored":18,"threads_injected":5,"top_scores":[{"id":"779b130f","score":23},{"id":"8795cf02","score":22},{"id":"67874113","score":20},{"id":"04ef07db","score":19.9},{"id":"9c2a2b01","score":18.8}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T00:06:18.312Z","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:06:26.839Z","tool":"report_intent","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:06:41.659Z","tool":"powershell","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:06:53.101Z","tool":"read_powershell","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:07:10.658Z","tool":"powershell","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:07:19.112Z","tool":"read_powershell","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:07:32.253Z","tool":"powershell","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:07:39.440Z","tool":"read_powershell","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:07:50.851Z","tool":"powershell","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:08:02.198Z","tool":"powershell","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:08:17.448Z","tool":"powershell","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T00:08:25.588Z","session_id":"d41ca572-01ba-401d-b331-faaa15adeebd","status":"closed","files_touched":[".claude/hooks/inject-context.js",".claude/hooks/on-error.js",".claude/hooks/on-stop.js",".claude/hooks/pre-tool-use.js",".claude/hooks/session-end.js",".claude/hooks/session-start.js",".claude/hooks/sticky-utils.js",".claude/hooks/track-work.js",".github/copilot-instructions.md","CLAUDE.md","templates/hooks/sticky-utils.js"],"work_type":"general"}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T00:10:53.755Z","session_id":"b27e9268-d07e-4e2d-ade0-35240a073f08"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T00:11:08.252Z","session_id":"b27e9268-d07e-4e2d-ade0-35240a073f08","prompt":"add a comment to templates/hooks/sticky-utils.js make it a small update to the top level comment"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T00:11:09.548Z","session_id":"b27e9268-d07e-4e2d-ade0-35240a073f08","prompt":"add a comment to templates/hooks/sticky-utils.js make it a small update to the top level comment","result":"injected","threads_scored":17,"threads_injected":5,"top_scores":[{"id":"779b130f","score":43},{"id":"9c2a2b01","score":41.8},{"id":"8795cf02","score":40},{"id":"bb0b9ab6","score":30},{"id":"67874113","score":29}]}
+{"type":"lazy_inject","user":"dbandaru","ts":"2026-03-09T00:11:23.881Z","session_id":"b27e9268-d07e-4e2d-ade0-35240a073f08","file":"C:\\Users\\dbandaru\\OneDrive - Microsoft\\Desktop\\Projects\\sticky-note\\templates\\hooks\\sticky-utils.js","threads_injected":1,"thread_ids":["d0bc86eb"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:11:24.808Z","tool":"Read","session_id":"b27e9268-d07e-4e2d-ade0-35240a073f08","file":"templates\\hooks\\sticky-utils.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:16:21.830Z","tool":"Edit","session_id":"b27e9268-d07e-4e2d-ade0-35240a073f08","file":"templates\\hooks\\sticky-utils.js","lines_changed":["3-6"]}
+{"type":"stop","user":"dbandaru","ts":"2026-03-09T00:16:25.287Z","session_id":"b27e9268-d07e-4e2d-ade0-35240a073f08","reason":"stop_checkpoint"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T00:16:47.132Z","session_id":"b27e9268-d07e-4e2d-ade0-35240a073f08","status":"closed","files_touched":["templates\\hooks\\sticky-utils.js",".claude/hooks/inject-context.js",".claude/hooks/on-error.js",".claude/hooks/on-stop.js",".claude/hooks/pre-tool-use.js",".claude/hooks/session-end.js",".claude/hooks/session-start.js",".claude/hooks/sticky-utils.js",".claude/hooks/track-work.js",".github/copilot-instructions.md","CLAUDE.md","templates/hooks/sticky-utils.js"],"work_type":"feature-development"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T00:17:07.456Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","prompt":"still not seeing the sticky note label in claude ❯ add a comment to templates/hooks/sticky-utils.js make it a small update to the top level comment\n\n● Read 1 file (ctrl+o to expand)\n  ⎿  Loaded templates\\CLAUDE.md\n\n● Update(templates\\hooks\\sticky-utils.js)\n  ⎿  Added 1 line\n      3  // sticky-utils.js — Shared utilities for Sticky Note hooks.\n      4  // Copied into .sticky-note/hooks/ during `npx sticky-note init` and required by all hook scripts.\n      5  // Exports helpers for path resolution"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T00:17:08.229Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","prompt":"still not seeing the sticky note label in claude ❯ add a comment to templates/hooks/sticky-utils.js make it a small upda","result":"injected","threads_scored":19,"threads_injected":5,"top_scores":[{"id":"779b130f","score":44},{"id":"9c2a2b01","score":41.8},{"id":"8795cf02","score":41},{"id":"427db3fd","score":32},{"id":"bb0b9ab6","score":31}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T00:17:11.044Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:17:28.677Z","tool":"report_intent","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:17:29.829Z","tool":"view","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T00:17:41.846Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","status":"closed","files_touched":[".claude/hooks/inject-context.js",".claude/hooks/on-error.js",".claude/hooks/on-stop.js",".claude/hooks/pre-tool-use.js",".claude/hooks/session-end.js",".claude/hooks/session-start.js",".claude/hooks/sticky-utils.js",".claude/hooks/track-work.js",".github/copilot-instructions.md","CLAUDE.md","templates/hooks/sticky-utils.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T00:19:41.099Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","prompt":"no in the agent output we were supposed to see [sticky note] tracked this or something like that"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T00:19:41.666Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","prompt":"no in the agent output we were supposed to see [sticky note] tracked this or something like that","result":"injected","threads_scored":20,"threads_injected":5,"top_scores":[{"id":"9c2a2b01","score":36.8},{"id":"779b130f","score":35},{"id":"8795cf02","score":32},{"id":"427db3fd","score":29},{"id":"d290cae4","score":28}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T00:19:44.286Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:19:59.750Z","tool":"report_intent","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:21:03.444Z","tool":"task","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:21:22.497Z","tool":"view","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:21:35.649Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T00:21:37.346Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","status":"closed","files_touched":[".claude/hooks/inject-context.js",".claude/hooks/on-error.js",".claude/hooks/on-stop.js",".claude/hooks/pre-tool-use.js",".claude/hooks/session-end.js",".claude/hooks/session-start.js",".claude/hooks/sticky-utils.js",".claude/hooks/track-work.js",".github/copilot-instructions.md","CLAUDE.md","templates/hooks/sticky-utils.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T00:21:44.985Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","prompt":"continue"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T00:21:45.757Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","prompt":"continue","result":"injected","threads_scored":20,"threads_injected":5,"top_scores":[{"id":"d290cae4","score":20},{"id":"427db3fd","score":20},{"id":"bb0b9ab6","score":20},{"id":"67874113","score":20},{"id":"8795cf02","score":20}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T00:21:48.526Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:22:02.237Z","tool":"report_intent","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:22:03.991Z","tool":"view","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:22:05.619Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:22:15.168Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:22:26.481Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T00:22:34.271Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","status":"closed","files_touched":[".claude/hooks/inject-context.js",".claude/hooks/on-error.js",".claude/hooks/on-stop.js",".claude/hooks/pre-tool-use.js",".claude/hooks/session-end.js",".claude/hooks/session-start.js",".claude/hooks/sticky-utils.js",".claude/hooks/track-work.js",".github/copilot-instructions.md","CLAUDE.md","templates/hooks/sticky-utils.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T00:24:17.259Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","prompt":"no that output I gave you was copied and pasted from claude code"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T00:24:17.989Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","prompt":"no that output I gave you was copied and pasted from claude code","result":"injected","threads_scored":20,"threads_injected":5,"top_scores":[{"id":"779b130f","score":31},{"id":"9c2a2b01","score":29.8},{"id":"d290cae4","score":29},{"id":"427db3fd","score":29},{"id":"bb0b9ab6","score":29}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T00:24:21.138Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:24:35.264Z","tool":"report_intent","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:24:36.588Z","tool":"view","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:24:38.153Z","tool":"view","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:24:44.099Z","tool":"view","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:24:49.757Z","tool":"view","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:25:20.278Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:25:31.320Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:26:22.288Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:26:23.873Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:26:38.780Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:26:55.417Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:27:51.732Z","tool":"Edit","session_id":"test-sim"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:27:53.106Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:28:58.971Z","tool":"Edit","session_id":"test-sim-2"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:28:59.272Z","tool":"unknown","session_id":"9e0df130-6b89-44b4-98d3-632f6ef0371e"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:29:01.586Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:29:47.988Z","tool":"view","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:30:00.536Z","tool":"edit","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:30:02.935Z","tool":"edit","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:30:16.487Z","tool":"edit","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","file":".claude\\hooks\\track-work.js","lines_changed":["82-82","305-309"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:30:19.917Z","tool":"edit","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","file":".claude\\hooks\\track-work.js","lines_changed":["82-82","305-309"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:30:36.891Z","tool":"grep","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","file":"templates\\hooks"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:30:40.446Z","tool":"Edit","session_id":"test-fix","file":"templates\\hooks\\sticky-utils.js","lines_changed":["3-6"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:30:43.767Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:30:54.087Z","tool":"grep","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","file":"templates\\hooks\\pre-tool-use.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:31:03.147Z","tool":"grep","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","file":"templates\\hooks\\pre-tool-use.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:31:11.525Z","tool":"view","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","file":"templates\\hooks\\pre-tool-use.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:31:24.182Z","tool":"edit","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","file":"templates\\hooks\\pre-tool-use.js","lines_changed":["69-69"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:31:28.831Z","tool":"edit","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","file":".claude\\hooks\\pre-tool-use.js","lines_changed":["69-69","113-113"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:31:47.858Z","tool":"Edit","session_id":"final-test","file":"templates\\hooks\\sticky-utils.js","lines_changed":["3-6"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T00:31:51.079Z","tool":"powershell","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T00:32:01.522Z","session_id":"a1c1168c-4a7e-4d13-ad38-cf43c7a208e8","status":"closed","files_touched":[".claude\\hooks\\track-work.js","templates\\hooks","templates\\hooks\\pre-tool-use.js",".claude\\hooks\\pre-tool-use.js",".claude/hooks/inject-context.js",".claude/hooks/on-error.js",".claude/hooks/on-stop.js",".claude/hooks/pre-tool-use.js",".claude/hooks/session-end.js",".claude/hooks/session-start.js",".claude/hooks/sticky-utils.js",".claude/hooks/track-work.js",".github/copilot-instructions.md","CLAUDE.md","templates/hooks/pre-tool-use.js","templates/hooks/sticky-utils.js","templates/hooks/track-work.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T01:03:40.673Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","prompt":"list all the threads in this repo"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T01:03:43.681Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","prompt":"list all the threads in this repo","result":"injected","threads_scored":20,"threads_injected":5,"top_scores":[{"id":"779b130f","score":29},{"id":"8795cf02","score":26},{"id":"9c2a2b01","score":23.8},{"id":"04ef07db","score":22.8},{"id":"d290cae4","score":22}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T01:03:49.089Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:04:12.274Z","tool":"report_intent","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:04:19.405Z","tool":"powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:04:27.803Z","tool":"read_powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:04:44.074Z","tool":"glob","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:04:53.441Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\sticky-note.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:05:11.485Z","tool":"powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:05:21.177Z","tool":"read_powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:05:31.027Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\sticky-note.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:05:50.264Z","tool":"powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:06:00.194Z","tool":"read_powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:06:40.738Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\sticky-note.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:06:43.131Z","tool":"grep","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\sticky-note.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:06:46.071Z","tool":"grep","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\sticky-note.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:06:49.667Z","tool":"grep","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\sticky-note.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:06:52.754Z","tool":"grep","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\sticky-note.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:06:55.788Z","tool":"grep","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\sticky-note.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:07:02.665Z","tool":"grep","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\sticky-note.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:07:07.001Z","tool":"grep","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\sticky-note.json"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T01:07:39.886Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","status":"closed","files_touched":[".sticky-note\\sticky-note.json",".claude/hooks/inject-context.js",".claude/hooks/on-error.js",".claude/hooks/on-stop.js",".claude/hooks/pre-tool-use.js",".claude/hooks/session-end.js",".claude/hooks/session-start.js",".claude/hooks/sticky-utils.js",".claude/hooks/track-work.js",".github/copilot-instructions.md","CLAUDE.md","templates/hooks/pre-tool-use.js","templates/hooks/sticky-utils.js","templates/hooks/track-work.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T01:10:03.910Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","prompt":"resume d290cae4"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T01:10:05.970Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","prompt":"resume d290cae4","result":"injected","threads_scored":21,"threads_injected":5,"top_scores":[{"id":"e1d04700","score":20},{"id":"d290cae4","score":20},{"id":"427db3fd","score":20},{"id":"bb0b9ab6","score":20},{"id":"67874113","score":20}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T01:10:13.356Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:10:30.308Z","tool":"report_intent","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:10:34.754Z","tool":"powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:10:44.288Z","tool":"read_powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:10:55.272Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\sticky-note.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:11:05.498Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\sticky-note.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:11:18.077Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\sticky-note.json"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T01:11:33.620Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","status":"closed","files_touched":[".sticky-note\\sticky-note.json",".claude/hooks/inject-context.js",".claude/hooks/on-error.js",".claude/hooks/on-stop.js",".claude/hooks/pre-tool-use.js",".claude/hooks/session-end.js",".claude/hooks/session-start.js",".claude/hooks/sticky-utils.js",".claude/hooks/track-work.js",".github/copilot-instructions.md","CLAUDE.md","templates/hooks/pre-tool-use.js","templates/hooks/sticky-utils.js","templates/hooks/track-work.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T01:18:07.944Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","prompt":"yesh debug why [sticky note]"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T01:18:09.196Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","prompt":"yesh debug why [sticky note]","result":"injected","threads_scored":21,"threads_injected":5,"top_scores":[{"id":"9c2a2b01","score":29.8},{"id":"779b130f","score":24.9},{"id":"e1d04700","score":23},{"id":"427db3fd","score":23},{"id":"8795cf02","score":23}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T01:18:13.005Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:18:32.019Z","tool":"report_intent","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:19:57.775Z","tool":"task","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:20:22.271Z","tool":"report_intent","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:20:25.115Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".claude"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:20:28.855Z","tool":"powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:20:32.593Z","tool":"powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:20:45.858Z","tool":"stop_powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:20:48.381Z","tool":"stop_powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:21:03.754Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".claude\\hooks"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:21:06.967Z","tool":"powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:21:14.376Z","tool":"read_powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:21:26.991Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".claude\\hooks\\track-work.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:21:30.115Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\track-work.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:21:37.816Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\track-work.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:21:46.652Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\track-work.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:21:53.767Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\track-work.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:22:12.187Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\.sticky-debug.jsonl"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:22:13.554Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".claude\\settings.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:22:15.062Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\audit\\dbandaru.jsonl"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:22:46.684Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\CLAUDE.md"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:22:48.726Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\.sticky-debug.jsonl"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:22:50.739Z","tool":"grep","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\.sticky-debug.jsonl"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:22:52.377Z","tool":"grep","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\.sticky-debug.jsonl"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:25:00.516Z","tool":"report_intent","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:25:02.770Z","tool":"grep","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\audit\\dbandaru.jsonl"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:25:05.325Z","tool":"grep","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\audit\\dbandaru.jsonl"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:25:07.460Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".sticky-note\\.sticky-debug.jsonl"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:26:17.410Z","tool":"powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:26:32.124Z","tool":"powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:26:42.789Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\pre-tool-use.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:27:10.305Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\track-work.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:27:12.563Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\pre-tool-use.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:27:42.032Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".claude\\rules"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:27:44.863Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".claude\\settings.local.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:28:11.958Z","tool":"powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:28:24.559Z","tool":"read_powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T01:29:01.848Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","status":"closed","files_touched":[".sticky-note\\sticky-note.json",".claude",".claude\\hooks",".claude\\hooks\\track-work.js","templates\\hooks\\track-work.js",".sticky-note\\.sticky-debug.jsonl",".claude\\settings.json",".sticky-note\\audit\\dbandaru.jsonl","templates\\CLAUDE.md","templates\\hooks\\pre-tool-use.js",".claude\\rules",".claude\\settings.local.json",".claude/hooks/inject-context.js",".claude/hooks/on-error.js",".claude/hooks/on-stop.js",".claude/hooks/pre-tool-use.js",".claude/hooks/session-end.js",".claude/hooks/session-start.js",".claude/hooks/sticky-utils.js",".claude/hooks/track-work.js",".github/copilot-instructions.md","CLAUDE.md","templates/hooks/pre-tool-use.js","templates/hooks/sticky-utils.js","templates/hooks/track-work.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T01:29:10.611Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","prompt":"continue"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T01:29:11.886Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","prompt":"continue","result":"injected","threads_scored":21,"threads_injected":5,"top_scores":[{"id":"e1d04700","score":20},{"id":"d290cae4","score":20},{"id":"427db3fd","score":20},{"id":"bb0b9ab6","score":20},{"id":"67874113","score":20}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T01:29:15.601Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:29:28.948Z","tool":"report_intent","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:29:31.073Z","tool":"list_powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:29:49.650Z","tool":"Edit","session_id":"test-debug","file":"templates/hooks/sticky-utils.js","lines_changed":["3-6"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:29:55.250Z","tool":"powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:30:27.752Z","tool":"web_search","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:30:57.945Z","tool":"grep","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T01:31:13.321Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","status":"closed","files_touched":[".sticky-note\\sticky-note.json",".claude",".claude\\hooks",".claude\\hooks\\track-work.js","templates\\hooks\\track-work.js",".sticky-note\\.sticky-debug.jsonl",".claude\\settings.json",".sticky-note\\audit\\dbandaru.jsonl","templates\\CLAUDE.md","templates\\hooks\\pre-tool-use.js",".claude\\rules",".claude\\settings.local.json","templates\\hooks",".claude/hooks/inject-context.js",".claude/hooks/on-error.js",".claude/hooks/on-stop.js",".claude/hooks/pre-tool-use.js",".claude/hooks/session-end.js",".claude/hooks/session-start.js",".claude/hooks/sticky-utils.js",".claude/hooks/track-work.js",".github/copilot-instructions.md","CLAUDE.md","templates/hooks/pre-tool-use.js","templates/hooks/sticky-utils.js","templates/hooks/track-work.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T01:40:22.486Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","prompt":"I think I want claude to see all the hooks so fix it as needed"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T01:40:23.284Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","prompt":"I think I want claude to see all the hooks so fix it as needed","result":"injected","threads_scored":21,"threads_injected":5,"top_scores":[{"id":"e1d04700","score":46},{"id":"779b130f","score":39.9},{"id":"9c2a2b01","score":39.8},{"id":"8795cf02","score":38},{"id":"d290cae4","score":37}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T01:40:26.299Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:42:21.779Z","tool":"report_intent","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:42:25.106Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\session-end.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:42:26.547Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\on-error.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:42:27.889Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\on-stop.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:42:36.127Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\session-start.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:42:43.770Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\inject-context.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:43:04.857Z","tool":"sql","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:43:05.989Z","tool":"create","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"..\\..\\..\\..\\.copilot\\session-state\\2e95a5e5-5b20-454b-9a37-5c0ac9e967b0\\plan.md"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:43:31.565Z","tool":"report_intent","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:43:32.666Z","tool":"sql","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:43:33.734Z","tool":"edit","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\track-work.js","lines_changed":["82-82","306-307","310-311"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:43:35.666Z","tool":"edit","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\on-error.js","lines_changed":["122-122","124-125"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:43:37.741Z","tool":"edit","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\on-stop.js","lines_changed":["136-136","139-140"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:43:40.232Z","tool":"edit","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":"templates\\hooks\\session-end.js","lines_changed":["926-926","930-931"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:43:54.116Z","tool":"sql","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:44:00.013Z","tool":"powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:44:13.538Z","tool":"sql","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:44:15.716Z","tool":"Edit","session_id":"test-stderr","file":"templates/hooks/sticky-utils.js","lines_changed":["3-6"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:44:18.016Z","tool":"powershell","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:44:25.837Z","tool":"sql","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:44:36.181Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".claude\\hooks\\on-stop.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:44:37.390Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".claude\\hooks\\on-error.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T01:44:38.627Z","tool":"view","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","file":".claude\\hooks\\session-end.js"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T01:44:48.678Z","session_id":"2e95a5e5-5b20-454b-9a37-5c0ac9e967b0","status":"closed","files_touched":[".sticky-note\\sticky-note.json",".claude",".claude\\hooks",".claude\\hooks\\track-work.js","templates\\hooks\\track-work.js",".sticky-note\\.sticky-debug.jsonl",".claude\\settings.json",".sticky-note\\audit\\dbandaru.jsonl","templates\\CLAUDE.md","templates\\hooks\\pre-tool-use.js",".claude\\rules",".claude\\settings.local.json","templates\\hooks","templates\\hooks\\session-end.js","templates\\hooks\\on-error.js","templates\\hooks\\on-stop.js","templates\\hooks\\session-start.js","templates\\hooks\\inject-context.js","..\\..\\..\\..\\.copilot\\session-state\\2e95a5e5-5b20-454b-9a37-5c0ac9e967b0\\plan.md",".claude\\hooks\\on-stop.js",".claude\\hooks\\on-error.js",".claude\\hooks\\session-end.js",".claude/hooks/inject-context.js",".claude/hooks/on-error.js",".claude/hooks/on-stop.js",".claude/hooks/pre-tool-use.js",".claude/hooks/session-end.js",".claude/hooks/session-start.js",".claude/hooks/sticky-utils.js",".claude/hooks/track-work.js",".github/copilot-instructions.md","CLAUDE.md","templates/hooks/on-error.js","templates/hooks/on-stop.js","templates/hooks/pre-tool-use.js","templates/hooks/session-end.js","templates/hooks/sticky-utils.js","templates/hooks/track-work.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T02:44:39.731Z","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1","prompt":"can you check wherever you left off last time"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T02:44:40.813Z","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1","prompt":"can you check wherever you left off last time","result":"injected","threads_scored":21,"threads_injected":5,"top_scores":[{"id":"e1d04700","score":20},{"id":"d290cae4","score":20},{"id":"427db3fd","score":20},{"id":"bb0b9ab6","score":20},{"id":"67874113","score":20}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T02:44:45.287Z","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:45:19.679Z","tool":"report_intent","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:45:23.147Z","tool":"sql","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:45:27.151Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:45:46.745Z","tool":"sql","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:45:48.879Z","tool":"read_powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:45:51.016Z","tool":"sql","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:46:14.352Z","tool":"sql","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:46:15.785Z","tool":"sql","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T02:46:18.949Z","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1","status":"closed","files_touched":[".claude/hooks/inject-context.js",".claude/hooks/on-error.js",".claude/hooks/on-stop.js",".claude/hooks/pre-tool-use.js",".claude/hooks/session-end.js",".claude/hooks/session-start.js",".claude/hooks/sticky-utils.js",".claude/hooks/track-work.js",".github/copilot-instructions.md","CLAUDE.md","templates/hooks/on-error.js","templates/hooks/on-stop.js","templates/hooks/pre-tool-use.js","templates/hooks/session-end.js","templates/hooks/sticky-utils.js","templates/hooks/track-work.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T02:46:28.711Z","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1","prompt":"continue"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T02:46:29.479Z","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1","prompt":"continue","result":"injected","threads_scored":22,"threads_injected":5,"top_scores":[{"id":"be004d60","score":20},{"id":"e1d04700","score":20},{"id":"d290cae4","score":20},{"id":"427db3fd","score":20},{"id":"bb0b9ab6","score":20}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T02:46:32.170Z","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:46:48.576Z","tool":"report_intent","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:46:53.354Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:46:54.744Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:47:22.888Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:47:23.939Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:47:48.930Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:48:22.578Z","tool":"sql","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:48:25.746Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-09T02:48:37.199Z","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1","status":"closed","files_touched":[".claude/hooks/inject-context.js",".claude/hooks/on-error.js",".claude/hooks/on-stop.js",".claude/hooks/pre-tool-use.js",".claude/hooks/session-end.js",".claude/hooks/session-start.js",".claude/hooks/sticky-utils.js",".claude/hooks/track-work.js",".github/copilot-instructions.md","CLAUDE.md","templates/hooks/on-error.js","templates/hooks/on-stop.js","templates/hooks/pre-tool-use.js","templates/hooks/session-end.js","templates/hooks/sticky-utils.js","templates/hooks/track-work.js"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-09T02:52:22.337Z","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1","prompt":"yes let's pick up and make it so that the hook output is readable for claude code"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-09T02:52:23.115Z","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1","prompt":"yes let's pick up and make it so that the hook output is readable for claude code","result":"injected","threads_scored":22,"threads_injected":5,"top_scores":[{"id":"e1d04700","score":57},{"id":"779b130f","score":39.9},{"id":"9c2a2b01","score":39.8},{"id":"8795cf02","score":38},{"id":"d290cae4","score":37}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-09T02:52:25.669Z","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:52:54.373Z","tool":"report_intent","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:53:33.358Z","tool":"task","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:55:00.883Z","tool":"report_intent","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:55:04.349Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:55:05.780Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:55:06.843Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:55:21.678Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:56:02.815Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:56:03.796Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:56:18.903Z","tool":"view","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1","file":".claude\\hooks\\sticky-utils.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:56:26.871Z","tool":"edit","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1","file":".claude\\hooks\\sticky-utils.js","lines_changed":["3-5"]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:56:44.571Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:57:01.493Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-09T02:57:14.596Z","tool":"powershell","session_id":"0f5d779a-a01e-43b9-8744-7605df046df1"}
