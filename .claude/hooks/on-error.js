@@ -119,10 +119,13 @@ function main() {
   });
 
   saveJson(memoryPath, memory);
-  // Write to stderr + exit 2 so Claude sees the message (stdout exit 0 is user-only)
   const statusMsg = `[STICKY-NOTE] Marked thread as STUCK - ${errorMsg.substring(0, 80)}`;
-  process.stderr.write(statusMsg + "\n");
-  process.exit(2);
+  try {
+    process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
+  } catch (_) {
+    process.stdout.write('{"output":""}\n');
+  }
+  process.exit(0);
 }
 
 try {

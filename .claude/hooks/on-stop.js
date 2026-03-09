@@ -133,11 +133,14 @@ function main() {
   });
 
   saveJson(memoryPath, memory);
-  // Write to stderr + exit 2 so Claude sees the message (stdout exit 0 is user-only)
   const reasonStr = reason ? reason.substring(0, 60) : "checkpoint";
   const statusMsg = `[STICKY-NOTE] Session stopped - handoff saved (${reasonStr})`;
-  process.stderr.write(statusMsg + "\n");
-  process.exit(2);
+  try {
+    process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
+  } catch (_) {
+    process.stdout.write('{"output":""}\n');
+  }
+  process.exit(0);
 }
 
 try {

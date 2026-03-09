@@ -303,12 +303,15 @@ function main() {
   }
 
   // Build status message for transparency
-  // Write to stderr + exit 2 so Claude sees the message (stdout exit 0 is user-only)
   const linePart = lineRanges && lineRanges.length > 0 ? ` (lines ${lineRanges.map(r => `${r.start}-${r.end}`).join(", ")})` : "";
   const statusMsg = `[STICKY-NOTE] Tracked ${toolName}${filePath ? " on " + filePath : ""}${linePart}`;
 
-  process.stderr.write(statusMsg + "\n");
-  process.exit(2);
+  try {
+    process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
+  } catch (_) {
+    process.stdout.write('{"output":""}\n');
+  }
+  process.exit(0);
 }
 
 try {

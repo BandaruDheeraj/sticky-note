@@ -924,12 +924,15 @@ function main() {
   clearInjectedSet();
   saveJson(memoryPath, memory);
 
-  // Write to stderr + exit 2 so Claude sees the message (stdout exit 0 is user-only)
   const fileCount = filesTouched.length;
   const commitCount = commitShas.length;
   const statusMsg = `[STICKY-NOTE] Session closed - thread created (${fileCount} file${fileCount !== 1 ? "s" : ""}${commitCount > 0 ? ", " + commitCount + " commit" + (commitCount !== 1 ? "s" : "") : ""})`;
-  process.stderr.write(statusMsg + "\n");
-  process.exit(2);
+  try {
+    process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
+  } catch (_) {
+    process.stdout.write('{"output":""}\n');
+  }
+  process.exit(0);
 }
 
 try {
