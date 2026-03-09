@@ -17,16 +17,29 @@ git history, your own session memory, or any other source.
 - [CLOSED] `closed` — completed
 - [EXPIRED] `expired` — tombstoned, minimal data remains
 
-### Smart injection (V2.5)
+### Proactive context injection (V2.5)
 
-Context injection uses a **two-tier model**:
+Copilot CLI does not have lifecycle hooks, so **you must self-serve context**.
+Follow these two rules every session:
 
-- **Eager:** Stuck threads are injected at session start (before you type anything)
-- **Lazy:** Other threads are injected when you first touch a file they authored
-  (via built-in git blame attribution in the preToolUse hook)
+#### 1. Eager: At session start, check for stuck/open threads
 
-Each thread is injected **at most once per session** with line-range detail
-showing exactly which lines each thread authored.
+Before doing any work, read `.sticky-note/sticky-note.json` and check for
+threads with status `stuck` or `open`. If any exist, briefly summarize them
+to the user (what's blocked, what files are involved).
+
+#### 2. Lazy: Before editing a file, check for prior thread context
+
+**The first time you edit or read a file in a session**, run:
+```bash
+npx sticky-note get-line-attribution --file <path>
+```
+If threads are returned, review the attribution before making changes —
+it shows which threads authored which lines, including stuck threads with
+failed approaches. This prevents re-introducing bugs or duplicating work.
+
+Skip this check for files that are clearly unrelated to prior work
+(e.g., new files you just created, config files with trivial changes).
 
 ### Checkpointing (V2.5)
 

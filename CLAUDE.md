@@ -44,14 +44,23 @@ cat .sticky-note/sticky-note.json
 
 ### Smart injection (V2.5)
 
-Context injection uses a **two-tier model**:
+Context injection uses a **two-tier model** via Claude Code hooks:
 
-- **Eager:** Stuck threads are injected at session start (before you type anything)
+- **Eager:** Stuck/relevant threads are injected at session start
+  (via the `UserPromptSubmit` hook in `inject-context.js`)
 - **Lazy:** Other threads are injected when you first touch a file they authored
-  (via built-in git blame attribution in the PreToolUse hook)
+  (via git blame attribution in the `PreToolUse` hook in `pre-tool-use.js`)
 
 Each thread is injected **at most once per session** with line-range detail
 showing exactly which lines each thread authored.
+
+**Fallback (no hooks):** If hooks are not running (e.g., in Copilot CLI or
+other tools), self-serve context injection instead:
+1. At session start: read `.sticky-note/sticky-note.json` and check for
+   stuck/open threads. Summarize any that exist.
+2. Before editing a file for the first time: run
+   `npx sticky-note get-line-attribution --file <path>` to check for prior
+   thread context. Review attribution before making changes.
 
 ### Checkpointing (V2.5)
 
