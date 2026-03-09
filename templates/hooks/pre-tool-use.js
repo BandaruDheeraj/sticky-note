@@ -121,7 +121,7 @@ function formatThreadForInjection(threadData, file) {
 
   const failed = thread.failed_approaches || [];
   if (failed.length > 0) {
-    lines.push(`⚠️ ${failed.length} failed approach(es) — check thread ${(thread.id || "").substring(0, 8)} for details`);
+    lines.push(`[!] ${failed.length} failed approach(es) - check thread ${(thread.id || "").substring(0, 8)} for details`);
   }
 
   if (thread.handoff_summary) {

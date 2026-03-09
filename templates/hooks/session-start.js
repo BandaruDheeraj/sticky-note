@@ -93,7 +93,7 @@ function formatThreadsForInjection(threads, maxThreads, maxTokens) {
   const capped = active.slice(0, maxThreads);
   if (capped.length === 0) return { text: "", threadIds: [] };
 
-  const lines = ["## [STICKY-NOTE] ⚠️ Stuck Threads (eager injection)\n"];
+  const lines = ["## [STICKY-NOTE] [!] Stuck Threads (eager injection)\n"];
   let tokenEstimate = 10;
   const injectedIds = [];
 
@@ -119,7 +119,7 @@ function formatThreadsForInjection(threads, maxThreads, maxTokens) {
 
     const failed = t.failed_approaches || [];
     if (failed.length > 0) {
-      line += `\n  ⚠️ ${failed.length} failed approach(es)`;
+      line += `\n  [!] ${failed.length} failed approach(es)`;
       for (const fa of failed.slice(0, 2)) {
         const desc = (fa.description || "").substring(0, 80);
         line += `\n    - ${desc}`;
