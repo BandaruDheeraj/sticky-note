@@ -21,7 +21,7 @@ const {
 
 function parsePlaintextTranscript(filePath) {
   try {
-    return fs.readFileSync(filePath, "utf-8").split("\n");
+    return fs.readFileSync(filePath, "utf-8").split(/\r?\n/);
   } catch (_) {
     return [];
   }

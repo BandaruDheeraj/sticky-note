@@ -158,7 +158,7 @@ function captureLineChanges(filePath) {
     if (!raw.trim()) return null;
 
     const ranges = [];
-    for (const line of raw.split("\n")) {
+    for (const line of raw.split(/\r?\n/)) {
       // @@ -old_start,old_count +new_start,new_count @@
       const match = line.match(/^@@\s.*\+(\d+)(?:,(\d+))?\s@@/);
       if (match) {

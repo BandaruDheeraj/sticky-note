@@ -15,7 +15,7 @@
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
-const { execSync } = require("child_process");
+const { execSync, execFileSync } = require("child_process");
 
 // ──────────────────────────────────────────────
 // Constants
@@ -56,7 +56,7 @@ function printBanner() {
 
 function isGitRepo() {
   try {
-    execSync("git rev-parse --is-inside-work-tree", { stdio: "pipe" });
+    execFileSync("git", ["rev-parse", "--is-inside-work-tree"], { stdio: "pipe" });
     return true;
   } catch {
     return false;
@@ -149,7 +149,7 @@ function countJsonlLines(filePath) {
   if (!fs.existsSync(filePath)) return 0;
   try {
     const content = fs.readFileSync(filePath, "utf-8");
-    return content.split("\n").filter((l) => l.trim()).length;
+    return content.split(/\r?\n/).filter((l) => l.trim()).length;
   } catch {
     return 0;
   }
@@ -481,7 +481,7 @@ async function cmdInit() {
   const ignoreAdditions = fs
     .readFileSync(path.join(TEMPLATES_DIR, "gitignore-additions.txt"), "utf-8")
     .trim()
-    .split("\n")
+    .split(/\r?\n/)
     .filter((l) => l.trim() && !l.startsWith("#"));
 
   let gitignoreContent = "";
@@ -518,7 +518,7 @@ async function cmdInit() {
   // Add git aliases for safe branch switching
   try {
     const swAlias = '!f() { npx sticky-note switch "$@"; }; f';
-    execSync(`git config alias.sw '${swAlias}'`, {
+    execFileSync("git", ["config", "alias.sw", swAlias], {
       cwd: process.cwd(),
       stdio: ["pipe", "pipe", "pipe"],
     });
@@ -788,7 +788,7 @@ function cmdStatus() {
   // Check Git Notes configuration
   let notesConfigured = false;
   try {
-    const ref = execSync("git config --get notes.rewriteRef", { encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"] }).trim();
+    const ref = execFileSync("git", ["config", "--get", "notes.rewriteRef"], { encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"] }).trim();
     notesConfigured = ref.includes("sticky-note");
   } catch (_) { /* not configured */ }
   print(`    ${notesConfigured ? "[OK]" : "[--]"} Git Notes rewrite configured`);
@@ -1137,7 +1137,7 @@ function cmdAudit() {
   for (const auditPath of auditPaths) {
     try {
       const content = fs.readFileSync(auditPath, "utf-8");
-      const lines = content.split("\n").filter((l) => l.trim());
+      const lines = content.split(/\r?\n/).filter((l) => l.trim());
       for (const line of lines) {
         let entry;
         try {
@@ -1288,7 +1288,7 @@ function cmdSwitch() {
   if (!fs.existsSync(stickyDir)) {
     print("  No .sticky-note/ directory. Running plain git switch.");
     try {
-      execSync(`git switch ${branch}`, { stdio: "inherit" });
+      execFileSync("git", ["switch", branch], { stdio: "inherit" });
     } catch (_) {
       process.exit(1);
     }
@@ -1298,8 +1298,8 @@ function cmdSwitch() {
   // Step 1: Stash .sticky-note/ changes
   let stashed = false;
   try {
-    const result = execSync(
-      'git stash push -m "sticky-note-auto" -- .sticky-note/',
+    const result = execFileSync(
+      "git", ["stash", "push", "-m", "sticky-note-auto", "--", ".sticky-note/"],
       { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
     );
     stashed = result.includes("Saved working directory");
@@ -1313,7 +1313,7 @@ function cmdSwitch() {
   // Step 2: Switch branch
   let switchOk = false;
   try {
-    execSync(`git switch ${branch}`, { stdio: "inherit" });
+    execFileSync("git", ["switch", branch], { stdio: "inherit" });
     switchOk = true;
     print(`  [OK] Switched to ${branch}`);
   } catch (_) {
@@ -1321,7 +1321,7 @@ function cmdSwitch() {
     // Try to restore stash if we made one
     if (stashed) {
       try {
-        execSync("git stash pop", { stdio: ["pipe", "pipe", "pipe"] });
+        execFileSync("git", ["stash", "pop"], { stdio: ["pipe", "pipe", "pipe"] });
         print("  [OK] Restored stashed .sticky-note/ changes");
       } catch (_2) {
         print("  [WARN] Stash exists but could not pop. Run 'git stash pop' manually.");
@@ -1333,15 +1333,15 @@ function cmdSwitch() {
   // Step 3: Pop stash to restore .sticky-note/ data
   if (stashed) {
     try {
-      execSync("git stash pop", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
+      execFileSync("git", ["stash", "pop"], { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
       print("  [OK] Restored .sticky-note/ data");
     } catch (_) {
       // Conflicts — force our version (sticky-note data is branch-independent)
       try {
-        execSync("git checkout --theirs -- .sticky-note/", {
+        execFileSync("git", ["checkout", "--theirs", "--", ".sticky-note/"], {
           stdio: ["pipe", "pipe", "pipe"],
         });
-        execSync("git stash drop", { stdio: ["pipe", "pipe", "pipe"] });
+        execFileSync("git", ["stash", "drop"], { stdio: ["pipe", "pipe", "pipe"] });
         print("  [OK] Restored .sticky-note/ data (resolved conflicts)");
       } catch (_2) {
         print("  [WARN] Could not auto-resolve. Run 'git stash pop' and resolve manually.");

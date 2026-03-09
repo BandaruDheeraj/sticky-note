@@ -51,6 +51,7 @@ try {
 }
 
 const ATTRIBUTION_TIMEOUT_MS = 500;
+const normalizeSep = utils ? utils.normalizeSep : (p) => typeof p === "string" ? p.replace(/\\/g, "/") : p;
 
 // ── Three-tier SHA → session resolution ───────────────────
 
@@ -86,7 +87,7 @@ function resolveViaAudit(sha) {
   for (const auditPath of auditPaths) {
     try {
       const raw = fs.readFileSync(auditPath, "utf-8");
-      for (const line of raw.split("\n")) {
+      for (const line of raw.split(/\r?\n/)) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         if (!trimmed.includes(sha)) continue;
@@ -162,13 +163,13 @@ function resolveViaHeuristic(sha, file) {
   // Last resort: match by file + date window
   const memory = utils.loadJson(utils.getMemoryPath(), { version: "2", threads: [] });
   const results = [];
-  const normalizedFile = file ? file.replace(/\\/g, "/") : null;
+  const normalizedFile = file ? normalizeSep(file) : null;
 
   for (const thread of memory.threads || []) {
     if (thread.status === "expired") continue;
     if (!normalizedFile) continue;
 
-    const touchedFiles = (thread.files_touched || []).map((f) => f.replace(/\\/g, "/"));
+    const touchedFiles = (thread.files_touched || []).map((f) => normalizeSep(f));
     const fileMatch = touchedFiles.some(
       (f) => f === normalizedFile || normalizedFile.endsWith(f) || f.endsWith(normalizedFile)
     );

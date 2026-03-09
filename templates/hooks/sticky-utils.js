@@ -9,6 +9,13 @@ const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
 
+// ── Cross-platform path normalization ──────────────────────
+
+// Normalize path separators to forward slashes for consistent storage/comparison.
+function normalizeSep(p) {
+  return typeof p === "string" ? p.replace(/\\/g, "/") : p;
+}
+
 // ── Shared regex patterns ─────────────────────────────────
 
 const ERROR_PATTERNS = new RegExp(
@@ -273,7 +280,7 @@ function parseJsonlFile(filePath) {
   const entries = [];
   try {
     const raw = fs.readFileSync(filePath, "utf-8");
-    for (const line of raw.split("\n")) {
+    for (const line of raw.split(/\r?\n/)) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       try {
@@ -424,7 +431,7 @@ function extractSessionFromAudit(sessionId) {
   for (const auditPath of auditPaths) {
     try {
       const raw = fs.readFileSync(auditPath, "utf-8");
-      for (const line of raw.split("\n")) {
+      for (const line of raw.split(/\r?\n/)) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         let entry;
@@ -634,5 +641,7 @@ module.exports = {
   getActiveResumeThreadId,
   setActiveResumeThreadId,
   clearActiveResumeThreadId,
+  // V2.5: cross-platform path helper
+  normalizeSep,
 };
 // tier1 test

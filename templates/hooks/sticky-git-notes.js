@@ -124,7 +124,7 @@ function parseBlameOutput(raw) {
   let currentSha = null;
   let currentLine = null;
 
-  for (const line of raw.split("\n")) {
+  for (const line of raw.split(/\r?\n/)) {
     // Lines starting with a 40-char hex SHA begin a new block
     const headerMatch = line.match(/^([0-9a-f]{40})\s+\d+\s+(\d+)/);
     if (headerMatch) {
@@ -247,7 +247,7 @@ function copyNotesForRewrite(pairs) {
  */
 function parsePostRewriteInput(stdin) {
   const pairs = [];
-  for (const line of stdin.split("\n")) {
+  for (const line of stdin.split(/\r?\n/)) {
     const parts = line.trim().split(/\s+/);
     if (parts.length >= 2 && /^[0-9a-f]{40}$/.test(parts[0]) && /^[0-9a-f]{40}$/.test(parts[1])) {
       pairs.push({ oldSha: parts[0], newSha: parts[1] });

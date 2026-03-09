@@ -56,6 +56,7 @@ const {
   getActiveResumeThreadId,
   clearActiveResumeThreadId,
   clearInjectedSet,
+  normalizeSep,
 } = utils;
 
 // ── Constants ─────────────────────────────────────────────
@@ -163,7 +164,7 @@ function extractFilesTouched(hookInput) {
   if (transcriptPath && fs.existsSync(transcriptPath)) {
     try {
       const raw = fs.readFileSync(transcriptPath, "utf-8");
-      for (const line of raw.split("\n")) {
+      for (const line of raw.split(/\r?\n/)) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         let entry;
@@ -181,7 +182,7 @@ function extractFilesTouched(hookInput) {
     for (const auditPath of getAllAuditPaths()) {
       try {
         const raw = fs.readFileSync(auditPath, "utf-8");
-        for (const line of raw.split("\n")) {
+        for (const line of raw.split(/\r?\n/)) {
           const trimmed = line.trim();
           if (!trimmed) continue;
           let entry;
@@ -219,7 +220,7 @@ function getSessionCommitShas() {
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     });
-    return result.trim().split("\n").filter((s) => s.trim()).map((s) => s.trim());
+    return result.trim().split(/\r?\n/).filter((s) => s.trim()).map((s) => s.trim());
   } catch (_) {
     // Fallback: just return current HEAD
     try {
@@ -246,7 +247,7 @@ function getGitFilesTouched() {
         timeout: 5000,
         stdio: ["pipe", "pipe", "pipe"],
       });
-      for (const f of result.trim().split("\n")) {
+      for (const f of result.trim().split(/\r?\n/)) {
         const trimmed = f.trim();
         if (trimmed) files.add(trimmed);
       }
@@ -257,7 +258,7 @@ function getGitFilesTouched() {
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     });
-    for (const f of unstaged.trim().split("\n")) {
+    for (const f of unstaged.trim().split(/\r?\n/)) {
       const trimmed = f.trim();
       if (trimmed) files.add(trimmed);
     }
@@ -267,7 +268,7 @@ function getGitFilesTouched() {
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     });
-    for (const f of staged.trim().split("\n")) {
+    for (const f of staged.trim().split(/\r?\n/)) {
       const trimmed = f.trim();
       if (trimmed) files.add(trimmed);
     }
@@ -276,7 +277,7 @@ function getGitFilesTouched() {
   }
 
   return Array.from(files).filter((f) => {
-    const normalized = f.replace(/\\/g, "/");
+    const normalized = normalizeSep(f);
     return !STICKY_FILES_PREFIX.some((p) => normalized === p || normalized.startsWith(p));
   });
 }
@@ -289,7 +290,7 @@ function _extractUserPrompt(hookInput) {
 
   try {
     const raw = fs.readFileSync(transcriptPath, "utf-8");
-    for (const line of raw.split("\n")) {
+    for (const line of raw.split(/\r?\n/)) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       let entry;
@@ -429,13 +430,13 @@ function _looksLikeError(text) {
 
 function _summarizeError(text) {
   if (!text) return "";
-  for (const line of text.split("\n")) {
+  for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (trimmed && ERROR_PATTERNS.test(trimmed)) {
       return trimmed.substring(0, 100);
     }
   }
-  return text.trim().split("\n")[0].substring(0, 100);
+  return text.trim().split(/\r?\n/)[0].substring(0, 100);
 }
 
 function _isTestCommand(cmd) {
@@ -522,7 +523,7 @@ function _collectEditedFiles(hookInput) {
 
   try {
     const raw = fs.readFileSync(transcriptPath, "utf-8");
-    for (const line of raw.split("\n")) {
+    for (const line of raw.split(/\r?\n/)) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       let entry;
@@ -563,7 +564,7 @@ function analyzeSessionActivities(hookInput, auditData) {
   if (hasTranscript) {
     try {
       const raw = fs.readFileSync(transcriptPath, "utf-8");
-      for (const line of raw.split("\n")) {
+      for (const line of raw.split(/\r?\n/)) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         let entry;

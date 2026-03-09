@@ -1,3 +1,11 @@
 
+# Normalize line endings
+* text=auto
+*.json text eol=lf
+*.jsonl text eol=lf
+*.js text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=crlf
+
 # Sticky Note - auto-merge threads from both sides
 .sticky-note/sticky-note.json merge=union

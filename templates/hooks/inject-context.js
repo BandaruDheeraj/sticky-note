@@ -46,7 +46,7 @@ const {
   getMemoryPath, loadJson, saveJson, getUser, getBranch,
   getResumeThreadId, findThreadById, getSessionId,
   appendAuditLine, detectTool, getConfigPath,
-  isThreadInjected, markThreadInjected,
+  isThreadInjected, markThreadInjected, normalizeSep,
 } = utils;
 
 // ── Git helpers ───────────────────────────────────────────
@@ -62,7 +62,7 @@ function getRecentlyModifiedFiles() {
         timeout: 5000,
         stdio: ["pipe", "pipe", "pipe"],
       });
-      for (const f of result.trim().split("\n")) {
+      for (const f of result.trim().split(/\r?\n/)) {
         const trimmed = f.trim();
         if (trimmed) files.add(trimmed);
       }
@@ -77,7 +77,7 @@ function getRecentlyModifiedFiles() {
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     });
-    for (const f of result.trim().split("\n")) {
+    for (const f of result.trim().split(/\r?\n/)) {
       const trimmed = f.trim();
       if (trimmed) files.add(trimmed);
     }
@@ -91,7 +91,7 @@ function getRecentlyModifiedFiles() {
 
 function extractKeywords(prompt) {
   const keywords = new Set();
-  const words = prompt.toLowerCase().replace(/\//g, " ").replace(/\\/g, " ").replace(/\./g, " ").split(/\s+/);
+  const words = prompt.toLowerCase().replace(/[/\\.]/g, " ").split(/\s+/);
   for (const word of words) {
     const cleaned = word.replace(/[()[\]{}"'`,;:]/g, "");
     if (cleaned.length >= 2) {
@@ -102,7 +102,7 @@ function extractKeywords(prompt) {
     token = token.replace(/^[()[\]{}"'`,;:]+/, "").replace(/[()[\]{}"'`,;:]+$/, "");
     if (token.includes("/") || token.includes("\\") || token.includes(".")) {
       keywords.add(token.toLowerCase());
-      const parts = token.replace(/\\/g, "/").split("/");
+      const parts = normalizeSep(token).split("/");
       for (const part of parts) {
         if (part.length >= 2) {
           keywords.add(part.toLowerCase());
@@ -136,7 +136,7 @@ function scoreThread(thread, recentlyModified, currentBranch, currentUser, promp
   // Prompt keyword match against thread files
   for (const filePath of threadFiles) {
     const pathLower = filePath.toLowerCase();
-    const pathParts = new Set(pathLower.replace(/\\/g, "/").replace(/\./g, "/").split("/"));
+    const pathParts = new Set(normalizeSep(pathLower).replace(/\./g, "/").split("/"));
     for (const kw of promptKeywords) {
       if (pathLower.includes(kw) || pathParts.has(kw)) {
         score += 1;
