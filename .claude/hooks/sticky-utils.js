@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 "use strict";
-/**
- * sticky-utils.js — Shared utilities for Sticky Note hooks (Node.js port).
- */
+// sticky-utils.js — Shared utilities for Sticky Note hooks.
+// Copied into .sticky-note/hooks/ during `npx sticky-note init` and required by all hook scripts.
+// Exports helpers for path resolution, JSON I/O, git operations, thread management, audit logging, and pattern matching.
 
 const fs = require("fs");
 const path = require("path");

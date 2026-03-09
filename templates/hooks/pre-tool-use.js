@@ -66,7 +66,7 @@ const {
 // ── File path extraction from tool input ──────────────────
 
 function extractFilePath(hookInput) {
-  const toolInput = hookInput.tool_input || hookInput.input || {};
+  const toolInput = hookInput.tool_input || hookInput.input || hookInput.toolArgs || {};
 
   if (typeof toolInput === "object" && toolInput !== null) {
     for (const key of ["file_path", "filePath", "path", "file", "filename"]) {

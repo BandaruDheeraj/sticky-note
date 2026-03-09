@@ -93,7 +93,7 @@ function formatThreadsForInjection(threads, maxThreads, maxTokens) {
   const capped = active.slice(0, maxThreads);
   if (capped.length === 0) return { text: "", threadIds: [] };
 
-  const lines = ["## ⚠️ Stuck Threads (Sticky Note — eager injection)\n"];
+  const lines = ["## [STICKY-NOTE] ⚠️ Stuck Threads (eager injection)\n"];
   let tokenEstimate = 10;
   const injectedIds = [];
 
@@ -294,7 +294,7 @@ function main() {
 
   if (resumedThread) {
     const resumeLines = [
-      `## Resumed Thread -- ${(resumedThread.id || "").substring(0, 8)}\n`,
+      `## [STICKY-NOTE] Resumed Thread -- ${(resumedThread.id || "").substring(0, 8)}\n`,
     ];
     const files = (resumedThread.files_touched || []).slice(0, 10).join(", ");
     if (files) resumeLines.push(`**Files:** ${files}`);

@@ -66,7 +66,7 @@ const {
 // ── File path extraction from tool input ──────────────────
 
 function extractFilePath(hookInput) {
-  const toolInput = hookInput.tool_input || hookInput.input || {};
+  const toolInput = hookInput.tool_input || hookInput.input || hookInput.toolArgs || {};
 
   if (typeof toolInput === "object" && toolInput !== null) {
     for (const key of ["file_path", "filePath", "path", "file", "filename"]) {
@@ -110,7 +110,7 @@ function formatThreadForInjection(threadData, file) {
   const lineStr = lineRanges.length > 0 ? ` [lines ${lineRanges.join(", ")}]` : "";
 
   const lines = [
-    `[sticky-note] ${statusTag} ${user}'s thread on ${file}${lineStr}${branchStr}:`,
+    `[STICKY-NOTE] ${statusTag} ${user}'s thread on ${file}${lineStr}${branchStr}:`,
   ];
 
   if (thread.narrative) {

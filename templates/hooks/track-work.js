@@ -79,7 +79,7 @@ function extractFilePath(hookInput) {
   const cwd = hookInput.cwd || "";
   let rawPath = null;
 
-  for (const containerKey of ["tool_input", "input", "toolInput", "params"]) {
+  for (const containerKey of ["tool_input", "input", "toolInput", "toolArgs", "params"]) {
     const container = hookInput[containerKey];
     if (container && typeof container === "object" && !Array.isArray(container)) {
       for (const key of ["file_path", "filePath", "path", "filename", "file"]) {
@@ -303,10 +303,12 @@ function main() {
   }
 
   // Build status message for transparency
-  const linePart = lineRanges && lineRanges.length > 0 ? ` (lines ${lineRanges.join(", ")})` : "";
+  // Write to stderr + exit 2 so Claude sees the message (stdout exit 0 is user-only)
+  const linePart = lineRanges && lineRanges.length > 0 ? ` (lines ${lineRanges.map(r => `${r.start}-${r.end}`).join(", ")})` : "";
   const statusMsg = `[STICKY-NOTE] Tracked ${toolName}${filePath ? " on " + filePath : ""}${linePart}`;
 
-  process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
+  process.stderr.write(statusMsg + "\n");
+  process.exit(2);
 }
 
 try {
