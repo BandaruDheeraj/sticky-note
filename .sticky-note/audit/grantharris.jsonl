@@ -1,0 +1,21 @@
+{"type":"session_start","user":"grantharris","ts":"2026-03-09T06:13:30.693Z","session_id":"fb26befa-57cf-4adc-a5d4-df5ec0d00cc7"}
+{"type":"session_end","user":"grantharris","ts":"2026-03-09T06:13:35.956Z","session_id":"fb26befa-57cf-4adc-a5d4-df5ec0d00cc7","status":"closed","files_touched":["package.json"],"work_type":"general"}
+{"type":"session_start","user":"grantharris","ts":"2026-03-09T06:13:54.564Z","session_id":"5e0bc338-265c-4786-8c21-5a2a03d4949c"}
+{"type":"session_end","user":"grantharris","ts":"2026-03-09T06:13:55.801Z","session_id":"5e0bc338-265c-4786-8c21-5a2a03d4949c","status":"closed","files_touched":["package.json"],"work_type":"general"}
+{"type":"session_start","user":"grantharris","ts":"2026-03-09T06:14:04.726Z","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17"}
+{"type":"user_prompt","user":"grantharris","ts":"2026-03-09T06:14:14.784Z","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","prompt":"Summarize this repo."}
+{"type":"inject_result","user":"grantharris","ts":"2026-03-09T06:14:15.081Z","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","prompt":"Summarize this repo.","result":"injected","threads_scored":9,"threads_injected":5,"top_scores":[{"id":"04ef07db","score":16.8},{"id":"9c2a2b01","score":16.8},{"id":"d0bc86eb","score":13.8},{"id":"eeaf8cbb","score":8},{"id":"31d43ad2","score":8}]}
+{"type":"tool_use","user":"grantharris","ts":"2026-03-09T06:14:18.447Z","tool":"ToolSearch","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17"}
+{"type":"tool_use","user":"grantharris","ts":"2026-03-09T06:14:21.959Z","tool":"Read","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","file":"package.json"}
+{"type":"tool_use","user":"grantharris","ts":"2026-03-09T06:14:25.703Z","tool":"Glob","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17"}
+{"type":"tool_use","user":"grantharris","ts":"2026-03-09T06:14:28.151Z","tool":"Read","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","file":"README.md"}
+{"type":"tool_use","user":"grantharris","ts":"2026-03-09T06:14:28.176Z","tool":"Read","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","file":"bin\\cli.js"}
+{"type":"stop","user":"grantharris","ts":"2026-03-09T06:14:46.070Z","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"grantharris","ts":"2026-03-09T06:24:27.949Z","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","prompt":"Show me all previous threads"}
+{"type":"inject_result","user":"grantharris","ts":"2026-03-09T06:24:28.247Z","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","prompt":"Show me all previous threads","result":"injected","threads_scored":10,"threads_injected":5,"top_scores":[{"id":"04ef07db","score":16.8},{"id":"9c2a2b01","score":16.8},{"id":"d0bc86eb","score":13.8},{"id":"eeaf8cbb","score":6},{"id":"31d43ad2","score":6}]}
+{"type":"tool_use","user":"grantharris","ts":"2026-03-09T06:24:32.028Z","tool":"Read","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","file":".sticky-note\\sticky-note.json"}
+{"type":"stop","user":"grantharris","ts":"2026-03-09T06:24:46.513Z","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"grantharris","ts":"2026-03-09T06:25:27.490Z","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","prompt":"Dive deeper into thread 04ef07db"}
+{"type":"inject_result","user":"grantharris","ts":"2026-03-09T06:25:27.790Z","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","prompt":"Dive deeper into thread 04ef07db","result":"injected","threads_scored":11,"threads_injected":5,"top_scores":[{"id":"04ef07db","score":16.8},{"id":"9c2a2b01","score":16.8},{"id":"d0bc86eb","score":13.8},{"id":"eeaf8cbb","score":6},{"id":"31d43ad2","score":6}]}
+{"type":"stop","user":"grantharris","ts":"2026-03-09T06:25:50.747Z","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","reason":"stop_checkpoint"}
+{"type":"session_end","user":"grantharris","ts":"2026-03-09T06:25:55.910Z","session_id":"4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17","status":"closed","files_touched":["package.json","README.md","bin\\cli.js",".sticky-note\\sticky-note.json"],"work_type":"code-review"}

@@ -279,6 +279,150 @@
         "unknown": 1
       },
       "prompts": []
+    },
+    {
+      "id": "31d43ad2-47b8-4ce7-96a8-8fa4672c72b4",
+      "user": "grantharris",
+      "project": "",
+      "status": "closed",
+      "branch": "main",
+      "created_at": "2026-03-09T06:13:35.956Z",
+      "closed_at": "2026-03-09T06:13:35.956Z",
+      "last_activity_at": "2026-03-09T06:13:35.956Z",
+      "files_touched": [
+        "package.json"
+      ],
+      "last_note": "User exited session",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "claude-code",
+      "session_id": "fb26befa-57cf-4adc-a5d4-df5ec0d00cc7",
+      "work_type": "general",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": []
+    },
+    {
+      "id": "eeaf8cbb-a431-4a8f-acbb-4fc88ac341ae",
+      "user": "grantharris",
+      "project": "",
+      "status": "closed",
+      "branch": "main",
+      "created_at": "2026-03-09T06:13:55.801Z",
+      "closed_at": "2026-03-09T06:13:55.801Z",
+      "last_activity_at": "2026-03-09T06:13:55.801Z",
+      "files_touched": [
+        "package.json"
+      ],
+      "last_note": "User exited session",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "claude-code",
+      "session_id": "5e0bc338-265c-4786-8c21-5a2a03d4949c",
+      "work_type": "general",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": []
+    },
+    {
+      "id": "80b41fab-34d1-4144-93b6-fd4cae1f2c89",
+      "user": "grantharris",
+      "project": "",
+      "status": "closed",
+      "branch": "pretty-cool",
+      "created_at": "2026-03-09T06:14:46.070Z",
+      "closed_at": "2026-03-09T06:25:55.910Z",
+      "last_activity_at": "2026-03-09T06:25:55.910Z",
+      "files_touched": [
+        "package.json",
+        "README.md",
+        "bin\\cli.js",
+        ".sticky-note\\sticky-note.json"
+      ],
+      "last_note": "[code-review] Here's a deep dive on thread `04ef07db`:\n\n---\n\n## Thread `04ef07db` — dbandaru · 🛠️ copilot-cli · feature/v2\n\n**Duration:** `2026-03-08T02:01` → `05:03` (~3 hours)\n**Work type:** genera",
+      "narrative": "Here's a deep dive on thread `04ef07db`:\n\n---\n\n## Thread `04ef07db` — dbandaru · 🛠️ copilot-cli · feature/v2\n\n**Duration:** `2026-03-08T02:01` → `05:03` (~3 hours)\n**Work type:** general\n**Status:** closed\n\n---\n\n### What was worked on\n\nThis was a **pre-merge review session for v2**, done in Copilot",
+      "failed_approaches": [
+        {
+          "description": "Here's a summary of the **sticky-note** repo:\n\n---\n\n## sticky-note v2\n\n**What it is:** A git-backed shared memory layer for AI coding assistant handof",
+          "error": "ext (files touched, status, narratives, failed approaches) and surfaces teammate context automatical",
+          "files_tried": [
+            "bin/cli.js",
+            "session-start.js",
+            "session-end.js",
+            "inject-context.js",
+            "track-work.js"
+          ]
+        },
+        {
+          "description": "Here's a deep dive on thread `04ef07db`:\n\n---\n\n## Thread `04ef07db` — dbandaru · 🛠️ copilot-cli · feature/v2\n\n**Duration:** `2026-03-08T02:01` → `05:",
+          "error": "7, `sql`: 10, `create`: 1\n\n---\n\n### No failed approaches recorded\n\nNo errors or stuck states during ",
+          "files_tried": [
+            "templates/hooks/inject-context.js",
+            ".github/copilot-instructions.md",
+            "CLAUDE.md",
+            "templates/CLAUDE.md",
+            "templates/copilot-instructions.md"
+          ]
+        }
+      ],
+      "handoff_summary": "Session stopped -- no summary available",
+      "related_session_ids": [],
+      "tool": "claude-code",
+      "session_id": "4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17",
+      "work_type": "code-review",
+      "activities": [],
+      "tool_calls": {
+        "ToolSearch": 1,
+        "Read": 4,
+        "Glob": 1
+      },
+      "prompts": [
+        "Summarize this repo.",
+        "Show me all previous threads",
+        "Dive deeper into thread 04ef07db"
+      ]
+    },
+    {
+      "id": "7460aef1-357e-404f-ba35-5644de4069fd",
+      "user": "grantharris",
+      "project": "",
+      "status": "closed",
+      "branch": "pretty-cool",
+      "created_at": "2026-03-09T06:24:46.513Z",
+      "closed_at": "2026-03-09T06:24:46.513Z",
+      "last_activity_at": "2026-03-09T06:24:46.513Z",
+      "files_touched": [],
+      "last_note": "Session stopped",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "Session stopped -- no summary available",
+      "related_session_ids": [],
+      "tool": "claude-code",
+      "session_id": "4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17"
+    },
+    {
+      "id": "6b142e7b-0940-4537-a104-c8c082ac43a7",
+      "user": "grantharris",
+      "project": "",
+      "status": "closed",
+      "branch": "pretty-cool",
+      "created_at": "2026-03-09T06:25:50.747Z",
+      "closed_at": "2026-03-09T06:25:50.747Z",
+      "last_activity_at": "2026-03-09T06:25:50.747Z",
+      "files_touched": [],
+      "last_note": "Session stopped",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "Session stopped -- no summary available",
+      "related_session_ids": [],
+      "tool": "claude-code",
+      "session_id": "4fb70a41-b4a1-4f2f-82e8-f7a7c0858e17"
     }
   ]
 }
