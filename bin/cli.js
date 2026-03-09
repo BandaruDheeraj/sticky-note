@@ -85,6 +85,25 @@ function makeExecutable(filePath) {
   }
 }
 
+function installGitHook(hookName) {
+  try {
+    const gitDir = path.join(process.cwd(), ".git");
+    if (!fs.existsSync(gitDir)) return false;
+    const hooksDir = path.join(gitDir, "hooks");
+    mkdirSafe(hooksDir);
+    const src = path.join(TEMPLATES_DIR, "hooks", hookName + ".js");
+    if (!fs.existsSync(src)) return false;
+    // Use relative path so it works on any machine after clone
+    const shimContent = `#!/bin/sh\nnode "$(dirname "$0")/../../templates/hooks/${hookName}.js" "$@"\n`;
+    const dest = path.join(hooksDir, hookName);
+    fs.writeFileSync(dest, shimContent, "utf-8");
+    makeExecutable(dest);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function ask(rl, question, defaultVal) {
   return new Promise((resolve) => {
     const suffix = defaultVal !== undefined ? ` (${defaultVal})` : "";
@@ -558,6 +577,11 @@ async function cmdInit() {
     print("");
   }
 
+  // Install git hooks (.git/hooks/) for attribution persistence
+  if (installGitHook("post-rewrite")) {
+    print("  [OK] .git/hooks/post-rewrite (attribution survives rebase)");
+  }
+
   // Done!
   print("\n  ✨ Sticky Note V2 initialized!\n");
   print("  Next steps:");
@@ -611,6 +635,11 @@ function cmdUpdate() {
     const hooksTemplate = JSON.parse(readTemplate("hooks.json"));
     fs.writeFileSync(hooksPath, JSON.stringify(hooksTemplate, null, 2) + "\n");
     print("  [OK] .github/hooks/hooks.json (updated)");
+  }
+
+  // Update git hooks (.git/hooks/)
+  if (installGitHook("post-rewrite")) {
+    print("  [OK] .git/hooks/post-rewrite (attribution survives rebase)");
   }
 
   // Update hook_version in config

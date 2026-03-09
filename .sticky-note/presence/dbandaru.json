@@ -1,9 +1,15 @@
 {
   "active_files": [
+    ".claude\\hooks\\inject-context.js",
+    ".claude\\hooks\\pre-tool-use.js",
     ".claude\\hooks\\session-start.js",
-    ".claude\\hooks\\session-end.js",
-    "templates\\hooks\\session-end.js",
-    "templates\\hooks\\session-start.js"
+    "bin\\cli.js",
+    ".git\\hooks",
+    ".gitattributes",
+    "templates\\hooks\\post-rewrite.js",
+    "templates\\hooks\\sticky-git-notes.js",
+    ".git\\hooks\\post-rewrite",
+    "templates\\hooks\\sticky-utils.js"
   ],
-  "last_seen": "2026-03-09T05:02:48.823Z"
+  "last_seen": "2026-03-09T13:48:15.220Z"
 }
