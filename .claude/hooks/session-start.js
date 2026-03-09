@@ -215,15 +215,21 @@ function main() {
   }
 
   let sessionId = getSessionId(hookInput);
+  const aiTool = detectTool(hookInput);
+  const isCopilotCli = aiTool === "copilot-cli" || process.argv.includes("--copilot-cli") || !!process.env.COPILOT_CLI;
+
   if (sessionId === "unknown") {
     sessionId = crypto.randomUUID();
   }
   saveSessionId(sessionId);
   saveHeadSha();
 
-  // V2.5: Clear injected-this-session tracking for fresh session
-  clearInjectedSet();
-  clearActiveResumeThreadId();
+  // V2.5: Only clear injected-this-session tracking for truly new sessions.
+  // Copilot CLI fires SessionStart per-turn; clearing would lose dedup state.
+  if (!isCopilotCli) {
+    clearInjectedSet();
+    clearActiveResumeThreadId();
+  }
 
   // Migrate legacy single-file audit/presence to per-user dirs
   migrateAuditAndPresence();

@@ -735,6 +735,7 @@ function main() {
 
   const sessionId = getSessionId(hookInput);
   const aiTool = detectTool(hookInput);
+  const isCopilotCli = aiTool === "copilot-cli" || process.argv.includes("--copilot-cli") || !!process.env.COPILOT_CLI;
   const user = getUser();
   const now = new Date().toISOString();
   const branch = getBranch();
@@ -842,8 +843,12 @@ function main() {
     existing.work_type = sessionAnalysis.work_type;
     existing.activities = sessionAnalysis.activities;
     existing.last_activity_at = now;
-    existing.status = "closed";
-    existing.closed_at = now;
+    // Copilot CLI fires SessionEnd per-turn, not per-session.
+    // Keep thread open so it isn't prematurely closed between turns.
+    if (!isCopilotCli) {
+      existing.status = "closed";
+      existing.closed_at = now;
+    }
     existing.branch = branch || existing.branch || "";
 
     // Merge tool call counts
@@ -865,10 +870,10 @@ function main() {
       id: crypto.randomUUID(),
       user,
       project: memory.project || "",
-      status: "closed",
+      status: isCopilotCli ? "open" : "closed",
       branch,
       created_at: now,
-      closed_at: now,
+      closed_at: isCopilotCli ? null : now,
       last_activity_at: now,
       files_touched: filesTouched,
       last_note: lastNote,
@@ -893,13 +898,14 @@ function main() {
   const commitShas = getSessionCommitShas();
 
   // Housekeeping
+  const threadStatus = isCopilotCli ? "open" : "closed";
   tombstoneSweep(threads, staleDays);
   const auditEntry = {
     type: "session_end",
     user,
     ts: now,
     session_id: sessionId,
-    status: "closed",
+    status: threadStatus,
     files_touched: filesTouched,
     work_type: sessionAnalysis.work_type,
   };
@@ -918,15 +924,20 @@ function main() {
       commit_sha: sha,
     });
   }
-  clearPresence(user);
-  clearSessionFile();
-  clearHeadFile();
-  clearInjectedSet();
+  // Only clear transient files for true session end (Claude Code).
+  // Copilot CLI fires per-turn; clearing would break state across turns.
+  if (!isCopilotCli) {
+    clearPresence(user);
+    clearSessionFile();
+    clearHeadFile();
+    clearInjectedSet();
+  }
   saveJson(memoryPath, memory);
 
   const fileCount = filesTouched.length;
   const commitCount = commitShas.length;
-  const statusMsg = `[STICKY-NOTE] Session closed - thread created (${fileCount} file${fileCount !== 1 ? "s" : ""}${commitCount > 0 ? ", " + commitCount + " commit" + (commitCount !== 1 ? "s" : "") : ""})`;
+  const statusLabel = isCopilotCli ? "updated" : "closed";
+  const statusMsg = `[STICKY-NOTE] Session ${statusLabel} - thread ${isCopilotCli ? "updated" : "created"} (${fileCount} file${fileCount !== 1 ? "s" : ""}${commitCount > 0 ? ", " + commitCount + " commit" + (commitCount !== 1 ? "s" : "") : ""})`;
   try {
     process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
   } catch (_) {

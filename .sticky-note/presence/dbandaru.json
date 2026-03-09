@@ -1,4 +1,9 @@
 {
-  "active_files": [],
-  "last_seen": "2026-03-09T04:46:18.985Z"
+  "active_files": [
+    ".claude\\hooks\\session-start.js",
+    ".claude\\hooks\\session-end.js",
+    "templates\\hooks\\session-end.js",
+    "templates\\hooks\\session-start.js"
+  ],
+  "last_seen": "2026-03-09T05:02:48.823Z"
 }
