@@ -1,4 +1,4 @@
-# Thread Resume — Local Mode (V2.5)
+# Thread resume — local mode (V2.5)
 
 Thread resume lets one developer pick up where another left off.
 Alice's thread becomes Bob's active thread — one thread, two
@@ -27,25 +27,25 @@ npx sticky-note resume-thread --query "auth" --json
 
 ---
 
-## How It Works
+## How it works
 
-### 1. Thread Discovery
+### 1. Thread discovery
 
 `resume-thread` searches all non-expired threads using:
 
-- **Text similarity** — matches query against narrative, failed_approaches,
+- Text similarity — matches query against narrative, failed_approaches,
   handoff_summary, last_note, and files_touched
-- **User filter** — optional, filters to a specific thread author
-- **File attribution** — boosts threads whose attributed lines (via
+- User filter — optional, filters to a specific thread author
+- File attribution — boosts threads whose attributed lines (via
   built-in `git blame`) overlap with the specified file
 
-### 2. Match Selection
+### 2. Match selection
 
 - If one clear winner: selected automatically
 - If top 2 scores are within 0.5 of each other: both shown, best selected
 - JSON mode returns best_match + alternatives for programmatic use
 
-### 3. Resume Activation
+### 3. Resume activation
 
 When a thread is resumed:
 
@@ -54,7 +54,7 @@ When a thread is resumed:
 3. Next AI session picks up the thread's full context automatically
 4. Session-end appends to the resumed thread (not a new thread)
 
-### 4. Thread Update on Session End
+### 4. Thread update on session end
 
 When Bob's session ends on a resumed thread:
 
@@ -66,7 +66,7 @@ When Bob's session ends on a resumed thread:
 
 ---
 
-## Thread Schema Additions (V2.5)
+## Thread schema additions (V2.5)
 
 All fields are **optional and backward-compatible** — V1/V2 threads work
 unchanged.
@@ -99,7 +99,7 @@ Example thread with resume data:
 
 ---
 
-## Injection vs Resume
+## Injection vs resume
 
 | | Injection | Resume |
 |---|-----------|--------|
@@ -111,7 +111,7 @@ Example thread with resume data:
 
 ---
 
-## Limitation: Push Required
+## Limitation: push required
 
 In V2.5, `resume-thread` reads `sticky-note.json` and audit JSONL
 **locally**. If Alice is on a different machine and hasn't pushed, her
@@ -119,14 +119,14 @@ threads are not visible to Bob.
 
 **Workaround:** Alice pushes her branch. Bob pulls. Resume works.
 
-**V3.5 removes this limitation** by moving the thread store to cloud,
-enabling cross-machine resume without push.
+**Workaround:** Ensure both developers push/pull regularly so thread
+data stays in sync.
 
 ---
 
-## What Resume Is Not
+## What resume is not
 
-- ✗ **Not a fork** — one thread, multiple contributors
-- ✗ **Not an assignment** — Bob pulls, Alice doesn't push
-- ✗ **Not a lock** — Alice can resume her own thread concurrently
-- ✗ **Not required** — smart injection still works without resume
+- ✗ Not a fork — one thread, multiple contributors
+- ✗ Not an assignment — Bob pulls, Alice doesn't push
+- ✗ Not a lock — Alice can resume her own thread concurrently
+- ✗ Not required — smart injection still works without resume

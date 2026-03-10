@@ -29,6 +29,6 @@
     "node": ">=16.0.0"
   },
   "scripts": {
-    "test": "echo \"No tests yet\""
+    "test": "node test/smoke.test.js"
   }
 }

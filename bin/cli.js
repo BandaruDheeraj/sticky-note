@@ -47,6 +47,12 @@ function print(msg) {
   process.stdout.write(msg + "\n");
 }
 
+function debugLog(msg) {
+  if (process.env.STICKY_DEBUG) {
+    process.stderr.write(`[sticky-note] ${msg}\n`);
+  }
+}
+
 function printBanner() {
   print("");
   print(`  📌 sticky-note v${VERSION}`);
@@ -93,13 +99,24 @@ function installGitHook(hookName) {
     mkdirSafe(hooksDir);
     const src = path.join(TEMPLATES_DIR, "hooks", hookName + ".js");
     if (!fs.existsSync(src)) return false;
-    // Use relative path so it works on any machine after clone
-    const shimContent = `#!/bin/sh\nnode "$(dirname "$0")/../../templates/hooks/${hookName}.js" "$@"\n`;
-    const dest = path.join(hooksDir, hookName);
-    fs.writeFileSync(dest, shimContent, "utf-8");
-    makeExecutable(dest);
+
+    if (process.platform === "win32") {
+      // Windows: create a .bat shim that invokes node with the hook script
+      const shimContent =
+        `@echo off\r\nnode "%~dp0..\\..\\templates\\hooks\\${hookName}.js" %*\r\n`;
+      const dest = path.join(hooksDir, hookName);
+      fs.writeFileSync(dest, shimContent, "utf-8");
+    } else {
+      // Unix: create a sh shim
+      const shimContent =
+        `#!/bin/sh\nnode "$(dirname "$0")/../../templates/hooks/${hookName}.js" "$@"\n`;
+      const dest = path.join(hooksDir, hookName);
+      fs.writeFileSync(dest, shimContent, "utf-8");
+      makeExecutable(dest);
+    }
     return true;
-  } catch {
+  } catch (err) {
+    debugLog("installGitHook failed for " + hookName + ": " + (err.message || err));
     return false;
   }
 }
@@ -116,7 +133,8 @@ function ask(rl, question, defaultVal) {
 function readJsonSafe(filePath, fallback) {
   try {
     return JSON.parse(fs.readFileSync(filePath, "utf-8"));
-  } catch {
+  } catch (err) {
+    debugLog("readJsonSafe failed for " + filePath + ": " + (err.message || err));
     return fallback;
   }
 }
@@ -198,7 +216,7 @@ function detectMcpServers() {
         if (config.url) entry.url = config.url;
         servers.set(name, entry);
       }
-    } catch { /* skip */ }
+    } catch (err) { debugLog("detectMcpServers settings.json: " + (err.message || err)); }
   }
 
   const localSettingsPath = path.join(process.cwd(), ".claude", "settings.local.json");
@@ -221,7 +239,7 @@ function detectMcpServers() {
           }
         }
       }
-    } catch { /* skip */ }
+    } catch (err) { debugLog("detectMcpServers settings.local.json: " + (err.message || err)); }
   }
 
   return Array.from(servers.values());
@@ -246,7 +264,7 @@ function detectSkills() {
           }
         }
       }
-    } catch { /* skip */ }
+    } catch (err) { debugLog("detectSkills: " + (err.message || err)); }
   }
 
   return Array.from(skills);
@@ -277,7 +295,7 @@ async function syncMcpFromStickyNote(rl) {
   if (fs.existsSync(mcpJsonPath)) {
     try {
       existingServers = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8")).mcpServers || {};
-    } catch { /* skip */ }
+    } catch (err) { debugLog("syncMcp read .mcp.json: " + (err.message || err)); }
   }
 
   const missing = provisionable.filter((s) => !existingServers[s.name]);
@@ -300,7 +318,7 @@ async function syncMcpFromStickyNote(rl) {
     try {
       mcpJson = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8"));
       mcpJson.mcpServers = mcpJson.mcpServers || {};
-    } catch { /* start fresh */ }
+    } catch (err) { debugLog("syncMcp parse .mcp.json: " + (err.message || err)); }
   }
 
   for (const s of missing) {
@@ -1318,7 +1336,8 @@ function cmdSwitch() {
     print("  No .sticky-note/ directory. Running plain git switch.");
     try {
       execFileSync("git", ["switch", branch], { stdio: "inherit" });
-    } catch (_) {
+    } catch (err) {
+      debugLog("git switch failed: " + (err.message || err));
       process.exit(1);
     }
     return;
@@ -1345,8 +1364,9 @@ function cmdSwitch() {
     execFileSync("git", ["switch", branch], { stdio: "inherit" });
     switchOk = true;
     print(`  [OK] Switched to ${branch}`);
-  } catch (_) {
+  } catch (err) {
     print(`  [ERR] Failed to switch to ${branch}`);
+    debugLog("git switch (stash workflow): " + (err.message || err));
     // Try to restore stash if we made one
     if (stashed) {
       try {
