@@ -133,7 +133,14 @@ function main() {
   });
 
   saveJson(memoryPath, memory);
-  process.stdout.write(JSON.stringify({ output: "" }) + "\n");
+  const reasonStr = reason ? reason.substring(0, 60) : "checkpoint";
+  const statusMsg = `[STICKY-NOTE] Session stopped - handoff saved (${reasonStr})`;
+  try {
+    process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
+  } catch (_) {
+    process.stdout.write('{"output":""}\n');
+  }
+  process.exit(0);
 }
 
 try {

@@ -1,4 +1,4 @@
-# 📌 Sticky Note v2
+# 📌 Sticky Note v2.5
 
 > [OPEN] **Yes, we use Sticky Note to build Sticky Note — and it's working!** It's sticky notes all the way down.
 
@@ -29,7 +29,17 @@ Just shared files in your repo.
 
 ---
 
-## What's New in V2
+## What's New in V2.5
+
+- **Smart injection (two-tier)**: Stuck threads injected eagerly at session start; all other threads injected lazily when you first touch a file they authored — via built-in git blame attribution
+- **Thread resume (local)**: `npx sticky-note resume-thread --query "auth fix" --user alice` — natural language thread discovery with text similarity + file attribution ranking
+- **Built-in attribution engine**: `npx sticky-note get-line-attribution --file src/auth.ts` — maps file lines to commit SHAs via git blame, resolves to threads with line ranges. No external dependencies.
+- **Git Notes storage**: Session attribution stored in `refs/notes/sticky-note` — survives rebase/amend
+- **Three-tier SHA resolution**: Git Notes → Audit JSONL → File+date heuristic — attribution never breaks
+- **PreToolUse hook**: New hook fires before each tool call for lazy injection with line-range detail
+- **Thread schema additions**: `contributors[]`, `resumed_by`, `resumed_at`, `resume_history[]` — multi-contributor threads with full resume chain
+
+### What's New in V2
 
 - **Per-user audit & presence**: Audit logs and presence in per-user files under `audit/` and `presence/` — committed and shared with the team
 - **Relevance scoring**: Context injected based on file overlap, branch match, and recency
@@ -102,25 +112,26 @@ refresh them without overwriting your own content.
 
 ### 2. Session Start Hook (`session-start.js`)
 
-Runs once when a session begins. Injects up to four blocks of context:
+Runs once when a session begins. V2.5 uses **eager injection** for stuck
+threads only — non-stuck threads are held for lazy injection.
 
 - **Resumed thread** — If a `.sticky-resume` signal file exists, the full
   thread payload is injected: narrative, files touched, failed approaches,
   conversation prompts, and the complete resume chain history.
-- **Teammate threads** — Top 10 open/stuck threads from `sticky-note.json`,
-  labeled with status, author, branch, and work type.
+- **Stuck threads** — All stuck threads are injected eagerly (V2.5).
 - **Team config** — Conventions, MCP servers, and skills from
   `sticky-note-config.json`.
 - **Active presence** — Developers seen in the last 15 minutes and the
   files they're working on.
 
-The hook also snapshots `HEAD` (for git-diff at session end), generates a
-stable session ID, and ages stale threads (14+ days → `stale`).
+The hook also clears the injected-this-session tracking set, snapshots
+`HEAD`, generates a session ID, and ages stale threads.
 
 ### 3. Per-Prompt Injection (`inject-context.js`)
 
 Runs on **every user prompt**. Scores all live threads by relevance and
-injects the top 3–5 (max 300 tokens) as additional context:
+injects the top 3–5 (under token budget) as additional context.
+**V2.5:** Skips threads already injected by session-start or PreToolUse.
 
 | Signal | Weight | Description |
 |--------|--------|-------------|
@@ -132,8 +143,17 @@ injects the top 3–5 (max 300 tokens) as additional context:
 | Same developer | 1 | Your own previous threads |
 | Resume signal | +10 | Thread targeted by `.sticky-resume` |
 
-The top thread gets full detail; threads 2–5 get one-liner summaries.
-Each prompt is also logged to the audit trail for session-end processing.
+### 3b. PreToolUse Hook (`pre-tool-use.js`) — V2.5
+
+Runs **before each tool call**. Lazy injection tier:
+
+1. Extracts target file from tool input
+2. Runs `git blame --line-porcelain <file>` → commit SHAs per line
+3. Three-tier SHA resolution: Git Notes → Audit JSONL → File+date heuristic
+4. Resolves session IDs → loads threads with line ranges
+5. Injects matching threads (if not already injected this session)
+
+No external dependencies — uses built-in git blame.
 
 ### 4. Resume Flow (`npx sticky-note resume <id>`)
 
@@ -245,10 +265,14 @@ CLAUDE.md                         # AI instructions for Claude Code
     ├── session-start.js      # Load & inject teammate context
     ├── session-end.js        # Capture session thread
     ├── inject-context.js     # Per-prompt relevance scoring
-    ├── track-work.js         # JSONL audit + presence heartbeat
+    ├── pre-tool-use.js       # Lazy injection via git blame attribution (V2.5)
+    ├── sticky-attribution.js # Built-in attribution engine (V2.5)
+    ├── sticky-git-notes.js   # Git Notes utilities (V2.5)
+    ├── track-work.js         # JSONL audit + presence + line tracking (V2.5)
     ├── parse-transcript.js   # Narrative + failed approach extraction
     ├── on-stop.js            # Handoff summary on stop
     ├── on-error.js           # Stuck thread on error
+    ├── post-rewrite.js       # Git Notes rewrite survival (V2.5)
     └── sticky-codex.sh       # Optional Codex wrapper
 
 .github/
@@ -263,7 +287,9 @@ CLAUDE.md                         # AI instructions for Claude Code
 │   └── <username>.jsonl      # One file per team member
 ├── presence/                 # Per-user presence (git-tracked)
 │   └── <username>.json       # One file per team member
-└── .sticky-resume            # Resume signal (local only)
+├── .sticky-resume            # Resume signal (local only)
+├── .sticky-injected          # Injection tracking (local only, V2.5)
+└── .sticky-active-resume     # Active resume marker (local only, V2.5)
 ```
 
 ---
@@ -274,16 +300,19 @@ CLAUDE.md                         # AI instructions for Claude Code
 npx sticky-note init           # Interactive setup
 npx sticky-note init --codex   # Setup with Codex wrapper
 npx sticky-note update         # Update hook scripts (preserves data)
-npx sticky-note status         # Diagnostic report
+npx sticky-note status         # Diagnostic report (includes attribution health)
 npx sticky-note threads        # List threads with status icons
 npx sticky-note resume         # List resumable threads
 npx sticky-note resume <id>    # Resume a previous thread
 npx sticky-note resume --clear # Cancel active resume
+npx sticky-note resume-thread  # Smart resume: --query, --user, --file (V2.5)
 npx sticky-note audit          # Query merged audit trail (all users)
 npx sticky-note who            # Show active and recent team members
 npx sticky-note switch <branch> # Safe branch switch (auto-stashes data)
 npx sticky-note gc             # Tombstone expired threads
 npx sticky-note reset          # Wipe all threads (--force, --keep-audit)
+npx sticky-note get-line-attribution # File→thread attribution with line ranges (V2.5)
+npx sticky-note checkpoint         # Set work-topic checkpoint for attribution (V2.5)
 npx sticky-note --version      # Show version
 npx sticky-note --help         # Show help
 ```
@@ -310,7 +339,7 @@ Edit `.sticky-note/sticky-note-config.json`:
   "mcp_servers": [],
   "skills": [],
   "conventions": ["Use TypeScript strict mode", "Test before commit"],
-  "hook_version": "2.0.0"
+  "hook_version": "2.5.0"
 }
 ```
 

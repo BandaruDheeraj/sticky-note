@@ -42,6 +42,10 @@ const {
   saveSessionId,
   saveHeadSha,
   detectTool,
+  clearInjectedSet,
+  markThreadInjected,
+  clearActiveResumeThreadId,
+  getActiveResumeThreadId,
 } = utils;
 
 // ── Stale-thread ageing ───────────────────────────────────
@@ -76,8 +80,10 @@ function formatThreadsForInjection(threads, maxThreads, maxTokens) {
   maxThreads = maxThreads || 10;
   maxTokens = maxTokens || 500;
 
+  // V2.5: Eager injection only for stuck threads.
+  // Non-stuck threads are handled by lazy injection (PreToolUse hook).
   const active = (threads || []).filter(
-    (t) => t.status === "open" || t.status === "stuck"
+    (t) => t.status === "stuck"
   );
   active.sort((a, b) => {
     const aTime = a.last_activity_at || a.updated_at || "";
@@ -85,14 +91,14 @@ function formatThreadsForInjection(threads, maxThreads, maxTokens) {
     return bTime.localeCompare(aTime);
   });
   const capped = active.slice(0, maxThreads);
-  if (capped.length === 0) return "";
+  if (capped.length === 0) return { text: "", threadIds: [] };
 
-  const lines = ["## Teammate Threads (Sticky Note)\n"];
+  const lines = ["## [STICKY-NOTE] [!] Stuck Threads (eager injection)\n"];
   let tokenEstimate = 10;
+  const injectedIds = [];
 
   for (let i = 0; i < capped.length; i++) {
     const t = capped[i];
-    const statusLabel = t.status === "stuck" ? "[STUCK] " : "";
     const workType = t.work_type || "";
     const typeLabel =
       workType && workType !== "general" ? `[${workType}] ` : "";
@@ -102,7 +108,7 @@ function formatThreadsForInjection(threads, maxThreads, maxTokens) {
     const narrative = t.narrative || "";
     const branch = t.branch || "";
 
-    let line = `- ${statusLabel}${typeLabel}**${author}**`;
+    let line = `- [STUCK] ${typeLabel}**${author}**`;
     if (branch) line += ` (${branch})`;
     line += `: ${files}`;
     if (narrative) {
@@ -111,16 +117,28 @@ function formatThreadsForInjection(threads, maxThreads, maxTokens) {
       line += ` -- _${note}_`;
     }
 
+    const failed = t.failed_approaches || [];
+    if (failed.length > 0) {
+      line += `\n  [!] ${failed.length} failed approach(es)`;
+      for (const fa of failed.slice(0, 2)) {
+        const desc = (fa.description || "").substring(0, 80);
+        line += `\n    - ${desc}`;
+      }
+    }
+
     tokenEstimate += Math.floor(line.length / 4);
     if (tokenEstimate > maxTokens) {
       lines.push(
-        `- ... and ${capped.length - lines.length + 1} more threads`
+        `- ... and ${capped.length - lines.length + 1} more stuck threads`
       );
       break;
     }
     lines.push(line);
+    injectedIds.push(t.id);
   }
-  return lines.join("\n");
+
+  lines.push("\n_Other threads are injected lazily when you touch their files._");
+  return { text: lines.join("\n"), threadIds: injectedIds };
 }
 
 function formatConfigForInjection(config) {
@@ -197,11 +215,21 @@ function main() {
   }
 
   let sessionId = getSessionId(hookInput);
+  const aiTool = detectTool(hookInput);
+  const isCopilotCli = aiTool === "copilot-cli" || process.argv.includes("--copilot-cli") || !!process.env.COPILOT_CLI;
+
   if (sessionId === "unknown") {
     sessionId = crypto.randomUUID();
   }
   saveSessionId(sessionId);
   saveHeadSha();
+
+  // V2.5: Only clear injected-this-session tracking for truly new sessions.
+  // Copilot CLI fires SessionStart per-turn; clearing would lose dedup state.
+  if (!isCopilotCli) {
+    clearInjectedSet();
+    clearActiveResumeThreadId();
+  }
 
   // Migrate legacy single-file audit/presence to per-user dirs
   migrateAuditAndPresence();
@@ -247,10 +275,16 @@ function main() {
   }
 
   // ── Build context pieces ──────────────────────────────
-  const threadContext = formatThreadsForInjection(memory.threads || []);
+  const threadResult = formatThreadsForInjection(memory.threads || []);
+  const threadContext = threadResult.text;
   const configContext = formatConfigForInjection(config);
   const presenceData = loadAllPresence();
   const presenceContext = formatPresence(presenceData);
+
+  // V2.5: Mark eagerly-injected stuck threads so PreToolUse won't re-inject
+  for (const threadId of threadResult.threadIds) {
+    markThreadInjected(threadId, sessionId);
+  }
 
   appendAuditLine({
     type: "session_start",
@@ -266,7 +300,7 @@ function main() {
 
   if (resumedThread) {
     const resumeLines = [
-      `## Resumed Thread -- ${(resumedThread.id || "").substring(0, 8)}\n`,
+      `## [STICKY-NOTE] Resumed Thread -- ${(resumedThread.id || "").substring(0, 8)}\n`,
     ];
     const files = (resumedThread.files_touched || []).slice(0, 10).join(", ");
     if (files) resumeLines.push(`**Files:** ${files}`);

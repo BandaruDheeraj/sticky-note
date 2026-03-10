@@ -119,7 +119,13 @@ function main() {
   });
 
   saveJson(memoryPath, memory);
-  process.stdout.write(JSON.stringify({ output: "" }) + "\n");
+  const statusMsg = `[STICKY-NOTE] Marked thread as STUCK - ${errorMsg.substring(0, 80)}`;
+  try {
+    process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
+  } catch (_) {
+    process.stdout.write('{"output":""}\n');
+  }
+  process.exit(0);
 }
 
 try {

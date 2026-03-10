@@ -16,18 +16,19 @@ licensed and welcomes contributions from everyone.
 ## Development Setup
 
 ```bash
-git clone https://github.com/sticky-note/sticky-note.git
+git clone https://github.com/BandaruDheeraj/sticky-note.git
 cd sticky-note
-npm install   # no deps, just sets up the project
-python --version  # ensure 3.10+
+npm install   # zero external dependencies
+node --version  # ensure v16+
 ```
 
 ## Project Structure
 
 ```
 bin/cli.js                          # npx entry point (init/update/status/threads/audit/gc)
-templates/hooks/*.py                # Python hook scripts installed into repos
-templates/hooks/sticky-codex.sh     # Codex wrapper script
+templates/hooks/*.js                # JavaScript hook scripts installed into repos
+templates/hooks/sticky-codex.sh     # Codex wrapper script (Unix)
+templates/hooks/sticky-codex.ps1    # Codex wrapper script (Windows)
 templates/*.json                    # Config templates for Claude Code & Copilot CLI
 templates/gitignore-additions.txt   # Entries added to .gitignore on init
 ```
@@ -65,17 +66,16 @@ Consider adding a `.gitattributes` rule (done automatically by `init`):
 
 ## Code Style
 
-- Python: Follow PEP 8, target Python 3.10+
-- JavaScript: No transpilation, ES modules, Node 16+
+- JavaScript: No transpilation, Node 16+
 - Keep scripts self-contained with zero external dependencies
 
 ## Testing
 
-Hook scripts can be tested by running them directly:
+Hook scripts can be tested by piping JSON to stdin:
 ```bash
-echo '{}' | python .claude/hooks/session-start.py
-echo '{}' | python .claude/hooks/session-end.py
-echo '{}' | python .claude/hooks/track-work.py
+echo '{}' | node .claude/hooks/session-start.js
+echo '{}' | node .claude/hooks/session-end.js
+echo '{}' | node .claude/hooks/track-work.js
 ```
 
 CLI commands:
@@ -89,7 +89,7 @@ node bin/cli.js gc
 ## Reporting Issues
 
 Please include:
-- Your OS (macOS/Linux/Windows WSL)
-- Python and Node.js versions
+- Your OS (macOS/Linux/Windows)
+- Node.js version
 - Output of `npx sticky-note status`
 - The relevant section of `.sticky-note/sticky-note.json`

@@ -42,10 +42,18 @@ try {
 } catch (_) {
   _safeExit();
 }
+
+let gitNotes;
+try {
+  gitNotes = require("./sticky-git-notes.js");
+} catch (_) {
+  gitNotes = null;
+}
 const {
   getMemoryPath, loadJson, saveJson, getUser, getBranch,
   getResumeThreadId, findThreadById, getSessionId,
   appendAuditLine, detectTool, getConfigPath,
+  isThreadInjected, markThreadInjected, normalizeSep,
 } = utils;
 
 // ── Git helpers ───────────────────────────────────────────
@@ -61,7 +69,7 @@ function getRecentlyModifiedFiles() {
         timeout: 5000,
         stdio: ["pipe", "pipe", "pipe"],
       });
-      for (const f of result.trim().split("\n")) {
+      for (const f of result.trim().split(/\r?\n/)) {
         const trimmed = f.trim();
         if (trimmed) files.add(trimmed);
       }
@@ -76,7 +84,7 @@ function getRecentlyModifiedFiles() {
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     });
-    for (const f of result.trim().split("\n")) {
+    for (const f of result.trim().split(/\r?\n/)) {
       const trimmed = f.trim();
       if (trimmed) files.add(trimmed);
     }
@@ -90,7 +98,7 @@ function getRecentlyModifiedFiles() {
 
 function extractKeywords(prompt) {
   const keywords = new Set();
-  const words = prompt.toLowerCase().replace(/\//g, " ").replace(/\\/g, " ").replace(/\./g, " ").split(/\s+/);
+  const words = prompt.toLowerCase().replace(/[/\\.]/g, " ").split(/\s+/);
   for (const word of words) {
     const cleaned = word.replace(/[()[\]{}"'`,;:]/g, "");
     if (cleaned.length >= 2) {
@@ -101,7 +109,7 @@ function extractKeywords(prompt) {
     token = token.replace(/^[()[\]{}"'`,;:]+/, "").replace(/[()[\]{}"'`,;:]+$/, "");
     if (token.includes("/") || token.includes("\\") || token.includes(".")) {
       keywords.add(token.toLowerCase());
-      const parts = token.replace(/\\/g, "/").split("/");
+      const parts = normalizeSep(token).split("/");
       for (const part of parts) {
         if (part.length >= 2) {
           keywords.add(part.toLowerCase());
@@ -135,7 +143,7 @@ function scoreThread(thread, recentlyModified, currentBranch, currentUser, promp
   // Prompt keyword match against thread files
   for (const filePath of threadFiles) {
     const pathLower = filePath.toLowerCase();
-    const pathParts = new Set(pathLower.replace(/\\/g, "/").replace(/\./g, "/").split("/"));
+    const pathParts = new Set(normalizeSep(pathLower).replace(/\./g, "/").split("/"));
     for (const kw of promptKeywords) {
       if (pathLower.includes(kw) || pathParts.has(kw)) {
         score += 1;
@@ -300,6 +308,21 @@ function main() {
     // ignore
   }
 
+  // Auto-checkpoint: tag subsequent edits with what the user asked for
+  if (gitNotes) {
+    try {
+      gitNotes.saveCheckpoint({
+        topic: prompt.substring(0, 200),
+        user: getUser(),
+        ts: new Date().toISOString(),
+        session_id: sessionId,
+        auto: true,
+      });
+    } catch (_) {
+      // ignore — checkpoint is best-effort
+    }
+  }
+
   const memory = loadJson(getMemoryPath(), { version: "2", threads: [] });
   const threads = memory.threads || [];
 
@@ -354,6 +377,9 @@ function main() {
   // Score threads
   const scored = [];
   for (const t of live) {
+    // V2.5: Skip threads already injected this session by PreToolUse or session-start
+    if (isThreadInjected(t.id)) continue;
+
     let s = scoreThread(t, recentlyModified, currentBranch, currentUser, keywords);
     if (resumeThreadId && t.id === resumeThreadId) {
       s = Math.max(s, 0) + 10;
@@ -375,7 +401,7 @@ function main() {
 
   // Debug / scoring block
   const debugLines = [
-    "\n---\n[STICKY NOTE -- scoring] prompt: " + prompt.substring(0, 80),
+    "\n---\n[STICKY-NOTE] [scoring] prompt: " + prompt.substring(0, 80),
   ];
   debugLines.push(
     "  keywords: " +
@@ -450,14 +476,17 @@ function main() {
     tokenCount += blockTokens;
     outputLines.push(block);
     threadsShown++;
+
+    // V2.5: Mark as injected so PreToolUse won't re-inject
+    try { markThreadInjected(thread.id, sessionId); } catch (_) {}
   }
 
   const header =
-    "[STICKY NOTE -- " +
+    "[STICKY-NOTE] " +
     threadsShown +
     " relevant thread" +
     (threadsShown !== 1 ? "s" : "") +
-    "]\n";
+    " injected\n";
   outputLines.unshift(header);
 
   let output = outputLines.join("\n").trim();

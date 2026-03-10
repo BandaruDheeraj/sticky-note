@@ -5,6 +5,9 @@
 .sticky-note/.sticky-session
 .sticky-note/.sticky-resume
 .sticky-note/.sticky-head
+.sticky-note/.sticky-injected
+.sticky-note/.sticky-active-resume
+.sticky-note/.sticky-checkpoint
 
 # Sticky Note - debug log
 .sticky-note/hook-debug.log

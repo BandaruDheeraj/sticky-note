@@ -53,6 +53,10 @@ const {
   clearSessionFile,
   readHeadSha,
   clearHeadFile,
+  getActiveResumeThreadId,
+  clearActiveResumeThreadId,
+  clearInjectedSet,
+  normalizeSep,
 } = utils;
 
 // ── Constants ─────────────────────────────────────────────
@@ -73,6 +77,8 @@ const STICKY_FILES_PREFIX = [
   ".sticky-note/.sticky-debug.jsonl",
   ".sticky-note/sticky-note-config.json",
   ".sticky-note/.sticky-presence.json",
+  ".sticky-note/.sticky-injected",
+  ".sticky-note/.sticky-active-resume",
 ];
 
 // ── Transcript helpers ────────────────────────────────────
@@ -158,7 +164,7 @@ function extractFilesTouched(hookInput) {
   if (transcriptPath && fs.existsSync(transcriptPath)) {
     try {
       const raw = fs.readFileSync(transcriptPath, "utf-8");
-      for (const line of raw.split("\n")) {
+      for (const line of raw.split(/\r?\n/)) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         let entry;
@@ -176,7 +182,7 @@ function extractFilesTouched(hookInput) {
     for (const auditPath of getAllAuditPaths()) {
       try {
         const raw = fs.readFileSync(auditPath, "utf-8");
-        for (const line of raw.split("\n")) {
+        for (const line of raw.split(/\r?\n/)) {
           const trimmed = line.trim();
           if (!trimmed) continue;
           let entry;
@@ -200,6 +206,36 @@ function extractFilesTouched(hookInput) {
 
 // ── Git diff helpers ──────────────────────────────────────
 
+/**
+ * V2.5: Collect commit SHAs created between session start HEAD and current HEAD.
+ * These are the commits made during this session — the join key for attribution engine.
+ */
+function getSessionCommitShas() {
+  const savedSha = readHeadSha();
+  if (!savedSha || !/^[0-9a-f]+$/i.test(savedSha)) return [];
+
+  try {
+    const result = execFileSync("git", ["log", "--format=%H", savedSha + "..HEAD"], {
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return result.trim().split(/\r?\n/).filter((s) => s.trim()).map((s) => s.trim());
+  } catch (_) {
+    // Fallback: just return current HEAD
+    try {
+      const head = execFileSync("git", ["rev-parse", "HEAD"], {
+        encoding: "utf-8",
+        timeout: 5000,
+        stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
+      return head !== savedSha ? [head] : [];
+    } catch (_) {
+      return [];
+    }
+  }
+}
+
 function getGitFilesTouched() {
   const files = new Set();
   const savedSha = readHeadSha();
@@ -211,7 +247,7 @@ function getGitFilesTouched() {
         timeout: 5000,
         stdio: ["pipe", "pipe", "pipe"],
       });
-      for (const f of result.trim().split("\n")) {
+      for (const f of result.trim().split(/\r?\n/)) {
         const trimmed = f.trim();
         if (trimmed) files.add(trimmed);
       }
@@ -222,7 +258,7 @@ function getGitFilesTouched() {
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     });
-    for (const f of unstaged.trim().split("\n")) {
+    for (const f of unstaged.trim().split(/\r?\n/)) {
       const trimmed = f.trim();
       if (trimmed) files.add(trimmed);
     }
@@ -232,7 +268,7 @@ function getGitFilesTouched() {
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     });
-    for (const f of staged.trim().split("\n")) {
+    for (const f of staged.trim().split(/\r?\n/)) {
       const trimmed = f.trim();
       if (trimmed) files.add(trimmed);
     }
@@ -241,7 +277,7 @@ function getGitFilesTouched() {
   }
 
   return Array.from(files).filter((f) => {
-    const normalized = f.replace(/\\/g, "/");
+    const normalized = normalizeSep(f);
     return !STICKY_FILES_PREFIX.some((p) => normalized === p || normalized.startsWith(p));
   });
 }
@@ -254,7 +290,7 @@ function _extractUserPrompt(hookInput) {
 
   try {
     const raw = fs.readFileSync(transcriptPath, "utf-8");
-    for (const line of raw.split("\n")) {
+    for (const line of raw.split(/\r?\n/)) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       let entry;
@@ -394,13 +430,13 @@ function _looksLikeError(text) {
 
 function _summarizeError(text) {
   if (!text) return "";
-  for (const line of text.split("\n")) {
+  for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (trimmed && ERROR_PATTERNS.test(trimmed)) {
       return trimmed.substring(0, 100);
     }
   }
-  return text.trim().split("\n")[0].substring(0, 100);
+  return text.trim().split(/\r?\n/)[0].substring(0, 100);
 }
 
 function _isTestCommand(cmd) {
@@ -487,7 +523,7 @@ function _collectEditedFiles(hookInput) {
 
   try {
     const raw = fs.readFileSync(transcriptPath, "utf-8");
-    for (const line of raw.split("\n")) {
+    for (const line of raw.split(/\r?\n/)) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       let entry;
@@ -528,7 +564,7 @@ function analyzeSessionActivities(hookInput, auditData) {
   if (hasTranscript) {
     try {
       const raw = fs.readFileSync(transcriptPath, "utf-8");
-      for (const line of raw.split("\n")) {
+      for (const line of raw.split(/\r?\n/)) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         let entry;
@@ -699,6 +735,7 @@ function main() {
 
   const sessionId = getSessionId(hookInput);
   const aiTool = detectTool(hookInput);
+  const isCopilotCli = aiTool === "copilot-cli" || process.argv.includes("--copilot-cli") || !!process.env.COPILOT_CLI;
   const user = getUser();
   const now = new Date().toISOString();
   const branch = getBranch();
@@ -731,8 +768,11 @@ function main() {
   memory.threads = threads;
   let existing = null;
 
-  // Check for resumed thread
-  const resumeThreadId = getResumeThreadId();
+  // V2.5: Check for active resumed thread (set by resume-thread command)
+  const activeResumeId = getActiveResumeThreadId();
+
+  // Check for resumed thread (V2 resume signal or V2.5 active resume)
+  const resumeThreadId = getResumeThreadId() || activeResumeId;
   if (resumeThreadId) {
     existing = findThreadById(threads, resumeThreadId);
     if (existing) {
@@ -759,8 +799,22 @@ function main() {
           resumed_from: prevSession,
         });
       }
+
+      // V2.5: Update contributors and resume metadata
+      const contributors = existing.contributors || [];
+      if (!contributors.includes(user)) {
+        contributors.push(user);
+      }
+      existing.contributors = contributors;
+      existing.resumed_by = user;
+      existing.resumed_at = now;
+
+      const resumeHistory = existing.resume_history || [];
+      resumeHistory.push({ user, at: now, session_id: sessionId });
+      existing.resume_history = resumeHistory;
     }
     clearResumeSignal();
+    clearActiveResumeThreadId();
   }
 
   // Fallback: find by session_id
@@ -789,8 +843,12 @@ function main() {
     existing.work_type = sessionAnalysis.work_type;
     existing.activities = sessionAnalysis.activities;
     existing.last_activity_at = now;
-    existing.status = "closed";
-    existing.closed_at = now;
+    // Copilot CLI fires SessionEnd per-turn, not per-session.
+    // Keep thread open so it isn't prematurely closed between turns.
+    if (!isCopilotCli) {
+      existing.status = "closed";
+      existing.closed_at = now;
+    }
     existing.branch = branch || existing.branch || "";
 
     // Merge tool call counts
@@ -812,10 +870,10 @@ function main() {
       id: crypto.randomUUID(),
       user,
       project: memory.project || "",
-      status: "closed",
+      status: isCopilotCli ? "open" : "closed",
       branch,
       created_at: now,
-      closed_at: now,
+      closed_at: isCopilotCli ? null : now,
       last_activity_at: now,
       files_touched: filesTouched,
       last_note: lastNote,
@@ -830,26 +888,62 @@ function main() {
       activities: sessionAnalysis.activities,
       tool_calls: sessionAnalysis.tool_calls || {},
       prompts: storedPrompts,
+      // V2.5 fields
+      contributors: [user],
+      resume_history: [],
     });
   }
 
+  // V2.5: Capture commit SHAs for attribution engine
+  const commitShas = getSessionCommitShas();
+
   // Housekeeping
+  const threadStatus = isCopilotCli ? "open" : "closed";
   tombstoneSweep(threads, staleDays);
-  appendAuditLine({
+  const auditEntry = {
     type: "session_end",
     user,
     ts: now,
     session_id: sessionId,
-    status: "closed",
+    status: threadStatus,
     files_touched: filesTouched,
     work_type: sessionAnalysis.work_type,
-  });
-  clearPresence(user);
-  clearSessionFile();
-  clearHeadFile();
+  };
+  if (commitShas.length > 0) {
+    auditEntry.commit_shas = commitShas;
+  }
+  appendAuditLine(auditEntry);
+
+  // V2.5: Also write individual commit_sha audit entries for bridge lookup
+  for (const sha of commitShas) {
+    appendAuditLine({
+      type: "commit",
+      user,
+      ts: now,
+      session_id: sessionId,
+      commit_sha: sha,
+    });
+  }
+  // Only clear transient files for true session end (Claude Code).
+  // Copilot CLI fires per-turn; clearing would break state across turns.
+  if (!isCopilotCli) {
+    clearPresence(user);
+    clearSessionFile();
+    clearHeadFile();
+    clearInjectedSet();
+  }
   saveJson(memoryPath, memory);
 
-  process.stdout.write(JSON.stringify({ output: "" }) + "\n");
+  const fileCount = filesTouched.length;
+  const commitCount = commitShas.length;
+  const statusLabel = isCopilotCli ? "updated" : "closed";
+  const statusMsg = `[STICKY-NOTE] Session ${statusLabel} - thread ${isCopilotCli ? "updated" : "created"} (${fileCount} file${fileCount !== 1 ? "s" : ""}${commitCount > 0 ? ", " + commitCount + " commit" + (commitCount !== 1 ? "s" : "") : ""})`;
+  try {
+    process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
+  } catch (_) {
+    process.stdout.write('{"output":""}\n');
+  }
+  process.exit(0);
 }
 
 try {

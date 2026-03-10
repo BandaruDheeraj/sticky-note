@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * track-work.js — Audit Trail (V2)
+ * track-work.js — Audit Trail (V2.5)
  *
  * Hook: PostToolUse (Claude Code) / postToolUse (Copilot CLI)
  * Appends one JSONL line per tool call. Updates presence heartbeat.
+ * V2.5: Captures line-level changes for write tools and writes Git Notes.
  */
 
 const fs = require("fs");
 const path = require("path");
+const { execFileSync } = require("child_process");
 
 function safeExit() {
   try {
@@ -24,6 +26,13 @@ try {
   utils = require("./sticky-utils.js");
 } catch (_) {
   safeExit();
+}
+
+let gitNotes;
+try {
+  gitNotes = require("./sticky-git-notes.js");
+} catch (_) {
+  gitNotes = null;
 }
 
 const {
@@ -70,7 +79,7 @@ function extractFilePath(hookInput) {
   const cwd = hookInput.cwd || "";
   let rawPath = null;
 
-  for (const containerKey of ["tool_input", "input", "toolInput", "params"]) {
+  for (const containerKey of ["tool_input", "input", "toolInput", "toolArgs", "params"]) {
     const container = hookInput[containerKey];
     if (container && typeof container === "object" && !Array.isArray(container)) {
       for (const key of ["file_path", "filePath", "path", "filename", "file"]) {
@@ -131,6 +140,75 @@ function autoDetectMcp(toolName) {
   return null;
 }
 
+// ── V2.5: Line-level change tracking ─────────────────────
+
+/**
+ * After a write tool completes, capture exact line ranges changed.
+ * Uses git diff --unified=0 to get precise line numbers.
+ * Returns array of { start, count } or null on failure.
+ */
+function captureLineChanges(filePath) {
+  if (!filePath) return null;
+  try {
+    const raw = execFileSync("git", ["diff", "--unified=0", "--", filePath], {
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    if (!raw.trim()) return null;
+
+    const ranges = [];
+    for (const line of raw.split(/\r?\n/)) {
+      // @@ -old_start,old_count +new_start,new_count @@
+      const match = line.match(/^@@\s.*\+(\d+)(?:,(\d+))?\s@@/);
+      if (match) {
+        const start = parseInt(match[1], 10);
+        const count = match[2] !== undefined ? parseInt(match[2], 10) : 1;
+        if (count > 0) {
+          ranges.push({ start, count, end: start + count - 1 });
+        }
+      }
+    }
+    return ranges.length > 0 ? ranges : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Write a Git Note on HEAD linking this edit to the session.
+ */
+function writeEditNote(sessionId, user, filePath, lineRanges, checkpoint) {
+  if (!gitNotes) return;
+  try {
+    const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      encoding: "utf-8",
+      timeout: 3000,
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    if (!headSha || !/^[0-9a-f]{40}$/.test(headSha)) return;
+
+    const noteData = {
+      session_id: sessionId,
+      user,
+      file: filePath,
+      ts: new Date().toISOString(),
+      type: "ai_edit",
+    };
+    if (lineRanges) {
+      noteData.lines_changed = lineRanges.map((r) => `${r.start}-${r.end}`);
+    }
+    if (checkpoint) {
+      noteData.checkpoint = checkpoint.topic;
+    }
+    gitNotes.writeNote(headSha, noteData);
+  } catch (_) {
+    // ignore — notes are best-effort
+  }
+}
+
+// ── Main ──────────────────────────────────────────────────
+
 function main() {
   let hookInput = {};
   try {
@@ -172,6 +250,17 @@ function main() {
 
   const user = getUser();
   const now = new Date().toISOString();
+  const isWriteTool = WRITE_TOOLS.has(toolName);
+
+  // V2.5: Capture line-level changes for write tools
+  let lineRanges = null;
+  let checkpoint = null;
+  if (isWriteTool && filePath) {
+    lineRanges = captureLineChanges(filePath);
+    if (gitNotes) {
+      checkpoint = gitNotes.getCurrentCheckpoint();
+    }
+  }
 
   const entry = {
     type: "tool_use",
@@ -183,9 +272,20 @@ function main() {
   if (filePath) {
     entry.file = filePath;
   }
+  if (lineRanges) {
+    entry.lines_changed = lineRanges.map((r) => `${r.start}-${r.end}`);
+  }
+  if (checkpoint) {
+    entry.checkpoint_topic = checkpoint.topic;
+  }
   appendAuditLine(entry);
 
   updatePresence(user, filePath);
+
+  // V2.5: Write Git Note for write tools
+  if (isWriteTool && filePath) {
+    writeEditNote(sessionId, user, filePath, lineRanges, checkpoint);
+  }
 
   const serverName = autoDetectMcp(toolName);
   if (serverName) {
@@ -202,7 +302,16 @@ function main() {
     }
   }
 
-  process.stdout.write(JSON.stringify({ output: "" }) + "\n");
+  // Build status message for transparency
+  const linePart = lineRanges && lineRanges.length > 0 ? ` (lines ${lineRanges.map(r => `${r.start}-${r.end}`).join(", ")})` : "";
+  const statusMsg = `[STICKY-NOTE] Tracked ${toolName}${filePath ? " on " + filePath : ""}${linePart}`;
+
+  try {
+    process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
+  } catch (_) {
+    process.stdout.write('{"output":""}\n');
+  }
+  process.exit(0);
 }
 
 try {
