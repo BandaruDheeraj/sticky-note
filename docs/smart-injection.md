@@ -1,4 +1,4 @@
-# Smart Injection — Two-Tier Context Model (V2.5)
+# Smart injection — two-tier context model (V2.5)
 
 Sticky Note V2.5 replaces V2's "inject top N threads per prompt" with a
 smarter two-tier model: **eager** injection for stuck threads at session
@@ -7,22 +7,22 @@ a file they authored.
 
 ---
 
-## How It Works
+## How it works
 
-### Tier 1: Eager Injection (Session Start)
+### Tier 1: eager injection (session start)
 
 Threads with `status: "stuck"` are injected immediately when a session
-begins — before you type anything. These represent unresolved blockers
+begins, before you type anything. These represent unresolved blockers
 that any developer should know about.
 
-**Why eager?** Stuck threads are urgent. If Alice hit a wall on the auth
-module, Bob needs to know before he starts working — not after he's
+Why eager? Stuck threads are urgent. If Alice hit a wall on the auth
+module, Bob needs to know before he starts working, not after he's
 already reading the same code.
 
-**Cost:** Minimal. Stuck threads are rare, and their payloads are compact
-(narrative + failed_approaches).
+The cost is minimal. Stuck threads are rare, and their payloads are
+compact (narrative + failed_approaches).
 
-### Tier 2: Lazy Injection (PreToolUse Hook)
+### Tier 2: lazy injection (PreToolUse hook)
 
 All non-stuck threads are held in reserve. When a tool call fires (Read,
 Edit, Write, Bash), the **PreToolUse hook** runs the built-in attribution
@@ -36,15 +36,15 @@ engine on the target file:
 3. Session ID lookup in `sticky-note.json` → loads thread with line ranges
 
 If a thread is found and hasn't been injected this session, it's delivered
-as a system note **before the tool executes** — including the specific
+as a system note **before the tool executes**, including the specific
 line ranges the thread authored.
 
-**Result:** Bob's AI assistant knows Alice worked on lines 45–80 of
-`src/auth/refresh.ts` and what she was doing — before it reads the file.
+Bob's AI assistant now knows Alice worked on lines 45–80 of
+`src/auth/refresh.ts` and what she was doing. All before it reads the file.
 
 ---
 
-## Decision Tree
+## Decision tree
 
 ```
 Session starts
@@ -68,8 +68,8 @@ UserPromptSubmit fires (inject-context.js)
 
 ## Deduplication
 
-Each thread is injected **at most once per session**, tracked via the
-`.sticky-note/.sticky-injected` file:
+Each thread is injected **at most once per session**, tracked via
+`.sticky-note/.sticky-injected`:
 
 ```json
 {
@@ -87,10 +87,10 @@ The set is cleared at session start.
 
 ---
 
-## Three-Tier SHA Resolution
+## Three-tier SHA resolution
 
 The attribution engine uses three fallback tiers to resolve commit SHAs
-to sessions, ensuring attribution survives history rewrites:
+to sessions, so attribution survives history rewrites:
 
 | Tier | Source | Survives Rebase? | Speed |
 |------|--------|-----------------|-------|
@@ -102,7 +102,7 @@ Run `npx sticky-note update` to configure Git Notes rewrite automatically.
 
 ---
 
-## Token Budgeting
+## Token budgeting
 
 Eager injection (stuck threads) uses a separate, compact budget — stuck
 threads are short by nature (narrative + failed approaches).

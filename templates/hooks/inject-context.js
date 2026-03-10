@@ -42,6 +42,13 @@ try {
 } catch (_) {
   _safeExit();
 }
+
+let gitNotes;
+try {
+  gitNotes = require("./sticky-git-notes.js");
+} catch (_) {
+  gitNotes = null;
+}
 const {
   getMemoryPath, loadJson, saveJson, getUser, getBranch,
   getResumeThreadId, findThreadById, getSessionId,
@@ -299,6 +306,21 @@ function main() {
     });
   } catch (_) {
     // ignore
+  }
+
+  // Auto-checkpoint: tag subsequent edits with what the user asked for
+  if (gitNotes) {
+    try {
+      gitNotes.saveCheckpoint({
+        topic: prompt.substring(0, 200),
+        user: getUser(),
+        ts: new Date().toISOString(),
+        session_id: sessionId,
+        auto: true,
+      });
+    } catch (_) {
+      // ignore — checkpoint is best-effort
+    }
   }
 
   const memory = loadJson(getMemoryPath(), { version: "2", threads: [] });
