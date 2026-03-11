@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/sticky-note"><img src="https://img.shields.io/npm/v/sticky-note.svg?style=flat-square&color=f59e0b" alt="npm version" /></a>
+  <a href="https://www.npmjs.com/package/sticky-note-cli"><img src="https://img.shields.io/npm/v/sticky-note-cli.svg?style=flat-square&color=f59e0b" alt="npm version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="MIT License" /></a>
   <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D16-brightgreen.svg?style=flat-square" alt="Node.js >= 16" /></a>
   <a href="#supported-tools"><img src="https://img.shields.io/badge/works%20with-Claude%20%C2%B7%20Copilot%20%C2%B7%20Codex-8b5cf6?style=flat-square" alt="Works with Claude, Copilot, Codex" /></a>
@@ -45,8 +45,8 @@ their next session by relevance.
 ## What's New in V2.5
 
 - **Smart injection (two-tier)**: Stuck threads injected eagerly at session start; all other threads injected lazily when you first touch a file they authored — via built-in git blame attribution
-- **Thread resume (local)**: `npx sticky-note resume-thread --query "auth fix" --user alice` — natural language thread discovery with text similarity + file attribution ranking
-- **Built-in attribution engine**: `npx sticky-note get-line-attribution --file src/auth.ts` — maps file lines to commit SHAs via git blame, resolves to threads with line ranges. No external dependencies.
+- **Thread resume (local)**: `npx sticky-note-cli resume-thread --query "auth fix" --user alice` — natural language thread discovery with text similarity + file attribution ranking
+- **Built-in attribution engine**: `npx sticky-note-cli get-line-attribution --file src/auth.ts` — maps file lines to commit SHAs via git blame, resolves to threads with line ranges. No external dependencies.
 - **Git Notes storage**: Session attribution stored in `refs/notes/sticky-note` — survives rebase/amend
 - **Three-tier SHA resolution**: Git Notes → Audit JSONL → File+date heuristic — attribution never breaks
 - **PreToolUse hook**: New hook fires before each tool call for lazy injection with line-range detail
@@ -58,7 +58,7 @@ their next session by relevance.
 - **Relevance scoring**: Context injected based on file overlap, branch match, and recency
 - **Richer threads**: Narrative summaries, failed approaches, work type, activities
 - **Tombstone expiry**: Old threads are automatically cleaned up via `gc`
-- **Presence tracking**: See who's currently active with `npx sticky-note who`
+- **Presence tracking**: See who's currently active with `npx sticky-note-cli who`
 - **Codex support**: Wrapper script for post-session capture
 - **Separate config**: Team settings in `sticky-note-config.json`
 
@@ -69,7 +69,7 @@ their next session by relevance.
 ### 1. Install
 
 ```bash
-npx sticky-note init
+npx sticky-note-cli init
 ```
 
 This runs an interactive setup that:
@@ -110,7 +110,7 @@ that's always available as a static file.
 
 ### 1. Static Instruction Files (always available)
 
-`npx sticky-note init` deploys AI instruction files that teach each tool
+`npx sticky-note-cli init` deploys AI instruction files that teach each tool
 how to interact with Sticky Note:
 
 | File | Consumed by | Installed to |
@@ -120,7 +120,7 @@ how to interact with Sticky Note:
 
 These files contain thread field references, status icons, resume
 instructions, display formats, and query examples. They're wrapped in
-`<!-- sticky-note:start/end -->` markers so `npx sticky-note update` can
+`<!-- sticky-note:start/end -->` markers so `npx sticky-note-cli update` can
 refresh them without overwriting your own content.
 
 ### 2. Session Start Hook (`session-start.js`)
@@ -168,13 +168,13 @@ Runs **before each tool call**. Lazy injection tier:
 
 No external dependencies — uses built-in git blame.
 
-### 4. Resume Flow (`npx sticky-note resume <id>`)
+### 4. Resume Flow (`npx sticky-note-cli resume <id>`)
 
 A manual trigger that enables **cross-tool handoff** (e.g., Claude Code →
 Copilot CLI):
 
 ```
-npx sticky-note resume <thread-id>
+npx sticky-note-cli resume <thread-id>
 ```
 
 1. Writes the thread UUID to a `.sticky-resume` signal file.
@@ -258,7 +258,7 @@ the thread's `handoff_summary` field.
 open → stale  (auto, after stale_days with no activity)
 open → closed (on session end)
 stuck → closed (on session end or manual)
-closed → open  (via `npx sticky-note resume <id>`)
+closed → open  (via `npx sticky-note-cli resume <id>`)
 closed → expired (auto, tombstoned by gc after stale_days)
 ```
 
@@ -310,34 +310,34 @@ CLAUDE.md                         # AI instructions for Claude Code
 ## CLI Commands
 
 ```bash
-npx sticky-note init           # Interactive setup
-npx sticky-note init --codex   # Setup with Codex wrapper
-npx sticky-note update         # Update hook scripts (preserves data)
-npx sticky-note status         # Diagnostic report (includes attribution health)
-npx sticky-note threads        # List threads with status icons
-npx sticky-note resume         # List resumable threads
-npx sticky-note resume <id>    # Resume a previous thread
-npx sticky-note resume --clear # Cancel active resume
-npx sticky-note resume-thread  # Smart resume: --query, --user, --file (V2.5)
-npx sticky-note audit          # Query merged audit trail (all users)
-npx sticky-note who            # Show active and recent team members
-npx sticky-note switch <branch> # Safe branch switch (auto-stashes data)
-npx sticky-note gc             # Tombstone expired threads
-npx sticky-note reset          # Wipe all threads (--force, --keep-audit)
-npx sticky-note get-line-attribution # File→thread attribution with line ranges (V2.5)
-npx sticky-note checkpoint         # Set work-topic checkpoint for attribution (V2.5)
-npx sticky-note --version      # Show version
-npx sticky-note --help         # Show help
+npx sticky-note-cli init           # Interactive setup
+npx sticky-note-cli init --codex   # Setup with Codex wrapper
+npx sticky-note-cli update         # Update hook scripts (preserves data)
+npx sticky-note-cli status         # Diagnostic report (includes attribution health)
+npx sticky-note-cli threads        # List threads with status icons
+npx sticky-note-cli resume         # List resumable threads
+npx sticky-note-cli resume <id>    # Resume a previous thread
+npx sticky-note-cli resume --clear # Cancel active resume
+npx sticky-note-cli resume-thread  # Smart resume: --query, --user, --file (V2.5)
+npx sticky-note-cli audit          # Query merged audit trail (all users)
+npx sticky-note-cli who            # Show active and recent team members
+npx sticky-note-cli switch <branch> # Safe branch switch (auto-stashes data)
+npx sticky-note-cli gc             # Tombstone expired threads
+npx sticky-note-cli reset          # Wipe all threads (--force, --keep-audit)
+npx sticky-note-cli get-line-attribution # File→thread attribution with line ranges (V2.5)
+npx sticky-note-cli checkpoint         # Set work-topic checkpoint for attribution (V2.5)
+npx sticky-note-cli --version      # Show version
+npx sticky-note-cli --help         # Show help
 ```
 
 ### Audit Filters
 
 ```bash
-npx sticky-note audit --user alice
-npx sticky-note audit --file src/auth.ts
-npx sticky-note audit --since 2025-01-01
-npx sticky-note audit --session abc-123
-npx sticky-note audit --limit 100
+npx sticky-note-cli audit --user alice
+npx sticky-note-cli audit --file src/auth.ts
+npx sticky-note-cli audit --since 2025-01-01
+npx sticky-note-cli audit --session abc-123
+npx sticky-note-cli audit --limit 100
 ```
 
 ---
@@ -387,7 +387,7 @@ All tools call the same JavaScript hooks and share the same data files.
 
 ## Concurrent Usage & Merge Strategy
 
-`npx sticky-note init` adds a `.gitattributes` rule:
+`npx sticky-note-cli init` adds a `.gitattributes` rule:
 
 ```
 .sticky-note/sticky-note.json merge=union
@@ -411,9 +411,9 @@ Use one of these approaches:
 
 ```bash
 # Recommended: sticky-note CLI wrapper
-npx sticky-note switch <branch>
+npx sticky-note-cli switch <branch>
 
-# Or: git alias (set up by npx sticky-note init)
+# Or: git alias (set up by npx sticky-note-cli init)
 git sw <branch>
 ```
 
@@ -433,13 +433,13 @@ A: `merge=union` in `.gitattributes` handles most cases automatically.
 
 **Q: Can I close a thread manually?**
 A: Edit `sticky-note.json` and change the thread's `status` to `"closed"`,
-or run `npx sticky-note gc` to tombstone expired threads.
+or run `npx sticky-note-cli gc` to tombstone expired threads.
 
 **Q: Does this work offline?**
 A: Yes. Everything is local until you `git push`.
 
 **Q: How do I set up Codex?**
-A: Run `npx sticky-note init --codex`, then alias the wrapper:
+A: Run `npx sticky-note-cli init --codex`, then alias the wrapper:
 `alias sticky-codex=".claude/hooks/sticky-codex.sh"`
 
 ---
