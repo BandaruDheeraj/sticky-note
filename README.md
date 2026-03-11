@@ -30,16 +30,15 @@
 
 ## The Problem
 
-Every developer using AI coding assistants starts every session from zero.
-The handoff between teammates happens in Slack and stand-ups — everywhere
-except inside the AI tool where the work actually happened.
+I have seen many agent-to-agent to orchestration systems and frameworks, but I still like working with other people.
+Other people that ALSO use agents to develop. I couldn't get my agent to understand what my friends agents were doing.
+So we built Sticky Note.
 
 ## The Solution
 
 Sticky Note captures what happened in each AI session (files touched, status,
 narrative, failed approaches) and surfaces it to teammates automatically on
-their next session start — ranked by relevance. No dashboards. No extra tools.
-Just shared files in your repo.
+their next session by relevance.
 
 ---
 
