@@ -1,6 +1,6 @@
 <p align="center">
   <!-- Replace with your own logo -->
-  <img src="docs/images/logo.png" alt="Sticky Note" width="120" />
+  <img src="docs/images/logo.png" alt="Sticky Note" width="400" />
 </p>
 
 <h1 align="center">Sticky Note</h1>
