@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 740" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
   <defs>
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#0d1117;stop-opacity:1" />
@@ -20,171 +20,163 @@
       <stop offset="0%" style="stop-color:#34d399;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
     </linearGradient>
-    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.3"/>
-    </filter>
-    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-      <path d="M0,0 L8,3 L0,6 Z" fill="#8b949e"/>
-    </marker>
-    <marker id="arrowGreen" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-      <path d="M0,0 L8,3 L0,6 Z" fill="#34d399"/>
-    </marker>
-    <marker id="arrowYellow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-      <path d="M0,0 L8,3 L0,6 Z" fill="#fbbf24"/>
-    </marker>
   </defs>
 
   <!-- Background -->
-  <rect width="900" height="520" rx="12" fill="url(#bgGrad)"/>
-  <rect x="1" y="1" width="898" height="518" rx="12" fill="none" stroke="#30363d" stroke-width="1"/>
+  <rect width="900" height="740" rx="12" fill="url(#bgGrad)"/>
+  <rect x="1" y="1" width="898" height="738" rx="12" fill="none" stroke="#30363d" stroke-width="1"/>
 
   <!-- Title -->
   <text x="450" y="38" text-anchor="middle" fill="#e6edf3" font-size="16" font-weight="600">How Sticky Note Works</text>
 
+  <!-- Column Labels -->
+  <text x="120" y="68" text-anchor="middle" fill="#8b949e" font-size="11" font-weight="600" letter-spacing="1.5">AI TOOLS</text>
+  <text x="450" y="68" text-anchor="middle" fill="#8b949e" font-size="11" font-weight="600" letter-spacing="1.5">HOOKS</text>
+  <text x="780" y="68" text-anchor="middle" fill="#8b949e" font-size="11" font-weight="600" letter-spacing="1.5">SHARED DATA</text>
+
   <!-- ═══ LEFT COLUMN: AI Tools ═══ -->
-  <text x="130" y="72" text-anchor="middle" fill="#8b949e" font-size="11" font-weight="600" letter-spacing="1.5">AI TOOLS</text>
+  <rect x="30" y="90" width="175" height="48" rx="8" fill="url(#toolGrad)" opacity="0.9"/>
+  <text x="118" y="112" text-anchor="middle" fill="#0d1117" font-size="13" font-weight="600">Claude Code</text>
+  <text x="118" y="128" text-anchor="middle" fill="#0d1117" font-size="10" opacity="0.7">6 hooks · full integration</text>
 
-  <!-- Claude Code -->
-  <rect x="30" y="88" width="200" height="50" rx="8" fill="url(#toolGrad)" filter="url(#shadow)" opacity="0.9"/>
-  <text x="130" y="110" text-anchor="middle" fill="#0d1117" font-size="13" font-weight="600">Claude Code</text>
-  <text x="130" y="126" text-anchor="middle" fill="#0d1117" font-size="10" opacity="0.7">6 hooks · full integration</text>
+  <rect x="30" y="245" width="175" height="48" rx="8" fill="url(#toolGrad)" opacity="0.9"/>
+  <text x="118" y="267" text-anchor="middle" fill="#0d1117" font-size="13" font-weight="600">Copilot CLI</text>
+  <text x="118" y="283" text-anchor="middle" fill="#0d1117" font-size="10" opacity="0.7">instruction files · CLI</text>
 
-  <!-- Copilot CLI -->
-  <rect x="30" y="148" width="200" height="50" rx="8" fill="url(#toolGrad)" filter="url(#shadow)" opacity="0.9"/>
-  <text x="130" y="170" text-anchor="middle" fill="#0d1117" font-size="13" font-weight="600">Copilot CLI</text>
-  <text x="130" y="186" text-anchor="middle" fill="#0d1117" font-size="10" opacity="0.7">instruction files · CLI</text>
+  <rect x="30" y="400" width="175" height="48" rx="8" fill="url(#toolGrad)" opacity="0.9"/>
+  <text x="118" y="422" text-anchor="middle" fill="#0d1117" font-size="13" font-weight="600">Codex</text>
+  <text x="118" y="438" text-anchor="middle" fill="#0d1117" font-size="10" opacity="0.7">wrapper script</text>
 
-  <!-- Codex -->
-  <rect x="30" y="208" width="200" height="50" rx="8" fill="url(#toolGrad)" filter="url(#shadow)" opacity="0.9"/>
-  <text x="130" y="230" text-anchor="middle" fill="#0d1117" font-size="13" font-weight="600">Codex</text>
-  <text x="130" y="246" text-anchor="middle" fill="#0d1117" font-size="10" opacity="0.7">wrapper script</text>
+  <!-- ═══ CENTER TOP: Collect Hooks ═══ -->
+  <rect x="310" y="80" width="280" height="158" rx="8" fill="#1c1f26" stroke="#34d399" stroke-width="1.5"/>
+  <text x="450" y="100" text-anchor="middle" fill="#34d399" font-size="10" font-weight="600">COLLECT</text>
 
-  <!-- ═══ CENTER COLUMN: Hooks ═══ -->
-  <text x="450" y="72" text-anchor="middle" fill="#8b949e" font-size="11" font-weight="600" letter-spacing="1.5">HOOK LAYER</text>
+  <rect x="330" y="108" width="240" height="26" rx="5" fill="url(#hookGrad)"/>
+  <text x="450" y="125" text-anchor="middle" fill="#fff" font-size="10">track-work</text>
 
-  <!-- Collect box -->
-  <rect x="310" y="88" width="130" height="172" rx="8" fill="#1c1f26" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="4,3"/>
-  <text x="375" y="106" text-anchor="middle" fill="#a5b4fc" font-size="10" font-weight="600">COLLECT</text>
+  <rect x="330" y="138" width="240" height="26" rx="5" fill="url(#hookGrad)"/>
+  <text x="450" y="155" text-anchor="middle" fill="#fff" font-size="10">session-end</text>
 
-  <rect x="320" y="114" width="110" height="30" rx="5" fill="url(#hookGrad)" filter="url(#shadow)"/>
-  <text x="375" y="133" text-anchor="middle" fill="#fff" font-size="10">track-work</text>
+  <rect x="330" y="168" width="240" height="26" rx="5" fill="url(#hookGrad)"/>
+  <text x="450" y="185" text-anchor="middle" fill="#fff" font-size="10">on-error</text>
 
-  <rect x="320" y="150" width="110" height="30" rx="5" fill="url(#hookGrad)" filter="url(#shadow)"/>
-  <text x="375" y="169" text-anchor="middle" fill="#fff" font-size="10">session-end</text>
+  <rect x="330" y="198" width="240" height="26" rx="5" fill="url(#hookGrad)"/>
+  <text x="450" y="215" text-anchor="middle" fill="#fff" font-size="10">on-stop</text>
 
-  <rect x="320" y="186" width="110" height="30" rx="5" fill="url(#hookGrad)" filter="url(#shadow)"/>
-  <text x="375" y="205" text-anchor="middle" fill="#fff" font-size="10">on-error</text>
+  <!-- ═══ CENTER BOTTOM: Inject Hooks ═══ -->
+  <rect x="310" y="300" width="280" height="158" rx="8" fill="#1c1f26" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="450" y="320" text-anchor="middle" fill="#fcd34d" font-size="10" font-weight="600">INJECT</text>
 
-  <rect x="320" y="222" width="110" height="30" rx="5" fill="url(#hookGrad)" filter="url(#shadow)"/>
-  <text x="375" y="241" text-anchor="middle" fill="#fff" font-size="10">on-stop</text>
+  <rect x="330" y="328" width="240" height="26" rx="5" fill="url(#hookGrad)"/>
+  <text x="450" y="345" text-anchor="middle" fill="#fff" font-size="10">session-start</text>
 
-  <!-- Inject box -->
-  <rect x="460" y="88" width="130" height="172" rx="8" fill="#1c1f26" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4,3"/>
-  <text x="525" y="106" text-anchor="middle" fill="#fcd34d" font-size="10" font-weight="600">INJECT</text>
+  <rect x="330" y="358" width="240" height="26" rx="5" fill="url(#hookGrad)"/>
+  <text x="450" y="375" text-anchor="middle" fill="#fff" font-size="10">inject-context</text>
 
-  <rect x="470" y="114" width="110" height="30" rx="5" fill="url(#hookGrad)" filter="url(#shadow)"/>
-  <text x="525" y="133" text-anchor="middle" fill="#fff" font-size="10">session-start</text>
+  <rect x="330" y="388" width="240" height="26" rx="5" fill="url(#hookGrad)"/>
+  <text x="450" y="405" text-anchor="middle" fill="#fff" font-size="10">pre-tool-use</text>
 
-  <rect x="470" y="150" width="110" height="30" rx="5" fill="url(#hookGrad)" filter="url(#shadow)"/>
-  <text x="525" y="169" text-anchor="middle" fill="#fff" font-size="10">inject-context</text>
+  <rect x="330" y="418" width="240" height="26" rx="5" fill="url(#hookGrad)"/>
+  <text x="450" y="435" text-anchor="middle" fill="#fff" font-size="10">attribution</text>
 
-  <rect x="470" y="186" width="110" height="30" rx="5" fill="url(#hookGrad)" filter="url(#shadow)"/>
-  <text x="525" y="205" text-anchor="middle" fill="#fff" font-size="10">pre-tool-use</text>
+  <!-- ═══ RIGHT COLUMN: Shared Data ═══ -->
+  <rect x="695" y="90" width="175" height="48" rx="8" fill="url(#dataGrad)" opacity="0.9"/>
+  <text x="782" y="112" text-anchor="middle" fill="#0d1117" font-size="13" font-weight="600">sticky-note.json</text>
+  <text x="782" y="128" text-anchor="middle" fill="#0d1117" font-size="10" opacity="0.7">threads · status · narratives</text>
 
-  <rect x="470" y="222" width="110" height="30" rx="5" fill="url(#hookGrad)" filter="url(#shadow)"/>
-  <text x="525" y="241" text-anchor="middle" fill="#fff" font-size="10">attribution</text>
+  <rect x="695" y="245" width="175" height="48" rx="8" fill="url(#dataGrad)" opacity="0.9"/>
+  <text x="782" y="267" text-anchor="middle" fill="#0d1117" font-size="13" font-weight="600">audit/*.jsonl</text>
+  <text x="782" y="283" text-anchor="middle" fill="#0d1117" font-size="10" opacity="0.7">per-user tool tracking</text>
 
-  <!-- ═══ RIGHT COLUMN: Data ═══ -->
-  <text x="770" y="72" text-anchor="middle" fill="#8b949e" font-size="11" font-weight="600" letter-spacing="1.5">SHARED DATA</text>
+  <rect x="695" y="400" width="175" height="48" rx="8" fill="url(#dataGrad)" opacity="0.9"/>
+  <text x="782" y="422" text-anchor="middle" fill="#0d1117" font-size="13" font-weight="600">git notes</text>
+  <text x="782" y="438" text-anchor="middle" fill="#0d1117" font-size="10" opacity="0.7">refs/notes/sticky-note</text>
 
-  <rect x="670" y="88" width="200" height="50" rx="8" fill="url(#dataGrad)" filter="url(#shadow)" opacity="0.9"/>
-  <text x="770" y="110" text-anchor="middle" fill="#0d1117" font-size="13" font-weight="600">sticky-note.json</text>
-  <text x="770" y="126" text-anchor="middle" fill="#0d1117" font-size="10" opacity="0.7">threads · status · narratives</text>
+  <!-- ═══ ARROWS: Collect Flow (solid green, horizontal at y=159) ═══ -->
+  <!-- Tools → Collect -->
+  <line x1="205" y1="159" x2="305" y2="159" stroke="#34d399" stroke-width="2"/>
+  <polygon points="310,159 300,154 300,164" fill="#34d399"/>
+  <text x="258" y="152" text-anchor="middle" fill="#34d399" font-size="9">sessions</text>
 
-  <rect x="670" y="148" width="200" height="50" rx="8" fill="url(#dataGrad)" filter="url(#shadow)" opacity="0.9"/>
-  <text x="770" y="170" text-anchor="middle" fill="#0d1117" font-size="13" font-weight="600">audit/*.jsonl</text>
-  <text x="770" y="186" text-anchor="middle" fill="#0d1117" font-size="10" opacity="0.7">per-user tool tracking</text>
+  <!-- Collect → Data -->
+  <line x1="590" y1="159" x2="690" y2="159" stroke="#34d399" stroke-width="2"/>
+  <polygon points="695,159 685,154 685,164" fill="#34d399"/>
+  <text x="642" y="152" text-anchor="middle" fill="#34d399" font-size="9">writes</text>
 
-  <rect x="670" y="208" width="200" height="50" rx="8" fill="url(#dataGrad)" filter="url(#shadow)" opacity="0.9"/>
-  <text x="770" y="230" text-anchor="middle" fill="#0d1117" font-size="13" font-weight="600">git notes</text>
-  <text x="770" y="246" text-anchor="middle" fill="#0d1117" font-size="10" opacity="0.7">refs/notes/sticky-note</text>
+  <!-- ═══ ARROWS: Inject Flow (dashed yellow, horizontal at y=379) ═══ -->
+  <!-- Data → Inject -->
+  <line x1="695" y1="379" x2="595" y2="379" stroke="#fbbf24" stroke-width="2" stroke-dasharray="6,3"/>
+  <polygon points="590,379 600,374 600,384" fill="#fbbf24"/>
+  <text x="642" y="372" text-anchor="middle" fill="#fbbf24" font-size="9">reads</text>
 
-  <!-- ═══ Arrows: Tools → Hooks ═══ -->
-  <line x1="230" y1="113" x2="310" y2="129" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <line x1="230" y1="173" x2="310" y2="170" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <line x1="230" y1="233" x2="310" y2="210" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <!-- Inject → Tools -->
+  <line x1="310" y1="379" x2="210" y2="379" stroke="#fbbf24" stroke-width="2" stroke-dasharray="6,3"/>
+  <polygon points="205,379 215,374 215,384" fill="#fbbf24"/>
+  <text x="258" y="372" text-anchor="middle" fill="#fbbf24" font-size="9">context</text>
 
-  <!-- Arrows: Hooks → Tools (inject back) -->
-  <line x1="460" y1="129" x2="235" y2="113" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowYellow)"/>
-  <line x1="460" y1="165" x2="235" y2="173" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowYellow)"/>
+  <!-- ═══ DIVIDER ═══ -->
+  <line x1="30" y1="488" x2="870" y2="488" stroke="#30363d" stroke-width="1"/>
 
-  <!-- Arrows: Collect → Data -->
-  <line x1="440" y1="129" x2="665" y2="113" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowGreen)"/>
-  <line x1="440" y1="165" x2="665" y2="165" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowGreen)"/>
-  <line x1="440" y1="201" x2="665" y2="175" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowGreen)"/>
-
-  <!-- Arrows: Data → Inject -->
-  <line x1="665" y1="113" x2="585" y2="129" stroke="#fbbf24" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arrowYellow)"/>
-  <line x1="665" y1="165" x2="585" y2="165" stroke="#fbbf24" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arrowYellow)"/>
-  <line x1="665" y1="233" x2="585" y2="237" stroke="#fbbf24" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arrowYellow)"/>
-
-  <!-- ═══ BOTTOM: Flow Diagram ═══ -->
-  <line x1="30" y1="290" x2="870" y2="290" stroke="#30363d" stroke-width="1"/>
-  <text x="450" y="318" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600">Session Lifecycle</text>
+  <!-- ═══ BOTTOM: Session Lifecycle ═══ -->
+  <text x="450" y="516" text-anchor="middle" fill="#e6edf3" font-size="14" font-weight="600">Session Lifecycle</text>
 
   <!-- Developer A -->
-  <rect x="30" y="340" width="160" height="70" rx="8" fill="#1c1f26" stroke="#22d3ee" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="110" y="365" text-anchor="middle" fill="#22d3ee" font-size="12" font-weight="600">👩‍💻 Alice</text>
-  <text x="110" y="383" text-anchor="middle" fill="#8b949e" font-size="10">Works in Claude Code</text>
-  <text x="110" y="398" text-anchor="middle" fill="#8b949e" font-size="10">Gets stuck on auth bug</text>
+  <rect x="30" y="536" width="160" height="70" rx="8" fill="#1c1f26" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="110" y="562" text-anchor="middle" fill="#22d3ee" font-size="12" font-weight="600">Alice</text>
+  <text x="110" y="579" text-anchor="middle" fill="#8b949e" font-size="10">Works in Claude Code</text>
+  <text x="110" y="594" text-anchor="middle" fill="#8b949e" font-size="10">Gets stuck on auth bug</text>
 
   <!-- Arrow -->
-  <line x1="190" y1="375" x2="230" y2="375" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="190" y1="571" x2="228" y2="571" stroke="#8b949e" stroke-width="1.5"/>
+  <polygon points="233,571 223,566 223,576" fill="#8b949e"/>
 
   <!-- Thread Created -->
-  <rect x="235" y="345" width="130" height="60" rx="8" fill="url(#noteGrad)" filter="url(#shadow)"/>
-  <text x="300" y="370" text-anchor="middle" fill="#0d1117" font-size="11" font-weight="700">📌 Thread</text>
-  <text x="300" y="386" text-anchor="middle" fill="#0d1117" font-size="10">status: stuck</text>
-  <text x="300" y="398" text-anchor="middle" fill="#0d1117" font-size="9" opacity="0.7">+ failed approaches</text>
+  <rect x="238" y="541" width="125" height="60" rx="8" fill="url(#noteGrad)"/>
+  <text x="300" y="565" text-anchor="middle" fill="#0d1117" font-size="11" font-weight="700">Thread Created</text>
+  <text x="300" y="581" text-anchor="middle" fill="#0d1117" font-size="10">status: stuck</text>
+  <text x="300" y="594" text-anchor="middle" fill="#0d1117" font-size="9" opacity="0.7">+ failed approaches</text>
 
   <!-- Arrow -->
-  <line x1="365" y1="375" x2="400" y2="375" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="363" y1="571" x2="398" y2="571" stroke="#8b949e" stroke-width="1.5"/>
+  <polygon points="403,571 393,566 393,576" fill="#8b949e"/>
 
   <!-- git push/pull -->
-  <rect x="405" y="350" width="90" height="50" rx="25" fill="#1c1f26" stroke="#8b949e" stroke-width="1" filter="url(#shadow)"/>
-  <text x="450" y="372" text-anchor="middle" fill="#e6edf3" font-size="11" font-weight="600">git push</text>
-  <text x="450" y="388" text-anchor="middle" fill="#e6edf3" font-size="11" font-weight="600">git pull</text>
+  <rect x="408" y="546" width="84" height="50" rx="25" fill="#1c1f26" stroke="#8b949e" stroke-width="1"/>
+  <text x="450" y="567" text-anchor="middle" fill="#e6edf3" font-size="11" font-weight="600">git push</text>
+  <text x="450" y="583" text-anchor="middle" fill="#e6edf3" font-size="11" font-weight="600">git pull</text>
 
   <!-- Arrow -->
-  <line x1="495" y1="375" x2="530" y2="375" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="492" y1="571" x2="530" y2="571" stroke="#8b949e" stroke-width="1.5"/>
+  <polygon points="535,571 525,566 525,576" fill="#8b949e"/>
 
   <!-- Auto-injected -->
-  <rect x="535" y="345" width="130" height="60" rx="8" fill="url(#noteGrad)" filter="url(#shadow)"/>
-  <text x="600" y="367" text-anchor="middle" fill="#0d1117" font-size="11" font-weight="700">💉 Injected</text>
-  <text x="600" y="383" text-anchor="middle" fill="#0d1117" font-size="10">into Bob's session</text>
-  <text x="600" y="395" text-anchor="middle" fill="#0d1117" font-size="9" opacity="0.7">ranked by relevance</text>
+  <rect x="540" y="541" width="125" height="60" rx="8" fill="url(#noteGrad)"/>
+  <text x="602" y="565" text-anchor="middle" fill="#0d1117" font-size="11" font-weight="700">Auto-Injected</text>
+  <text x="602" y="581" text-anchor="middle" fill="#0d1117" font-size="10">into Bob's session</text>
+  <text x="602" y="594" text-anchor="middle" fill="#0d1117" font-size="9" opacity="0.7">ranked by relevance</text>
 
   <!-- Arrow -->
-  <line x1="665" y1="375" x2="700" y2="375" stroke="#8b949e" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="665" y1="571" x2="700" y2="571" stroke="#8b949e" stroke-width="1.5"/>
+  <polygon points="705,571 695,566 695,576" fill="#8b949e"/>
 
   <!-- Developer B -->
-  <rect x="705" y="340" width="165" height="70" rx="8" fill="#1c1f26" stroke="#22d3ee" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="787" y="365" text-anchor="middle" fill="#22d3ee" font-size="12" font-weight="600">👨‍💻 Bob</text>
-  <text x="787" y="383" text-anchor="middle" fill="#8b949e" font-size="10">Opens Copilot CLI</text>
-  <text x="787" y="398" text-anchor="middle" fill="#8b949e" font-size="10">Sees Alice's stuck thread</text>
+  <rect x="710" y="536" width="160" height="70" rx="8" fill="#1c1f26" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="790" y="562" text-anchor="middle" fill="#22d3ee" font-size="12" font-weight="600">Bob</text>
+  <text x="790" y="579" text-anchor="middle" fill="#8b949e" font-size="10">Opens Copilot CLI</text>
+  <text x="790" y="594" text-anchor="middle" fill="#8b949e" font-size="10">Sees Alice's stuck thread</text>
 
-  <!-- Bottom labels -->
-  <text x="450" y="448" text-anchor="middle" fill="#6e7681" font-size="10">No dashboards. No extra tools. Just shared files in your git repo.</text>
+  <!-- Tagline -->
+  <text x="450" y="644" text-anchor="middle" fill="#6e7681" font-size="10">No dashboards. No extra tools. Just shared files in your git repo.</text>
 
   <!-- Legend -->
-  <rect x="260" y="470" width="10" height="10" rx="2" fill="#8b949e"/>
-  <text x="276" y="479" fill="#8b949e" font-size="10">data flow</text>
-  <line x1="340" y1="475" x2="370" y2="475" stroke="#34d399" stroke-width="1.5"/>
-  <text x="376" y="479" fill="#8b949e" font-size="10">collect</text>
-  <line x1="420" y1="475" x2="450" y2="475" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="5,3"/>
-  <text x="456" y="479" fill="#8b949e" font-size="10">inject</text>
-  <rect x="510" y="470" width="10" height="10" rx="2" fill="url(#hookGrad)"/>
-  <text x="526" y="479" fill="#8b949e" font-size="10">hooks</text>
-  <rect x="570" y="470" width="10" height="10" rx="2" fill="url(#dataGrad)"/>
-  <text x="586" y="479" fill="#8b949e" font-size="10">shared data</text>
+  <line x1="275" y1="680" x2="305" y2="680" stroke="#34d399" stroke-width="2"/>
+  <polygon points="310,680 300,675 300,685" fill="#34d399"/>
+  <text x="326" y="684" fill="#8b949e" font-size="10">collect flow</text>
+
+  <line x1="420" y1="680" x2="450" y2="680" stroke="#fbbf24" stroke-width="2" stroke-dasharray="6,3"/>
+  <polygon points="455,680 465,675 465,685" fill="#fbbf24"/>
+  <text x="481" y="684" fill="#8b949e" font-size="10">inject flow</text>
+
+  <rect x="555" y="674" width="12" height="12" rx="3" fill="url(#hookGrad)"/>
+  <text x="573" y="684" fill="#8b949e" font-size="10">hooks</text>
 </svg>
