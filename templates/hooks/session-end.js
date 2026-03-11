@@ -36,6 +36,7 @@ const {
   getAllAuditPaths,
   loadJson,
   saveJson,
+  saveMemoryMerged,
   appendAuditLine,
   getUser,
   getBranch,
@@ -932,7 +933,7 @@ function main() {
     clearHeadFile();
     clearInjectedSet();
   }
-  saveJson(memoryPath, memory);
+  saveMemoryMerged(memoryPath, memory);
 
   const fileCount = filesTouched.length;
   const commitCount = commitShas.length;

@@ -19,12 +19,13 @@ function _safeExit() {
   process.exit(0);
 }
 
-let getMemoryPath, loadJson, saveJson, appendAuditLine, getUser, detectTool, getSessionId;
+let getMemoryPath, loadJson, saveJson, saveMemoryMerged, appendAuditLine, getUser, detectTool, getSessionId;
 try {
   ({
     getMemoryPath,
     loadJson,
     saveJson,
+    saveMemoryMerged,
     appendAuditLine,
     getUser,
     detectTool,
@@ -118,7 +119,7 @@ function main() {
     tool: toolName,
   });
 
-  saveJson(memoryPath, memory);
+  saveMemoryMerged(memoryPath, memory);
   const statusMsg = `[STICKY-NOTE] Marked thread as STUCK - ${errorMsg.substring(0, 80)}`;
   try {
     process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");

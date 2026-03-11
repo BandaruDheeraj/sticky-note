@@ -29,6 +29,7 @@ const {
   getMemoryPath,
   loadJson,
   saveJson,
+  saveMemoryMerged,
   appendAuditLine,
   getUser,
   getBranch,
@@ -132,7 +133,7 @@ function main() {
     reason: reason ? reason.substring(0, 200) : "stop_checkpoint",
   });
 
-  saveJson(memoryPath, memory);
+  saveMemoryMerged(memoryPath, memory);
   const reasonStr = reason ? reason.substring(0, 60) : "checkpoint";
   const statusMsg = `[STICKY-NOTE] Session stopped - handoff saved (${reasonStr})`;
   try {

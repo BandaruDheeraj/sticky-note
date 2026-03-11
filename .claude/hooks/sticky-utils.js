@@ -205,6 +205,31 @@ function saveJson(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n", "utf-8");
 }
 
+/**
+ * Merge-on-write for the memory file. Re-reads the file from disk before
+ * writing and preserves any threads (by ID) that exist on disk but not in
+ * the in-memory copy. This prevents concurrent sessions or un-pulled commits
+ * from silently dropping other users' threads.
+ */
+function saveMemoryMerged(memoryPath, memory) {
+  try {
+    const onDisk = loadJson(memoryPath, { threads: [] });
+    const onDiskThreads = Array.isArray(onDisk.threads) ? onDisk.threads : [];
+    const inMemoryThreads = Array.isArray(memory.threads) ? memory.threads : [];
+    const inMemoryIds = new Set(inMemoryThreads.map((t) => t.id));
+
+    for (const diskThread of onDiskThreads) {
+      if (diskThread.id && !inMemoryIds.has(diskThread.id)) {
+        memory.threads.push(diskThread);
+      }
+    }
+  } catch (_) {
+    // If re-read fails, proceed with what we have
+  }
+
+  saveJson(memoryPath, memory);
+}
+
 function appendAuditLine(entry) {
   const filePath = getUserAuditPath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -618,6 +643,7 @@ module.exports = {
   clearResumeSignal,
   loadJson,
   saveJson,
+  saveMemoryMerged,
   appendAuditLine,
   getUser,
   detectTool,

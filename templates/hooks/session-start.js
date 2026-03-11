@@ -34,6 +34,7 @@ const {
   migrateAuditAndPresence,
   loadJson,
   saveJson,
+  saveMemoryMerged,
   appendAuditLine,
   getUser,
   getSessionId,
@@ -270,7 +271,7 @@ function main() {
         resumed_from: prevSession,
       });
       resumedThread.resume_chain = chain;
-      saveJson(memoryPath, memory);
+      saveMemoryMerged(memoryPath, memory);
     }
   }
 
@@ -293,7 +294,7 @@ function main() {
     session_id: sessionId,
   });
 
-  saveJson(memoryPath, memory);
+  saveMemoryMerged(memoryPath, memory);
 
   // ── Assemble output ───────────────────────────────────
   const parts = [];

@@ -7,5 +7,5 @@
 *.sh text eol=lf
 *.ps1 text eol=crlf
 
-# Sticky Note - auto-merge threads from both sides
-.sticky-note/sticky-note.json merge=union
+# Sticky Note - JSON-aware thread merge
+.sticky-note/sticky-note.json merge=sticky-note

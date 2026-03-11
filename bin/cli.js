@@ -537,19 +537,42 @@ async function cmdInit() {
 
   // Add .gitattributes merge strategy
   const gitattrsPath = path.join(process.cwd(), ".gitattributes");
-  const mergeRule = ".sticky-note/sticky-note.json merge=union";
+  const oldMergeRule = ".sticky-note/sticky-note.json merge=union";
+  const mergeRule = ".sticky-note/sticky-note.json merge=sticky-note";
   let gitattrsContent = "";
   if (fs.existsSync(gitattrsPath)) {
     gitattrsContent = fs.readFileSync(gitattrsPath, "utf-8");
   }
-  if (!gitattrsContent.includes(mergeRule)) {
+  // Upgrade from merge=union to custom merge driver
+  if (gitattrsContent.includes(oldMergeRule)) {
+    gitattrsContent = gitattrsContent.replace(oldMergeRule, mergeRule);
+    fs.writeFileSync(gitattrsPath, gitattrsContent, "utf-8");
+    print("  [OK] .gitattributes upgraded (merge=union -> merge=sticky-note)");
+  } else if (!gitattrsContent.includes(mergeRule)) {
     const addition = gitattrsContent.endsWith("\n") || gitattrsContent === ""
-      ? `\n# Sticky Note - auto-merge threads from both sides\n${mergeRule}\n`
-      : `\n\n# Sticky Note - auto-merge threads from both sides\n${mergeRule}\n`;
+      ? `\n# Sticky Note - JSON-aware thread merge\n${mergeRule}\n`
+      : `\n\n# Sticky Note - JSON-aware thread merge\n${mergeRule}\n`;
     fs.appendFileSync(gitattrsPath, addition);
-    print("  [OK] .gitattributes updated (merge=union)");
+    print("  [OK] .gitattributes updated (merge=sticky-note)");
   } else {
     print("  ⏭️  .gitattributes already configured");
+  }
+
+  // Install merge driver script and git config
+  const mergeDriverSrc = path.join(TEMPLATES_DIR, "merge-driver.js");
+  const mergeDriverDest = path.join(stickyDir, "merge-driver.js");
+  copyFile(mergeDriverSrc, mergeDriverDest);
+  print("  [OK] .sticky-note/merge-driver.js installed");
+  try {
+    execFileSync("git", ["config", "merge.sticky-note.name", "Sticky Note thread merge"], {
+      cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
+    });
+    execFileSync("git", ["config", "merge.sticky-note.driver", "node .sticky-note/merge-driver.js %O %A %B"], {
+      cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
+    });
+    print("  [OK] git merge driver configured (merge.sticky-note)");
+  } catch (_) {
+    print("  ⏭️  Could not configure git merge driver (non-fatal)");
   }
 
   // Add git aliases for safe branch switching
@@ -666,6 +689,38 @@ function cmdUpdate() {
     const config = readJsonSafe(configPath, {});
     config.hook_version = VERSION;
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+  }
+
+  // Update merge driver
+  const mergeDriverSrc = path.join(TEMPLATES_DIR, "merge-driver.js");
+  const mergeDriverDest = path.join(stickyDir, "merge-driver.js");
+  copyFile(mergeDriverSrc, mergeDriverDest);
+  print("  [OK] .sticky-note/merge-driver.js updated");
+
+  // Upgrade .gitattributes from merge=union to custom driver
+  const gitattrsPath = path.join(process.cwd(), ".gitattributes");
+  if (fs.existsSync(gitattrsPath)) {
+    let gitattrsContent = fs.readFileSync(gitattrsPath, "utf-8");
+    const oldRule = ".sticky-note/sticky-note.json merge=union";
+    const newRule = ".sticky-note/sticky-note.json merge=sticky-note";
+    if (gitattrsContent.includes(oldRule)) {
+      gitattrsContent = gitattrsContent.replace(oldRule, newRule);
+      fs.writeFileSync(gitattrsPath, gitattrsContent, "utf-8");
+      print("  [OK] .gitattributes upgraded (merge=union -> merge=sticky-note)");
+    }
+  }
+
+  // Ensure git merge driver config is set
+  try {
+    execFileSync("git", ["config", "merge.sticky-note.name", "Sticky Note thread merge"], {
+      cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
+    });
+    execFileSync("git", ["config", "merge.sticky-note.driver", "node .sticky-note/merge-driver.js %O %A %B"], {
+      cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
+    });
+    print("  [OK] git merge driver configured (merge.sticky-note)");
+  } catch (_) {
+    // non-fatal
   }
 
   print(`\n  ✨ Scripts updated to v${VERSION}`);

@@ -50,7 +50,7 @@ try {
   gitNotes = null;
 }
 const {
-  getMemoryPath, loadJson, saveJson, getUser, getBranch,
+  getMemoryPath, loadJson, saveJson, saveMemoryMerged, getUser, getBranch,
   getResumeThreadId, findThreadById, getSessionId,
   appendAuditLine, detectTool, getConfigPath,
   isThreadInjected, markThreadInjected, normalizeSep,
@@ -391,7 +391,7 @@ function main() {
 
   if (memoryDirty) {
     try {
-      saveJson(getMemoryPath(), memory);
+      saveMemoryMerged(getMemoryPath(), memory);
     } catch (_) {
       // ignore
     }
