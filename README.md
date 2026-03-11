@@ -1,16 +1,33 @@
-# 📌 Sticky Note v2.5
+<p align="center">
+  <!-- Replace with your own logo -->
+  <img src="docs/images/logo.png" alt="Sticky Note" width="120" />
+</p>
 
-> [OPEN] **Yes, we use Sticky Note to build Sticky Note — and it's working!** It's sticky notes all the way down.
+<h1 align="center">Sticky Note</h1>
 
+<p align="center">
+  <strong>Human-to-human handoff for AI coding assistants.</strong><br/>
+  Git-backed shared memory that captures session threads and surfaces<br/>
+  teammate context — automatically, inside the tools you already use.
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/sticky-note"><img src="https://img.shields.io/npm/v/sticky-note.svg?style=flat-square&color=f59e0b" alt="npm version" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square" alt="MIT License" /></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D16-brightgreen.svg?style=flat-square" alt="Node.js >= 16" /></a>
+  <a href="#supported-tools"><img src="https://img.shields.io/badge/works%20with-Claude%20%C2%B7%20Copilot%20%C2%B7%20Codex-8b5cf6?style=flat-square" alt="Works with Claude, Copilot, Codex" /></a>
+</p>
+
+<br/>
+
+<p align="center">
+  <img src="docs/images/architecture.svg" alt="Architecture diagram" width="800" />
+</p>
+
+<br/>
+
+> [!NOTE]
 > **Sticky Note is evolving.** Features, APIs, and file formats may change as we learn what works best for teams.
-
-**Human-to-human handoff for AI coding assistants.**
-
-Git-backed shared memory layer that captures session threads and surfaces
-teammate context in Claude Code, Copilot CLI, and Codex. Automatically.
-
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![npm version](https://img.shields.io/npm/v/sticky-note.svg)](https://www.npmjs.com/package/sticky-note)
 
 ---
 
