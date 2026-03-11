@@ -21,7 +21,7 @@
 <br/>
 
 <p align="center">
-  <img src="docs/images/architecture.svg" alt="Architecture diagram" width="800" />
+  <img src="https://raw.githubusercontent.com/BandaruDheeraj/sticky-note/main/docs/images/architecture.svg" alt="Architecture diagram" width="800" />
 </p>
 
 <br/>
