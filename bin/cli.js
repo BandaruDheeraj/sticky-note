@@ -21,7 +21,7 @@ const { execSync, execFileSync } = require("child_process");
 // Constants
 // ──────────────────────────────────────────────
 
-const VERSION = "2.5.2";
+const VERSION = require("../package.json").version;
 
 const HOOK_FILES = [
   "sticky-utils.js",
