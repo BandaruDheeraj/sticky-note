@@ -1,10 +1,7 @@
 <p align="center">
   <!-- Replace with your own logo -->
-  <img src="docs/images/logo.png" alt="Sticky Note" width="400" />
+  <img src="docs/images/logo.png" alt="Sticky Note" width="600" />
 </p>
-
-<h1 align="center">Sticky Note</h1>
-
 <p align="center">
   <strong>Human-to-human handoff for AI coding assistants.</strong><br/>
   Git-backed shared memory that captures session threads and surfaces<br/>
