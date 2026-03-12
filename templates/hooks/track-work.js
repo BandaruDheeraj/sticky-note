@@ -43,6 +43,9 @@ const {
   appendAuditLine,
   getUser,
   getSessionId,
+  useCloud,
+  cloudAppendAudit,
+  cloudWritePresence,
 } = utils;
 
 const WRITE_TOOLS = new Set([
@@ -223,6 +226,7 @@ function main() {
   }
 
   const sessionId = getSessionId(hookInput);
+  const cloud = useCloud();
 
   let toolName = hookInput.tool_name || "unknown";
   if (toolName === "unknown") {
@@ -279,8 +283,19 @@ function main() {
     entry.checkpoint_topic = checkpoint.topic;
   }
   appendAuditLine(entry);
+  if (cloud) {
+    cloudAppendAudit(entry).catch(() => {});
+  }
 
   updatePresence(user, filePath);
+  if (cloud) {
+    cloudWritePresence({
+      user,
+      last_seen: now,
+      active_files: filePath ? [filePath] : [],
+      session_id: sessionId,
+    }).catch(() => {});
+  }
 
   // V2.5: Write Git Note for write tools
   if (isWriteTool && filePath) {

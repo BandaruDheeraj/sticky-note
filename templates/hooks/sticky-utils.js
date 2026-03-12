@@ -669,5 +669,205 @@ module.exports = {
   clearActiveResumeThreadId,
   // V2.5: cross-platform path helper
   normalizeSep,
+  // V3: cloud transport
+  useCloud,
+  getCloudConfig,
+  getProjectName,
+  cloudFetch,
+  cloudReadThreads,
+  cloudReadThread,
+  cloudWriteThread,
+  cloudDeleteThread,
+  cloudAppendAudit,
+  cloudQueryAudit,
+  cloudReadPresence,
+  cloudWritePresence,
+  cloudDeletePresence,
+  cloudReadConfig,
+  cloudWriteConfig,
+  _cloudWarned,
 };
+
+// ── V3: Cloud transport layer ─────────────────────────────
+
+// Reads .env.sticky from the repo root for STICKY_URL and STICKY_API_KEY.
+// Falls back to environment variables.
+
+function _loadEnvStickyFile() {
+  try {
+    const repoRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    const envPath = path.join(repoRoot, ".env.sticky");
+    if (fs.existsSync(envPath)) {
+      const raw = fs.readFileSync(envPath, "utf-8");
+      const vars = {};
+      for (const line of raw.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const eq = trimmed.indexOf("=");
+        if (eq > 0) {
+          vars[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
+        }
+      }
+      return vars;
+    }
+  } catch (_) {
+    // ignore
+  }
+  return {};
+}
+
+let _envStickyCache = null;
+function _getEnvSticky() {
+  if (_envStickyCache === null) {
+    _envStickyCache = _loadEnvStickyFile();
+  }
+  return _envStickyCache;
+}
+
+function getCloudConfig() {
+  const envFile = _getEnvSticky();
+  return {
+    url: process.env.STICKY_URL || envFile.STICKY_URL || "",
+    apiKey: process.env.STICKY_API_KEY || envFile.STICKY_API_KEY || "",
+  };
+}
+
+function useCloud() {
+  return !!getCloudConfig().url;
+}
+
+function getProjectName() {
+  // Check config override first
+  try {
+    const config = loadJson(getConfigPath(), {});
+    if (config.project) return config.project;
+  } catch (_) {}
+
+  // Auto-detect from git remote
+  try {
+    const remote = execFileSync("git", ["remote", "get-url", "origin"], {
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    // git@github.com:Owner/Repo.git → Owner/Repo
+    // https://github.com/Owner/Repo.git → Owner/Repo
+    const match = remote.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+    if (match) return match[1];
+  } catch (_) {}
+
+  return "default";
+}
+
+// Track whether we've warned about cloud being unreachable this session
+let _cloudWarned = false;
+
+async function cloudFetch(method, endpoint, body) {
+  const { url, apiKey } = getCloudConfig();
+  if (!url) return null;
+
+  const project = getProjectName();
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Sticky-Project": project,
+  };
+  if (apiKey) {
+    headers["X-Sticky-API-Key"] = apiKey;
+  }
+
+  const opts = { method, headers };
+  if (body && (method === "POST" || method === "PUT")) {
+    opts.body = JSON.stringify(body);
+  }
+
+  try {
+    // Use dynamic import for fetch (Node 18+) or fall back to global
+    const fetchFn = typeof fetch !== "undefined" ? fetch : (await import("node:http")).default;
+    const resp = await fetchFn(`${url}${endpoint}`, opts);
+    if (!resp.ok) {
+      debugLog(`Cloud ${method} ${endpoint} returned ${resp.status}`);
+      return null;
+    }
+    const text = await resp.text();
+    return text ? JSON.parse(text) : {};
+  } catch (err) {
+    if (!_cloudWarned) {
+      _cloudWarned = true;
+      process.stderr.write(
+        "[STICKY-NOTE] Cloud unreachable, using local fallback\n"
+      );
+    }
+    debugLog(`Cloud fetch error: ${err.message}`);
+    return null;
+  }
+}
+
+// ── Cloud: Threads ────────────────────────────────────────
+
+async function cloudReadThreads(filters) {
+  const params = new URLSearchParams();
+  if (filters && filters.status) params.set("status", filters.status);
+  if (filters && filters.q) params.set("q", filters.q);
+  const qs = params.toString();
+  const result = await cloudFetch("GET", `/threads${qs ? "?" + qs : ""}`);
+  return result ? result.threads || [] : null;
+}
+
+async function cloudReadThread(id) {
+  return await cloudFetch("GET", `/threads/${id}`);
+}
+
+async function cloudWriteThread(thread) {
+  return await cloudFetch("PUT", `/threads/${thread.id}`, thread);
+}
+
+async function cloudDeleteThread(id) {
+  return await cloudFetch("DELETE", `/threads/${id}`);
+}
+
+// ── Cloud: Audit ──────────────────────────────────────────
+
+async function cloudAppendAudit(record) {
+  return await cloudFetch("POST", "/audit", record);
+}
+
+async function cloudQueryAudit(filters) {
+  const params = new URLSearchParams();
+  if (filters && filters.user) params.set("user", filters.user);
+  if (filters && filters.file) params.set("file", filters.file);
+  if (filters && filters.tool) params.set("tool", filters.tool);
+  if (filters && filters.since) params.set("since", filters.since);
+  const qs = params.toString();
+  const result = await cloudFetch("GET", `/audit${qs ? "?" + qs : ""}`);
+  return result ? result.audit || [] : null;
+}
+
+// ── Cloud: Presence ───────────────────────────────────────
+
+async function cloudReadPresence() {
+  const result = await cloudFetch("GET", "/presence");
+  return result ? result.presence || [] : null;
+}
+
+async function cloudWritePresence(record) {
+  return await cloudFetch("POST", "/presence", record);
+}
+
+async function cloudDeletePresence(user) {
+  return await cloudFetch("DELETE", `/presence/${encodeURIComponent(user)}`);
+}
+
+// ── Cloud: Config ─────────────────────────────────────────
+
+async function cloudReadConfig() {
+  return await cloudFetch("GET", "/config");
+}
+
+async function cloudWriteConfig(config) {
+  return await cloudFetch("PUT", "/config", config);
+}
 // tier1 test

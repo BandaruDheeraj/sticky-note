@@ -19,7 +19,7 @@ function _safeExit() {
   process.exit(0);
 }
 
-let getMemoryPath, loadJson, saveJson, saveMemoryMerged, appendAuditLine, getUser, detectTool, getSessionId;
+let getMemoryPath, loadJson, saveJson, saveMemoryMerged, appendAuditLine, getUser, detectTool, getSessionId, useCloud, cloudReadThreads, cloudWriteThread, cloudAppendAudit;
 try {
   ({
     getMemoryPath,
@@ -30,12 +30,16 @@ try {
     getUser,
     detectTool,
     getSessionId,
+    useCloud,
+    cloudReadThreads,
+    cloudWriteThread,
+    cloudAppendAudit,
   } = require("./sticky-utils.js"));
 } catch (_) {
   _safeExit();
 }
 
-function main() {
+async function main() {
   let hookInput = {};
   try {
     if (!process.stdin.isTTY) {
@@ -57,8 +61,14 @@ function main() {
   const user = getUser();
   const now = new Date().toISOString();
 
+  const cloud = useCloud();
   const memoryPath = getMemoryPath();
   const memory = loadJson(memoryPath, { version: "2", project: "", threads: [] });
+
+  if (cloud) {
+    const cloudThreads = await cloudReadThreads();
+    if (cloudThreads) memory.threads = cloudThreads;
+  }
 
   if (!Array.isArray(memory.threads)) {
     memory.threads = [];
@@ -110,16 +120,24 @@ function main() {
     threads.push(thread);
   }
 
-  appendAuditLine({
+  const auditEntry = {
     type: "error",
     user: user,
     ts: now,
     session_id: sessionId,
     error: errorMsg,
     tool: toolName,
-  });
+  };
+  appendAuditLine(auditEntry);
+  if (cloud) {
+    cloudAppendAudit(auditEntry).catch(() => {});
+  }
 
   saveMemoryMerged(memoryPath, memory);
+  if (cloud) {
+    const threadToSync = existing || threads[threads.length - 1];
+    cloudWriteThread(threadToSync).catch(() => {});
+  }
   const statusMsg = `[STICKY-NOTE] Marked thread as STUCK - ${errorMsg.substring(0, 80)}`;
   try {
     process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
@@ -129,8 +147,4 @@ function main() {
   process.exit(0);
 }
 
-try {
-  main();
-} catch (_) {
-  _safeExit();
-}
+main().catch(() => _safeExit());

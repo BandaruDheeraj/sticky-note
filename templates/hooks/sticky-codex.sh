@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# sticky-codex.sh — Codex wrapper for Sticky Note V2
+# sticky-codex.sh — Codex wrapper for Sticky Note V3
 #
 # Captures Codex stdout/stderr to a temp session log.
 # On exit: calls session-end.js with the transcript for
 # narrative + failed_approaches extraction.
+#
+# V3: If STICKY_URL is set, reads cloud context before session start
+# and writes session data to cloud on exit (via hook scripts).
 #
 # Usage:
 #   sticky-codex [codex args...]
@@ -11,9 +14,6 @@
 # Setup:
 #   npx sticky-note init --codex
 #   alias sticky-codex="/path/to/.claude/hooks/sticky-codex.sh"
-#
-# Limitation: Context is printed to terminal after Codex exits,
-# not injected into the Codex window. Per-prompt surfacing not available.
 
 set -euo pipefail
 
@@ -28,8 +28,17 @@ mkdir -p "$STICKY_DIR"
 
 # Print context from sticky-note before starting Codex
 echo ""
-echo "📌 Sticky Note — injecting context for Codex session $SESSION_ID"
+echo "[STICKY-NOTE] Injecting context for Codex session $SESSION_ID"
 echo ""
+
+# Load .env.sticky if it exists (for STICKY_URL and STICKY_API_KEY)
+ENV_STICKY="$(cd "$SCRIPT_DIR/../.." && pwd)/.env.sticky"
+if [ -f "$ENV_STICKY" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_STICKY"
+    set +a
+fi
 
 if [ -f "$STICKY_DIR/sticky-note.json" ]; then
     node "$SCRIPT_DIR/session-start.js" <<EOF 2>/dev/null || true

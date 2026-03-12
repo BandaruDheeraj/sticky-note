@@ -339,6 +339,10 @@ async function syncMcpFromStickyNote(rl) {
 // ──────────────────────────────────────────────
 
 async function cmdInit() {
+  const args = process.argv.slice(3);
+  const ciMode = args.includes("--ci") || args.includes("--no-prompts");
+  const v3Mode = args.includes("--v3");
+
   printBanner();
 
   // Preflight checks
@@ -352,71 +356,112 @@ async function cmdInit() {
   print("");
 
   // Auto-detect MCP servers and skills
-  print("  🔍 Scanning for existing configuration...");
+  print("  Scanning for existing configuration...");
   const detectedMcp = detectMcpServers();
   const detectedSkills = detectSkills();
 
   if (detectedMcp.length > 0) {
-    print(`  📡 Found ${detectedMcp.length} MCP server(s):`);
+    print(`  Found ${detectedMcp.length} MCP server(s):`);
     for (const s of detectedMcp) {
-      print(`     • ${s.name} (${s.source})`);
+      print(`     - ${s.name} (${s.source})`);
     }
   }
   if (detectedSkills.length > 0) {
-    print(`  🧩 Found ${detectedSkills.length} skill(s):`);
+    print(`  Found ${detectedSkills.length} skill(s):`);
     for (const s of detectedSkills) {
-      print(`     • ${s}`);
+      print(`     - ${s}`);
     }
   }
   if (detectedMcp.length === 0 && detectedSkills.length === 0) {
-    print("  ⏭️  No existing MCP servers or skills detected");
+    print("  No existing MCP servers or skills detected");
   }
   print("");
 
-  // Interactive prompts
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
+  let mcpServers, skills, conventions, staleDaysResolved, injectTokenBudgetResolved;
 
-  print("  📋 Team Configuration");
-  print("  (Press Enter to accept detected defaults)\n");
+  if (ciMode) {
+    // CI mode: no prompts, use env vars
+    const mcpRaw = process.env.STICKY_MCP_SERVERS || "";
+    const convRaw = process.env.STICKY_CONVENTIONS || "";
+    const staleDaysRaw = process.env.STICKY_STALE_DAYS || "14";
 
-  const mcpDefault = detectedMcp.map((s) => s.name).join(", ");
-  const mcpServersRaw = await ask(
-    rl,
-    "MCP servers (comma-separated)",
-    mcpDefault || ""
-  );
-  const conventionsRaw = await ask(
-    rl,
-    "Team conventions (comma-separated)",
-    ""
-  );
-  const staleDays = await ask(rl, "Stale thread age in days", "14");
-  const injectTokenBudget = await ask(rl, "Inject context token budget", "1000");
+    mcpServers = detectedMcp.slice();
+    if (mcpRaw) {
+      try {
+        const parsed = JSON.parse(mcpRaw);
+        if (Array.isArray(parsed)) mcpServers = parsed;
+      } catch (_) {
+        mcpRaw.split(",").map(s => s.trim()).filter(Boolean).forEach(name => {
+          mcpServers.push({ name, source: "ci-env" });
+        });
+      }
+    }
+    skills = [...detectedSkills];
+    conventions = convRaw ? convRaw.split(",").map(s => s.trim()).filter(Boolean) : [];
+    staleDaysResolved = parseIntOr(staleDaysRaw, 14);
+    injectTokenBudgetResolved = 1000;
+  } else {
+    // Interactive prompts
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
 
-  // Sync MCP servers from teammate's sticky-note config
-  await syncMcpFromStickyNote(rl);
+    print("  Team Configuration");
+    print("  (Press Enter to accept detected defaults)\n");
 
-  rl.close();
+    const mcpDefault = detectedMcp.map((s) => s.name).join(", ");
+    const mcpServersRaw = await ask(
+      rl,
+      "MCP servers (comma-separated)",
+      mcpDefault || ""
+    );
+    const conventionsRaw = await ask(
+      rl,
+      "Team conventions (comma-separated)",
+      ""
+    );
+    const staleDays = await ask(rl, "Stale thread age in days", "14");
+    const injectTokenBudget = await ask(rl, "Inject context token budget", "1000");
 
-  // Build MCP server list: prefer detected objects, fall back to names
-  const mcpNames = mcpServersRaw
-    ? mcpServersRaw.split(",").map((s) => s.trim()).filter(Boolean)
-    : [];
-  const mcpServers = mcpNames.map((name) => {
-    const detected = detectedMcp.find((d) => d.name === name);
-    return detected || { name, source: "manual" };
-  });
+    // Sync MCP servers from teammate's sticky-note config
+    await syncMcpFromStickyNote(rl);
 
-  const skills = [...detectedSkills];
+    rl.close();
 
-  const conventions = conventionsRaw
-    ? conventionsRaw.split(",").map((s) => s.trim()).filter(Boolean)
-    : [];
-  const staleDaysResolved = parseIntOr(staleDays, 14);
-  const injectTokenBudgetResolved = parseIntOr(injectTokenBudget, 1000);
+    // Build MCP server list: prefer detected objects, fall back to names
+    const mcpNames = mcpServersRaw
+      ? mcpServersRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+    mcpServers = mcpNames.map((name) => {
+      const detected = detectedMcp.find((d) => d.name === name);
+      return detected || { name, source: "manual" };
+    });
+
+    skills = [...detectedSkills];
+
+    conventions = conventionsRaw
+      ? conventionsRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+    staleDaysResolved = parseIntOr(staleDays, 14);
+    injectTokenBudgetResolved = parseIntOr(injectTokenBudget, 1000);
+  }
+
+  // V3: write .env.sticky if STICKY_URL is available
+  if (v3Mode || process.env.STICKY_URL) {
+    const envStickyPath = path.join(process.cwd(), ".env.sticky");
+    const stickyUrl = process.env.STICKY_URL || "";
+    const stickyApiKey = process.env.STICKY_API_KEY || "";
+    if (stickyUrl) {
+      let content = `STICKY_URL=${stickyUrl}\n`;
+      if (stickyApiKey) content += `STICKY_API_KEY=${stickyApiKey}\n`;
+      fs.writeFileSync(envStickyPath, content, "utf-8");
+      print("  [OK] .env.sticky (cloud backend configured)");
+    } else if (v3Mode && !ciMode) {
+      print("  [WARN] --v3 specified but STICKY_URL not set.");
+      print("         Run `npx sticky-note deploy-backend` to provision a cloud backend.");
+    }
+  }
 
   print("\n  📁 Creating files...\n");
 
@@ -877,6 +922,76 @@ function cmdStatus() {
   print(
     `    ${isGitRepo() ? "[OK]" : "[ERR]"} Git repository`
   );
+
+  // V3: Cloud backend health
+  const envStickyPath = path.join(process.cwd(), ".env.sticky");
+  print("\n  Cloud Backend (V3):");
+  if (fs.existsSync(envStickyPath)) {
+    try {
+      const envRaw = fs.readFileSync(envStickyPath, "utf-8");
+      let stickyUrl = "";
+      for (const line of envRaw.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("STICKY_URL=")) {
+          stickyUrl = trimmed.slice("STICKY_URL=".length).trim();
+        }
+      }
+      if (stickyUrl) {
+        print(`    [OK] .env.sticky found (${stickyUrl})`);
+        try {
+          const http = require(stickyUrl.startsWith("https") ? "https" : "http");
+          const healthCheck = new Promise((resolve) => {
+            const req = http.get(`${stickyUrl}/health`, { timeout: 5000 }, (res) => {
+              let body = "";
+              res.on("data", (chunk) => body += chunk);
+              res.on("end", () => {
+                if (res.statusCode === 200) {
+                  resolve({ ok: true, body });
+                } else {
+                  resolve({ ok: false, status: res.statusCode });
+                }
+              });
+            });
+            req.on("error", (err) => resolve({ ok: false, error: err.message }));
+            req.on("timeout", () => { req.destroy(); resolve({ ok: false, error: "timeout" }); });
+          });
+          const result = healthCheck;
+          // Synchronous-friendly: use execFileSync with curl/node to check
+          try {
+            const healthResult = execFileSync("node", ["-e", `
+              const url = ${JSON.stringify(stickyUrl + "/health")};
+              const mod = url.startsWith("https") ? require("https") : require("http");
+              const req = mod.get(url, {timeout: 5000}, (res) => {
+                let b = "";
+                res.on("data", c => b += c);
+                res.on("end", () => {
+                  if (res.statusCode === 200) process.stdout.write("OK:" + b);
+                  else process.stdout.write("ERR:" + res.statusCode);
+                });
+              });
+              req.on("error", e => process.stdout.write("ERR:" + e.message));
+              req.on("timeout", () => { req.destroy(); process.stdout.write("ERR:timeout"); });
+            `], { encoding: "utf-8", timeout: 8000, stdio: ["pipe", "pipe", "pipe"] }).trim();
+            if (healthResult.startsWith("OK:")) {
+              print(`    [OK] Backend reachable`);
+            } else {
+              print(`    [ERR] Backend unreachable (${healthResult.slice(4)})`);
+            }
+          } catch (_) {
+            print(`    [ERR] Backend unreachable (health check failed)`);
+          }
+        } catch (_) {
+          print(`    [ERR] Backend health check failed`);
+        }
+      } else {
+        print("    [--] .env.sticky found but STICKY_URL not set");
+      }
+    } catch (_) {
+      print("    [ERR] .env.sticky unreadable");
+    }
+  } else {
+    print("    [--] No .env.sticky (local-only mode, V2.5 compatible)");
+  }
 
   // V2.5: Attribution engine health
   print("\n  Attribution Engine (V2.5):");
@@ -1907,6 +2022,469 @@ function cmdGc() {
 }
 
 // ──────────────────────────────────────────────
+// DEPLOY-BACKEND command (V3)
+// ──────────────────────────────────────────────
+
+function cmdDeployBackend() {
+  printBanner();
+  print("  Deploy Cloudflare KV Backend\n");
+
+  // Check wrangler
+  try {
+    execSync("wrangler --version", { stdio: "pipe" });
+  } catch (_) {
+    print("  [ERR] `wrangler` CLI not found.");
+    print("        Install it: npm install -g wrangler");
+    print("        Then authenticate: wrangler login\n");
+    process.exit(1);
+  }
+
+  const serverDir = path.join(__dirname, "..", "sticky-server");
+  if (!fs.existsSync(path.join(serverDir, "worker.js"))) {
+    print("  [ERR] sticky-server/worker.js not found.");
+    print("        Make sure you have the full sticky-note package.\n");
+    process.exit(1);
+  }
+
+  print("  Step 1: Creating KV namespace...");
+  try {
+    const result = execSync("wrangler kv:namespace create STICKY_KV", {
+      cwd: serverDir,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    print("  [OK] KV namespace created");
+
+    // Extract namespace ID from wrangler output
+    const idMatch = result.match(/id\s*=\s*"([^"]+)"/);
+    if (idMatch) {
+      const namespaceId = idMatch[1];
+      // Update wrangler.toml with real namespace ID
+      const tomlPath = path.join(serverDir, "wrangler.toml");
+      let toml = fs.readFileSync(tomlPath, "utf-8");
+      toml = toml.replace("PLACEHOLDER_KV_NAMESPACE_ID", namespaceId);
+      fs.writeFileSync(tomlPath, toml);
+      print(`  [OK] wrangler.toml updated with namespace ID`);
+    }
+  } catch (err) {
+    print("  [ERR] Failed to create KV namespace: " + (err.message || err));
+    print("        Make sure you're logged in: wrangler login\n");
+    process.exit(1);
+  }
+
+  print("  Step 2: Deploying Worker...");
+  try {
+    const result = execSync("wrangler deploy", {
+      cwd: serverDir,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    // Extract worker URL
+    const urlMatch = result.match(/(https:\/\/[^\s]+\.workers\.dev)/);
+    const workerUrl = urlMatch ? urlMatch[1] : null;
+
+    if (workerUrl) {
+      print(`  [OK] Worker deployed: ${workerUrl}`);
+
+      // Write .env.sticky
+      const envPath = path.join(process.cwd(), ".env.sticky");
+      fs.writeFileSync(envPath, `STICKY_URL=${workerUrl}\n`, "utf-8");
+      print("  [OK] .env.sticky written with STICKY_URL");
+    } else {
+      print("  [OK] Worker deployed (URL not detected — check wrangler output)");
+    }
+  } catch (err) {
+    print("  [ERR] Failed to deploy Worker: " + (err.message || err));
+    process.exit(1);
+  }
+
+  print("\n  Backend ready! Run `npx sticky-note init --v3` in your repos.\n");
+}
+
+// ──────────────────────────────────────────────
+// MIGRATE command (V3)
+// ──────────────────────────────────────────────
+
+async function cmdMigrate() {
+  const args = process.argv.slice(3);
+  if (!args.includes("--to") || !args.includes("cloud")) {
+    print("  Usage: npx sticky-note migrate --to cloud");
+    print("  Migrates local V2 data to cloud backend.\n");
+    process.exit(1);
+  }
+
+  printBanner();
+  print("  Migrate V2 -> V3 Cloud\n");
+
+  // Check cloud config
+  const stickyUrl = process.env.STICKY_URL || "";
+  const stickyApiKey = process.env.STICKY_API_KEY || "";
+
+  // Try .env.sticky
+  let envUrl = stickyUrl;
+  let envKey = stickyApiKey;
+  const envStickyPath = path.join(process.cwd(), ".env.sticky");
+  if (!envUrl && fs.existsSync(envStickyPath)) {
+    const raw = fs.readFileSync(envStickyPath, "utf-8");
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("STICKY_URL=")) envUrl = trimmed.slice("STICKY_URL=".length);
+      if (trimmed.startsWith("STICKY_API_KEY=")) envKey = trimmed.slice("STICKY_API_KEY=".length);
+    }
+  }
+
+  if (!envUrl) {
+    print("  [ERR] STICKY_URL not found.");
+    print("        Set it in .env.sticky or run `npx sticky-note deploy-backend` first.\n");
+    process.exit(1);
+  }
+
+  // Detect project name
+  let projectName = "default";
+  try {
+    const remote = execSync("git remote get-url origin", { encoding: "utf-8", stdio: "pipe" }).trim();
+    const match = remote.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+    if (match) projectName = match[1];
+  } catch (_) {}
+
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Sticky-Project": projectName,
+  };
+  if (envKey) headers["X-Sticky-API-Key"] = envKey;
+
+  async function postToCloud(endpoint, body) {
+    try {
+      const resp = await fetch(`${envUrl}${endpoint}`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+      return resp.ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  async function putToCloud(endpoint, body) {
+    try {
+      const resp = await fetch(`${envUrl}${endpoint}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(body),
+      });
+      return resp.ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  print(`  Project: ${projectName}`);
+  print(`  Backend: ${envUrl}\n`);
+
+  // Migrate threads
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+  let threadCount = 0;
+  let threadErrors = 0;
+  if (fs.existsSync(memoryPath)) {
+    const memory = readJsonSafe(memoryPath, { threads: [] });
+    const threads = memory.threads || [];
+    print(`  Migrating ${threads.length} thread(s)...`);
+    for (const thread of threads) {
+      const ok = await putToCloud(`/threads/${thread.id}`, thread);
+      if (ok) threadCount++;
+      else threadErrors++;
+    }
+    print(`  [OK] ${threadCount} threads migrated${threadErrors ? `, ${threadErrors} failed` : ""}`);
+  } else {
+    print("  No sticky-note.json found — skipping threads.");
+  }
+
+  // Migrate audit records
+  const auditDir = path.join(stickyDir, "audit");
+  let auditCount = 0;
+  let auditErrors = 0;
+  if (fs.existsSync(auditDir)) {
+    const files = fs.readdirSync(auditDir).filter(f => f.endsWith(".jsonl"));
+    for (const file of files) {
+      const raw = fs.readFileSync(path.join(auditDir, file), "utf-8");
+      for (const line of raw.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          const record = JSON.parse(trimmed);
+          const ok = await postToCloud("/audit", record);
+          if (ok) auditCount++;
+          else auditErrors++;
+        } catch (_) {
+          auditErrors++;
+        }
+      }
+    }
+    print(`  [OK] ${auditCount} audit records migrated${auditErrors ? `, ${auditErrors} failed` : ""}`);
+  } else {
+    print("  No audit directory found — skipping audit.");
+  }
+
+  // Migrate presence
+  const presenceDir = path.join(stickyDir, "presence");
+  let presenceCount = 0;
+  if (fs.existsSync(presenceDir)) {
+    const files = fs.readdirSync(presenceDir).filter(f => f.endsWith(".json"));
+    for (const file of files) {
+      try {
+        const record = JSON.parse(fs.readFileSync(path.join(presenceDir, file), "utf-8"));
+        const ok = await postToCloud("/presence", record);
+        if (ok) presenceCount++;
+      } catch (_) {}
+    }
+    if (presenceCount) print(`  [OK] ${presenceCount} presence records migrated`);
+  }
+
+  // Migrate config
+  const configPath = path.join(stickyDir, "sticky-note-config.json");
+  if (fs.existsSync(configPath)) {
+    const config = readJsonSafe(configPath, {});
+    const ok = await putToCloud("/config", config);
+    if (ok) print("  [OK] Config migrated");
+  }
+
+  print(`\n  Migration complete. ${threadCount} threads, ${auditCount} audit records.\n`);
+}
+
+// ──────────────────────────────────────────────
+// MCP-SERVER command (V3)
+// ──────────────────────────────────────────────
+
+async function cmdMcpServer() {
+  // MCP server runs over stdio using JSON-RPC 2.0
+  const stickyUrl = process.env.STICKY_URL || "";
+  const stickyApiKey = process.env.STICKY_API_KEY || "";
+
+  // Try .env.sticky
+  let envUrl = stickyUrl;
+  let envKey = stickyApiKey;
+  const envStickyPath = path.join(process.cwd(), ".env.sticky");
+  if (!envUrl && fs.existsSync(envStickyPath)) {
+    const raw = fs.readFileSync(envStickyPath, "utf-8");
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("STICKY_URL=")) envUrl = trimmed.slice("STICKY_URL=".length);
+      if (trimmed.startsWith("STICKY_API_KEY=")) envKey = trimmed.slice("STICKY_API_KEY=".length);
+    }
+  }
+
+  // Detect project
+  let projectName = "default";
+  try {
+    const remote = execSync("git remote get-url origin", { encoding: "utf-8", stdio: "pipe" }).trim();
+    const match = remote.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+    if (match) projectName = match[1];
+  } catch (_) {}
+
+  const baseHeaders = {
+    "Content-Type": "application/json",
+    "X-Sticky-Project": projectName,
+  };
+  if (envKey) baseHeaders["X-Sticky-API-Key"] = envKey;
+
+  async function cloudGet(endpoint) {
+    if (!envUrl) return null;
+    try {
+      const resp = await fetch(`${envUrl}${endpoint}`, { headers: baseHeaders });
+      if (!resp.ok) return null;
+      return await resp.json();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function cloudPost(endpoint, body) {
+    if (!envUrl) return null;
+    try {
+      const resp = await fetch(`${envUrl}${endpoint}`, {
+        method: "PUT",
+        headers: baseHeaders,
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) return null;
+      return await resp.json();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Fallback: read from local files
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+
+  function localThreads(filter) {
+    const memory = readJsonSafe(memoryPath, { threads: [] });
+    let threads = memory.threads || [];
+    if (filter) threads = threads.filter(filter);
+    return threads;
+  }
+
+  // MCP tool definitions
+  const tools = [
+    { name: "get_open_threads", description: "Get all open threads", inputSchema: { type: "object", properties: {} } },
+    { name: "get_stuck_threads", description: "Get all stuck threads", inputSchema: { type: "object", properties: {} } },
+    { name: "search_threads", description: "Search threads by query", inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
+    { name: "get_session_context", description: "Get a specific thread by ID", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
+    { name: "write_thread", description: "Create or update a thread", inputSchema: { type: "object", properties: { thread: { type: "object" } }, required: ["thread"] } },
+    { name: "get_team_config", description: "Get team configuration", inputSchema: { type: "object", properties: {} } },
+    { name: "get_presence", description: "Get active developer presence", inputSchema: { type: "object", properties: {} } },
+    { name: "get_audit_trail", description: "Query audit trail", inputSchema: { type: "object", properties: { file: { type: "string" }, user: { type: "string" }, since: { type: "string" }, tool: { type: "string" } } } },
+  ];
+
+  // Handle MCP tool calls
+  async function handleToolCall(name, args) {
+    switch (name) {
+      case "get_open_threads": {
+        const result = await cloudGet("/threads?status=open");
+        return result ? result.threads : localThreads(t => t.status === "open");
+      }
+      case "get_stuck_threads": {
+        const result = await cloudGet("/threads?status=stuck");
+        return result ? result.threads : localThreads(t => t.status === "stuck");
+      }
+      case "search_threads": {
+        const q = args.query || "";
+        const result = await cloudGet(`/threads?q=${encodeURIComponent(q)}`);
+        if (result) return result.threads;
+        const qLower = q.toLowerCase();
+        return localThreads(t =>
+          (t.narrative || "").toLowerCase().includes(qLower) ||
+          (t.handoff_summary || "").toLowerCase().includes(qLower) ||
+          (t.files_touched || []).some(f => f.toLowerCase().includes(qLower))
+        );
+      }
+      case "get_session_context": {
+        const id = args.id;
+        const result = await cloudGet(`/threads/${id}`);
+        if (result && !result.error) return result;
+        const memory = readJsonSafe(memoryPath, { threads: [] });
+        return (memory.threads || []).find(t => t.id === id || t.id.startsWith(id)) || null;
+      }
+      case "write_thread": {
+        const thread = args.thread;
+        if (envUrl) await cloudPost(`/threads/${thread.id}`, thread);
+        return { ok: true };
+      }
+      case "get_team_config": {
+        const result = await cloudGet("/config");
+        if (result) return result;
+        const configPath = path.join(stickyDir, "sticky-note-config.json");
+        return readJsonSafe(configPath, {});
+      }
+      case "get_presence": {
+        const result = await cloudGet("/presence");
+        if (result) return result.presence;
+        // Local fallback: read presence files
+        const presDir = path.join(stickyDir, "presence");
+        try {
+          return fs.readdirSync(presDir).filter(f => f.endsWith(".json")).map(f =>
+            JSON.parse(fs.readFileSync(path.join(presDir, f), "utf-8"))
+          );
+        } catch (_) {
+          return [];
+        }
+      }
+      case "get_audit_trail": {
+        const params = new URLSearchParams();
+        if (args.file) params.set("file", args.file);
+        if (args.user) params.set("user", args.user);
+        if (args.since) params.set("since", args.since);
+        if (args.tool) params.set("tool", args.tool);
+        const qs = params.toString();
+        const result = await cloudGet(`/audit${qs ? "?" + qs : ""}`);
+        if (result) return result.audit;
+        // Local fallback: grep JSONL
+        const auditDir = path.join(stickyDir, "audit");
+        const records = [];
+        try {
+          for (const f of fs.readdirSync(auditDir).filter(f => f.endsWith(".jsonl"))) {
+            const raw = fs.readFileSync(path.join(auditDir, f), "utf-8");
+            for (const line of raw.split(/\r?\n/)) {
+              if (!line.trim()) continue;
+              try {
+                const r = JSON.parse(line);
+                if (args.user && r.user !== args.user) continue;
+                if (args.file && !(r.file || "").includes(args.file)) continue;
+                if (args.tool && r.tool !== args.tool) continue;
+                if (args.since && new Date(r.timestamp) < new Date(args.since)) continue;
+                records.push(r);
+              } catch (_) {}
+            }
+          }
+        } catch (_) {}
+        return records;
+      }
+      default:
+        return { error: `Unknown tool: ${name}` };
+    }
+  }
+
+  // MCP stdio protocol
+  const rl = readline.createInterface({ input: process.stdin });
+  let buffer = "";
+
+  rl.on("line", async (line) => {
+    try {
+      const msg = JSON.parse(line);
+
+      if (msg.method === "initialize") {
+        const response = {
+          jsonrpc: "2.0",
+          id: msg.id,
+          result: {
+            protocolVersion: "2024-11-05",
+            capabilities: { tools: {} },
+            serverInfo: { name: "sticky-note", version: VERSION },
+          },
+        };
+        process.stdout.write(JSON.stringify(response) + "\n");
+      } else if (msg.method === "notifications/initialized") {
+        // No response needed
+      } else if (msg.method === "tools/list") {
+        const response = {
+          jsonrpc: "2.0",
+          id: msg.id,
+          result: { tools },
+        };
+        process.stdout.write(JSON.stringify(response) + "\n");
+      } else if (msg.method === "tools/call") {
+        const toolName = msg.params.name;
+        const toolArgs = msg.params.arguments || {};
+        const result = await handleToolCall(toolName, toolArgs);
+        const response = {
+          jsonrpc: "2.0",
+          id: msg.id,
+          result: {
+            content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+          },
+        };
+        process.stdout.write(JSON.stringify(response) + "\n");
+      } else if (msg.id) {
+        // Unknown method with id — return error
+        const response = {
+          jsonrpc: "2.0",
+          id: msg.id,
+          error: { code: -32601, message: `Unknown method: ${msg.method}` },
+        };
+        process.stdout.write(JSON.stringify(response) + "\n");
+      }
+    } catch (err) {
+      // Parse error
+      if (line.trim()) {
+        process.stderr.write(`[sticky-note mcp] Parse error: ${err.message}\n`);
+      }
+    }
+  });
+}
+
+// ──────────────────────────────────────────────
 // Main
 // ──────────────────────────────────────────────
 
@@ -1954,6 +2532,15 @@ async function main() {
     case "checkpoint":
       cmdCheckpoint();
       break;
+    case "deploy-backend":
+      cmdDeployBackend();
+      break;
+    case "migrate":
+      await cmdMigrate();
+      break;
+    case "mcp-server":
+      await cmdMcpServer();
+      break;
     case "--version":
     case "-v":
       print(`sticky-note v${VERSION}`);
@@ -1964,7 +2551,9 @@ async function main() {
       printBanner();
       print("  Usage: npx sticky-note <command>\n");
       print("  Commands:");
-      print("    init               Interactive setup — creates V2.5 hooks and config");
+      print("    init               Interactive setup — creates hooks and config");
+      print("    init --v3          V3 setup with Cloudflare KV cloud backend");
+      print("    init --ci          Non-interactive setup for CI/GitHub Actions");
       print("    update             Update hook scripts (preserves data)");
       print("    status             Diagnostic report: threads, audit, attribution health");
       print("    threads            List open/stuck threads");
@@ -1975,8 +2564,11 @@ async function main() {
       print("    switch             Safe branch switching (auto-stashes .sticky-note/)");
       print("    gc                 Manual tombstone sweep for expired threads");
       print("    reset              Wipe all threads and start fresh (--force, --keep-audit)");
-      print("    get-line-attribution  File→thread attribution with line ranges (--file, --lines)");
-      print("    checkpoint         Set work-topic checkpoint for attribution (--topic, --show, --clear)");
+      print("    get-line-attribution  File-to-thread attribution with line ranges");
+      print("    checkpoint         Set work-topic checkpoint for attribution");
+      print("    deploy-backend     Provision Cloudflare KV backend (V3)");
+      print("    migrate            Migrate V2 local data to cloud (--to cloud)");
+      print("    mcp-server         Start MCP server (stdio transport)");
       print("");
       print("  Options:");
       print("    --version  Show version");

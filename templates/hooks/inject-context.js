@@ -54,6 +54,7 @@ const {
   getResumeThreadId, findThreadById, getSessionId,
   appendAuditLine, detectTool, getConfigPath,
   isThreadInjected, markThreadInjected, normalizeSep,
+  useCloud, cloudReadThreads, cloudWriteThread, cloudAppendAudit,
 } = utils;
 
 // ── Git helpers ───────────────────────────────────────────
@@ -254,7 +255,7 @@ function formatThread(thread, detailed) {
 
 // ── Main ──────────────────────────────────────────────────
 
-function main() {
+async function main() {
   let hookInput = {};
   try {
     const raw = require("fs").readFileSync(0, "utf-8");
@@ -272,6 +273,7 @@ function main() {
   }
 
   const sessionId = getSessionId(hookInput);
+  const cloud = useCloud();
 
   function _auditInject(result, threadsScored, threadsInjected, topScores, error) {
     threadsScored = threadsScored || 0;
@@ -290,6 +292,9 @@ function main() {
       if (topScores) entry.top_scores = topScores;
       if (error) entry.error = String(error).substring(0, 200);
       appendAuditLine(entry);
+      if (cloud) {
+        cloudAppendAudit(entry).catch(() => {});
+      }
     } catch (_) {
       // ignore
     }
@@ -297,13 +302,17 @@ function main() {
 
   // Audit the user prompt
   try {
-    appendAuditLine({
+    const promptAudit = {
       type: "user_prompt",
       user: getUser(),
       ts: new Date().toISOString(),
       session_id: sessionId,
       prompt: prompt.substring(0, 500),
-    });
+    };
+    appendAuditLine(promptAudit);
+    if (cloud) {
+      cloudAppendAudit(promptAudit).catch(() => {});
+    }
   } catch (_) {
     // ignore
   }
@@ -323,7 +332,12 @@ function main() {
     }
   }
 
-  const memory = loadJson(getMemoryPath(), { version: "2", threads: [] });
+  const memoryPath = getMemoryPath();
+  const memory = loadJson(memoryPath, { version: "2", threads: [] });
+  if (cloud) {
+    const cloudThreads = await cloudReadThreads();
+    if (cloudThreads) memory.threads = cloudThreads;
+  }
   const threads = memory.threads || [];
 
   const live = threads.filter(
@@ -391,7 +405,13 @@ function main() {
 
   if (memoryDirty) {
     try {
-      saveMemoryMerged(getMemoryPath(), memory);
+      saveMemoryMerged(memoryPath, memory);
+      if (cloud && resumeThreadId) {
+        const resumed = findThreadById(threads, resumeThreadId);
+        if (resumed) {
+          cloudWriteThread(resumed).catch(() => {});
+        }
+      }
     } catch (_) {
       // ignore
     }
@@ -507,9 +527,7 @@ function main() {
 // ── Entry point ───────────────────────────────────────────
 
 if (require.main === module) {
-  try {
-    main();
-  } catch (exc) {
+  main().catch((exc) => {
     try {
       appendAuditLine({
         type: "inject_result",
@@ -521,5 +539,5 @@ if (require.main === module) {
       // ignore
     }
     _safeExit();
-  }
+  });
 }

@@ -1,17 +1,17 @@
-# sticky-codex.ps1 - Codex wrapper for Sticky Note V2 (Windows)
+# sticky-codex.ps1 - Codex wrapper for Sticky Note V3 (Windows)
 #
 # Captures Codex stdout/stderr to a temp session log.
 # On exit: calls session-end.js with the transcript for
 # narrative + failed_approaches extraction.
+#
+# V3: If STICKY_URL is set, reads cloud context before session start
+# and writes session data to cloud on exit (via hook scripts).
 #
 # Usage:
 #   .\sticky-codex.ps1 [codex args...]
 #
 # Setup:
 #   npx sticky-note init --codex
-#
-# Limitation: Context is printed to terminal after Codex exits,
-# not injected into the Codex window. Per-prompt surfacing not available.
 
 param(
     [Parameter(ValueFromRemainingArguments = $true)]
@@ -33,6 +33,22 @@ if (-not (Test-Path $StickyDir)) {
 Write-Host ""
 Write-Host "[STICKY-NOTE] Injecting context for Codex session $SessionId"
 Write-Host ""
+
+# Load .env.sticky if it exists (for STICKY_URL and STICKY_API_KEY)
+$EnvStickyFile = Join-Path (Split-Path -Parent (Split-Path -Parent $ScriptDir)) ".env.sticky"
+if (Test-Path $EnvStickyFile) {
+    Get-Content $EnvStickyFile | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and -not $line.StartsWith("#")) {
+            $eq = $line.IndexOf("=")
+            if ($eq -gt 0) {
+                $key = $line.Substring(0, $eq).Trim()
+                $val = $line.Substring($eq + 1).Trim()
+                [Environment]::SetEnvironmentVariable($key, $val, "Process")
+            }
+        }
+    }
+}
 
 $MemoryFile = Join-Path $StickyDir "sticky-note.json"
 if (Test-Path $MemoryFile) {

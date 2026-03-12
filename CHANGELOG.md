@@ -1,5 +1,72 @@
 # Changelog
 
+## V3.0.0 (feature/v3)
+
+### New: Cloud Backend (Cloudflare KV)
+- **`sticky-server/`** — Cloudflare Worker with KV adapter (AGPL-3.0).
+  REST API: threads CRUD, append-only audit, distributed presence, team config.
+- **Adapter interface** for future backends (Supabase, D1).
+- **Auto-detected project namespacing** — one Worker deployment serves all repos
+  in an org. KV keys namespaced by git remote origin.
+- **API key authentication** via `X-Sticky-API-Key` header.
+
+### New: Cloud Transport in All Hooks
+- All 7 hook scripts gain a cloud transport layer. When `STICKY_URL` is set in
+  `.env.sticky`, hooks read/write through the cloud backend instead of local
+  files. V2.5 local file I/O is the automatic fallback.
+- `sticky-utils.js` — `cloudReadThreads()`, `cloudWriteThread()`,
+  `cloudAppendAudit()`, `cloudReadPresence()`, `cloudWritePresence()`, and more.
+- Offline fallback: one-time `[STICKY-NOTE] Cloud unreachable` warning, then
+  silent local I/O for the rest of the session.
+
+### New: Distributed Presence
+- Real-time heartbeat via `POST /presence` from `track-work.js`.
+- `session-end.js` clears presence on session close.
+- `inject-context.js` shows who's active across all machines.
+- Conflict warning when two developers edit the same file simultaneously.
+
+### New: MCP Server
+- `npx sticky-note-cli mcp-server` — stdio transport MCP server with 8 tools:
+  `get_open_threads`, `get_stuck_threads`, `search_threads`,
+  `get_session_context`, `write_thread`, `get_team_config`, `get_presence`,
+  `get_audit_trail`.
+
+### New: GitHub Action Auto-Install
+- `templates/sticky-note-install.yml` — org-wide workflow that auto-installs
+  hooks on every repo. Reads org secrets (`STICKY_URL`, `STICKY_API_KEY`) and
+  org variables (`STICKY_STALE_DAYS`, `STICKY_CONVENTIONS`, `STICKY_MCP_SERVERS`).
+- `init --ci --no-prompts` flag for non-interactive setup.
+
+### New: CLI Commands
+- `deploy-backend` — provision Cloudflare KV namespace, deploy Worker, write
+  `.env.sticky`.
+- `migrate --to cloud` — lift all V2 local data (threads, audit, presence) to
+  the cloud backend.
+- `mcp-server` — start MCP server over stdio.
+- `init --v3` — V3 setup flow with cloud backend configuration prompts.
+- `status` — now includes cloud backend reachability check.
+
+### New: Codex Cloud Injection
+- `sticky-codex.sh` and `sticky-codex.ps1` updated to read thread context
+  from cloud before session start.
+
+### Changed
+- `on-stop.js` now extracts narrative, files_touched, work_type, tool_calls,
+  and prompts from the audit trail and git diff. Previously created bare
+  threads when `session-end.js` didn't fire (common on Windows).
+
+### Documentation
+- `docs/prd-v3.md` — full product requirements document.
+- `docs/v3-migration-guide.md` — V2 → V3 migration steps.
+- `docs/org-rollout.md` — GitHub Action org rollout guide.
+- `README.md` — updated with V3 features and commands.
+
+### License
+- Client (hooks, CLI, templates): MIT (unchanged).
+- Cloud backend (`sticky-server/`): AGPL-3.0.
+
+---
+
 ## V2.5.0 (feature/v2.5)
 
 ### New: Built-in Attribution Engine

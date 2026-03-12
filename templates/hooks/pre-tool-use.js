@@ -61,6 +61,9 @@ const {
   appendAuditLine,
   isThreadInjected,
   markThreadInjected,
+  useCloud,
+  cloudAppendAudit,
+  cloudReadPresence,
 } = utils;
 
 // ── File path extraction from tool input ──────────────────
@@ -131,9 +134,32 @@ function formatThreadForInjection(threadData, file) {
   return lines.join("\n");
 }
 
+// V3: Cloud-based conflict warning
+async function _checkConflict(filePath) {
+  if (!filePath) return "";
+  try {
+    const presence = await cloudReadPresence();
+    if (!presence) return "";
+    const currentUser = getUser();
+    const conflicting = presence.filter(p => {
+      if (!p.user || p.user === currentUser) return false;
+      return (p.active_files || []).some(f =>
+        f === filePath || filePath.endsWith(f) || f.endsWith(filePath)
+      );
+    });
+    if (conflicting.length > 0) {
+      const names = conflicting.map(p => p.user).join(", ");
+      return `⚠️ [STICKY-NOTE] Conflict warning: ${names} also editing ${filePath}`;
+    }
+  } catch (_) {
+    // ignore
+  }
+  return "";
+}
+
 // ── Main ──────────────────────────────────────────────────
 
-function main() {
+async function main() {
   let hookInput = {};
   try {
     const raw = require("fs").readFileSync(0, "utf-8");
@@ -145,6 +171,7 @@ function main() {
   }
 
   const sessionId = getSessionId(hookInput);
+  const cloud = useCloud();
 
   // Extract file path from tool input
   const filePath = extractFilePath(hookInput);
@@ -163,6 +190,10 @@ function main() {
   }
 
   if (!fileAttr || !fileAttr.threads || fileAttr.threads.length === 0) {
+    if (cloud) {
+      const warning = await _checkConflict(filePath);
+      if (warning) { _emit(warning); return; }
+    }
     _emit("");
     return;
   }
@@ -173,6 +204,10 @@ function main() {
   );
 
   if (newThreads.length === 0) {
+    if (cloud) {
+      const warning = await _checkConflict(filePath);
+      if (warning) { _emit(warning); return; }
+    }
     _emit("");
     return;
   }
@@ -185,11 +220,11 @@ function main() {
     markThreadInjected(threadId, sessionId);
   }
 
-  const output = outputParts.join("\n\n");
+  let output = outputParts.join("\n\n");
 
   // Audit the injection
   try {
-    appendAuditLine({
+    const auditEntry = {
       type: "lazy_inject",
       user: getUser(),
       ts: new Date().toISOString(),
@@ -200,9 +235,19 @@ function main() {
         const id = t.thread ? t.thread.id : t.id;
         return (id || "").substring(0, 8);
       }),
-    });
+    };
+    appendAuditLine(auditEntry);
+    if (cloud) {
+      cloudAppendAudit(auditEntry).catch(() => {});
+    }
   } catch (_) {
     // ignore
+  }
+
+  // V3: Cloud-based conflict warning
+  if (cloud) {
+    const warning = await _checkConflict(filePath);
+    if (warning) output += "\n\n" + warning;
   }
 
   _emit(output);
@@ -211,9 +256,5 @@ function main() {
 // ── Entry point ───────────────────────────────────────────
 
 if (require.main === module) {
-  try {
-    main();
-  } catch (_) {
-    _safeExit();
-  }
+  main().catch(() => _safeExit());
 }

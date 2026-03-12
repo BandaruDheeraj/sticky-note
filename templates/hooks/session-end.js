@@ -58,6 +58,11 @@ const {
   clearActiveResumeThreadId,
   clearInjectedSet,
   normalizeSep,
+  useCloud,
+  cloudReadThreads,
+  cloudWriteThread,
+  cloudAppendAudit,
+  cloudDeletePresence,
 } = utils;
 
 // ── Constants ─────────────────────────────────────────────
@@ -725,7 +730,7 @@ function clearPresence(user) {
 
 // ── Main ──────────────────────────────────────────────────
 
-function main() {
+async function main() {
   let hookInput = {};
   try {
     const raw = fs.readFileSync(0, "utf-8");
@@ -741,8 +746,13 @@ function main() {
   const now = new Date().toISOString();
   const branch = getBranch();
 
+  const cloud = useCloud();
   const memoryPath = getMemoryPath();
   const memory = loadJson(memoryPath, { version: "2", project: "", threads: [] });
+  if (cloud) {
+    const cloudThreads = await cloudReadThreads();
+    if (cloudThreads) memory.threads = cloudThreads;
+  }
   const config = loadJson(getConfigPath(), { stale_days: 14 });
   const staleDays = config.stale_days || 14;
 
@@ -914,26 +924,42 @@ function main() {
     auditEntry.commit_shas = commitShas;
   }
   appendAuditLine(auditEntry);
+  if (cloud) {
+    cloudAppendAudit(auditEntry).catch(() => {});
+  }
 
   // V2.5: Also write individual commit_sha audit entries for bridge lookup
   for (const sha of commitShas) {
-    appendAuditLine({
+    const commitEntry = {
       type: "commit",
       user,
       ts: now,
       session_id: sessionId,
       commit_sha: sha,
-    });
+    };
+    appendAuditLine(commitEntry);
+    if (cloud) {
+      cloudAppendAudit(commitEntry).catch(() => {});
+    }
   }
   // Only clear transient files for true session end (Claude Code).
   // Copilot CLI fires per-turn; clearing would break state across turns.
   if (!isCopilotCli) {
     clearPresence(user);
+    if (cloud) {
+      cloudDeletePresence(user).catch(() => {});
+    }
     clearSessionFile();
     clearHeadFile();
     clearInjectedSet();
   }
   saveMemoryMerged(memoryPath, memory);
+  if (cloud) {
+    const threadToSync = threads.find(t => t.session_id === sessionId);
+    if (threadToSync) {
+      cloudWriteThread(threadToSync).catch(() => {});
+    }
+  }
 
   const fileCount = filesTouched.length;
   const commitCount = commitShas.length;
@@ -947,8 +973,4 @@ function main() {
   process.exit(0);
 }
 
-try {
-  main();
-} catch (_) {
-  _safeExit();
-}
+main().catch(() => _safeExit());

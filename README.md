@@ -42,6 +42,21 @@ their next session by relevance.
 
 ---
 
+## What's New in V3
+
+- **Cloud backend (optional)**: Cloudflare KV-backed storage for real-time handoff — no git push/pull required. Hooks auto-detect `STICKY_URL` and switch between cloud and local mode.
+- **Distributed presence**: Real-time heartbeat across all machines. See who's active *right now*, not at the time of your last pull. Conflict warnings when two developers edit the same file.
+- **HTTP audit API**: Query audit trail by project, file, user, tool, and date range via cloud endpoints. No more grepping JSONL files.
+- **MCP server**: 8 tools (`get_open_threads`, `get_stuck_threads`, `search_threads`, `get_session_context`, `write_thread`, `get_team_config`, `get_presence`, `get_audit_trail`) available via `npx sticky-note-cli mcp-server`.
+- **GitHub Action auto-install**: Zero-touch org rollout via `sticky-note-install.yml`. Org secrets provide cloud config, repos get hooks on first push.
+- **Codex cloud injection**: Codex wrapper reads thread context from cloud before session start — no longer blind to teammate activity.
+- **New CLI commands**: `deploy-backend`, `migrate --to cloud`, `mcp-server`, `init --v3`, `init --ci --no-prompts`
+- **Backward compatible**: Without `STICKY_URL`, everything works exactly like V2.5. Cloud is opt-in.
+
+See [V3 Migration Guide](docs/v3-migration-guide.md) and [Org Rollout Guide](docs/org-rollout.md).
+
+---
+
 ## What's New in V2.5
 
 - **Smart injection (two-tier)**: Stuck threads injected eagerly at session start; all other threads injected lazily when you first touch a file they authored — via built-in git blame attribution
@@ -310,11 +325,16 @@ CLAUDE.md                         # AI instructions for Claude Code
 ## CLI Commands
 
 ```bash
-npx sticky-note-cli init           # Interactive setup
-npx sticky-note-cli init --codex   # Setup with Codex wrapper
-npx sticky-note-cli update         # Update hook scripts (preserves data)
-npx sticky-note-cli status         # Diagnostic report (includes attribution health)
-npx sticky-note-cli threads        # List threads with status icons
+npx sticky-note-cli init               # Interactive setup
+npx sticky-note-cli init --v3          # V3 setup with cloud backend config
+npx sticky-note-cli init --ci          # Non-interactive for CI/GitHub Action
+npx sticky-note-cli init --codex       # Setup with Codex wrapper
+npx sticky-note-cli update             # Update hook scripts (preserves data)
+npx sticky-note-cli deploy-backend     # Provision Cloudflare KV + deploy Worker
+npx sticky-note-cli migrate --to cloud # Migrate V2 local data to cloud
+npx sticky-note-cli mcp-server         # Start MCP server (stdio transport)
+npx sticky-note-cli status             # Diagnostic report (includes cloud health)
+npx sticky-note-cli threads            # List threads with status icons
 npx sticky-note-cli resume         # List resumable threads
 npx sticky-note-cli resume <id>    # Resume a previous thread
 npx sticky-note-cli resume --clear # Cancel active resume
@@ -446,7 +466,9 @@ A: Run `npx sticky-note-cli init --codex`, then alias the wrapper:
 
 ## License
 
-[MIT](LICENSE) — fully open source, no restrictions.
+Client (hooks, CLI, templates): [MIT](LICENSE) — fully open source, no restrictions.
+
+Cloud backend (`sticky-server/`): [AGPL-3.0](sticky-server/LICENSE)
 
 ---
 

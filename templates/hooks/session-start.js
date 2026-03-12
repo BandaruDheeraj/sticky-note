@@ -47,6 +47,11 @@ const {
   markThreadInjected,
   clearActiveResumeThreadId,
   getActiveResumeThreadId,
+  useCloud,
+  cloudReadThreads,
+  cloudReadPresence,
+  cloudReadConfig,
+  cloudAppendAudit,
 } = utils;
 
 // ── Stale-thread ageing ───────────────────────────────────
@@ -204,7 +209,7 @@ function formatPresence(presenceData) {
 
 // ── Main ──────────────────────────────────────────────────
 
-function main() {
+async function main() {
   let hookInput = {};
   try {
     if (!process.stdin.isTTY) {
@@ -235,13 +240,24 @@ function main() {
   // Migrate legacy single-file audit/presence to per-user dirs
   migrateAuditAndPresence();
 
+  const cloud = useCloud();
   const memoryPath = getMemoryPath();
   const memory = loadJson(memoryPath, {
     version: "2",
     project: "",
     threads: [],
   });
-  const config = loadJson(getConfigPath(), { stale_days: 14 });
+  if (cloud) {
+    const cloudThreads = await cloudReadThreads();
+    if (cloudThreads) memory.threads = cloudThreads;
+  }
+  let config;
+  if (cloud) {
+    config = await cloudReadConfig();
+  }
+  if (!config) {
+    config = loadJson(getConfigPath(), { stale_days: 14 });
+  }
   const staleDays = config.stale_days != null ? config.stale_days : 14;
 
   ageStaleThreads(memory, staleDays);
@@ -279,7 +295,20 @@ function main() {
   const threadResult = formatThreadsForInjection(memory.threads || []);
   const threadContext = threadResult.text;
   const configContext = formatConfigForInjection(config);
-  const presenceData = loadAllPresence();
+  let presenceData;
+  if (cloud) {
+    const cloudPresence = await cloudReadPresence();
+    if (cloudPresence) {
+      presenceData = {};
+      for (const entry of cloudPresence) {
+        const u = entry.user || entry.name;
+        if (u) presenceData[u] = entry;
+      }
+    }
+  }
+  if (!presenceData) {
+    presenceData = loadAllPresence();
+  }
   const presenceContext = formatPresence(presenceData);
 
   // V2.5: Mark eagerly-injected stuck threads so PreToolUse won't re-inject
@@ -287,12 +316,16 @@ function main() {
     markThreadInjected(threadId, sessionId);
   }
 
-  appendAuditLine({
+  const auditEntry = {
     type: "session_start",
     user: getUser(),
     ts: new Date().toISOString(),
     session_id: sessionId,
-  });
+  };
+  appendAuditLine(auditEntry);
+  if (cloud) {
+    cloudAppendAudit(auditEntry).catch(() => {});
+  }
 
   saveMemoryMerged(memoryPath, memory);
 
@@ -388,8 +421,4 @@ function main() {
 
 // ── Entry point ───────────────────────────────────────────
 
-try {
-  main();
-} catch (_) {
-  _safeExit();
-}
+main().catch(() => _safeExit());
