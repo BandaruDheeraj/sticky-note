@@ -1373,6 +1373,282 @@ function _relativeTime(tsStr) {
 }
 
 // ──────────────────────────────────────────────
+// OVERLAP command — detect file overlaps with open/stuck threads
+// ──────────────────────────────────────────────
+
+function cmdOverlap() {
+  const args = process.argv.slice(3);
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+
+  if (!fs.existsSync(memoryPath)) {
+    print("  [ERR] No sticky-note.json found. Run `npx sticky-note init` first.");
+    process.exit(1);
+  }
+
+  printBanner();
+
+  // Get files to check: either --files flag or git diff
+  let filesToCheck = new Set();
+  const filesIdx = args.indexOf("--files");
+  if (filesIdx !== -1 && args.length > filesIdx + 1) {
+    for (const f of args.slice(filesIdx + 1)) {
+      if (f.startsWith("--")) break;
+      filesToCheck.add(_normSep(f));
+    }
+  } else {
+    // Use git diff (uncommitted + recent commits)
+    try {
+      const uncommitted = execSync("git diff --name-only", {
+        encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
+      for (const f of uncommitted.split(/\r?\n/)) {
+        if (f.trim()) filesToCheck.add(_normSep(f.trim()));
+      }
+    } catch (_) {}
+    try {
+      const staged = execSync("git diff --name-only --cached", {
+        encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
+      for (const f of staged.split(/\r?\n/)) {
+        if (f.trim()) filesToCheck.add(_normSep(f.trim()));
+      }
+    } catch (_) {}
+    const diffTargets = ["HEAD~5", "HEAD~1"];
+    for (const target of diffTargets) {
+      try {
+        const result = execSync(`git diff --name-only ${target}`, {
+          encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+        }).trim();
+        for (const f of result.split(/\r?\n/)) {
+          if (f.trim()) filesToCheck.add(_normSep(f.trim()));
+        }
+        break;
+      } catch (_) {}
+    }
+  }
+
+  if (filesToCheck.size === 0) {
+    print("  No modified files detected. Use --files <file1> <file2> to check specific files.\n");
+    return;
+  }
+
+  const currentUserNames = _getCurrentUserNames();
+  const isMe = (user) => currentUserNames.has(user || "");
+  const memory = readJsonSafe(memoryPath, { threads: [] });
+  const threads = (memory.threads || []).filter(
+    (t) => t.status === "open" || t.status === "stuck"
+  );
+
+  // Find overlaps
+  const overlaps = [];
+  for (const thread of threads) {
+    const threadFiles = (thread.files_touched || []).map(_normSep);
+    const threadFileSet = new Set(threadFiles);
+    const matching = [];
+    for (const f of filesToCheck) {
+      if (threadFileSet.has(f)) matching.push(f);
+    }
+    if (matching.length > 0) {
+      overlaps.push({ thread, matching });
+    }
+  }
+
+  print(`  Checking ${filesToCheck.size} file(s) against ${threads.length} open/stuck thread(s):\n`);
+
+  if (overlaps.length === 0) {
+    print("  ✅ No overlaps found. You're clear to work.\n");
+    return;
+  }
+
+  // Sort: other users first, then stuck before open, then by overlap count
+  overlaps.sort((a, b) => {
+    const aOther = !isMe(a.thread.user) ? 1 : 0;
+    const bOther = !isMe(b.thread.user) ? 1 : 0;
+    if (aOther !== bOther) return bOther - aOther;
+    if (a.thread.status !== b.thread.status) {
+      return a.thread.status === "stuck" ? -1 : 1;
+    }
+    return b.matching.length - a.matching.length;
+  });
+
+  for (const { thread, matching } of overlaps) {
+    const user = thread.user || thread.author || "unknown";
+    const icon = statusIcon(thread.status);
+    const isSelf = isMe(user);
+    const prefix = isSelf ? "  " : "  ⚠️ ";
+    const suffix = isSelf ? " (you)" : "";
+    const narrative = thread.narrative || thread.last_note || "";
+    const narrativeSnip = narrative.length > 80
+      ? narrative.substring(0, 80) + "…"
+      : narrative;
+    const branch = thread.branch ? ` on ${thread.branch}` : "";
+    const ago = thread.last_activity_at ? _relativeTime(thread.last_activity_at) : "";
+    const agoLabel = ago ? ` (${ago})` : "";
+
+    print(`${prefix}${icon} ${user}${suffix}${branch}${agoLabel}`);
+    if (narrativeSnip) {
+      print(`         "${narrativeSnip}"`);
+    }
+    print(`         overlapping: ${matching.join(", ")}`);
+    if (thread.failed_approaches && thread.failed_approaches.length > 0) {
+      print(`         ⚠️  ${thread.failed_approaches.length} failed approach(es)`);
+    }
+    const threadId = (thread.id || "").substring(0, 8);
+    if (!isSelf && threadId) {
+      print(`         → npx sticky-note resume ${threadId}`);
+    }
+    print("");
+  }
+
+  const otherUserOverlaps = overlaps.filter(
+    (o) => !isMe(o.thread.user)
+  );
+  if (otherUserOverlaps.length > 0) {
+    print(`  ⚠️  ${otherUserOverlaps.length} thread(s) from other users overlap with your files.`);
+    print("  Consider coordinating before diving in.\n");
+  }
+}
+
+function _normSep(p) {
+  return typeof p === "string" ? p.replace(/\\/g, "/") : p;
+}
+
+function _getGitUserName() {
+  try {
+    return execSync("git config user.name", {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+  } catch (_) {
+    return process.env.USER || process.env.USERNAME || "unknown";
+  }
+}
+
+function _getCurrentUserNames() {
+  const names = new Set();
+  const envUser = process.env.USER || process.env.USERNAME || "";
+  if (envUser) names.add(envUser);
+  try {
+    const gitName = execSync("git config user.name", {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    if (gitName) names.add(gitName);
+  } catch (_) {}
+  try {
+    const gitEmail = execSync("git config user.email", {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    if (gitEmail) names.add(gitEmail);
+  } catch (_) {}
+  return names;
+}
+
+// ──────────────────────────────────────────────
+// CLAIM command — declare intent to work on files
+// ──────────────────────────────────────────────
+
+function cmdClaim() {
+  const args = process.argv.slice(3);
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+
+  if (!fs.existsSync(memoryPath)) {
+    print("  [ERR] No sticky-note.json found. Run `npx sticky-note init` first.");
+    process.exit(1);
+  }
+
+  // Parse: npx sticky-note claim <file1> [file2...] "description"
+  // or: npx sticky-note claim --clear
+  if (args.includes("--clear")) {
+    const memory = readJsonSafe(memoryPath, { threads: [], claims: [] });
+    const userNames = _getCurrentUserNames();
+    const before = (memory.claims || []).length;
+    memory.claims = (memory.claims || []).filter((c) => !userNames.has(c.user));
+    const removed = before - memory.claims.length;
+    fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2));
+    print(`  [OK] Cleared ${removed} claim(s).`);
+    return;
+  }
+
+  if (args.includes("--list")) {
+    const memory = readJsonSafe(memoryPath, { threads: [], claims: [] });
+    const claims = memory.claims || [];
+    if (claims.length === 0) {
+      print("  No active claims.");
+      return;
+    }
+    printBanner();
+    print("  Active Claims:\n");
+    for (const c of claims) {
+      const ago = c.claimed_at ? _relativeTime(c.claimed_at) : "";
+      const agoLabel = ago ? ` (${ago})` : "";
+      print(`  📌 ${c.user}${agoLabel}: ${c.files.join(", ")}`);
+      if (c.description) print(`      "${c.description}"`);
+    }
+    print("");
+    return;
+  }
+
+  if (args.length === 0) {
+    print("  Usage: npx sticky-note claim <file1> [file2...] \"description\"");
+    print("         npx sticky-note claim --list");
+    print("         npx sticky-note claim --clear");
+    return;
+  }
+
+  // Parse files and description (last quoted arg or last arg is description)
+  const files = [];
+  let description = "";
+  for (const a of args) {
+    if (a.startsWith("--")) continue;
+    // If it looks like a file path (has a dot or slash), treat as file
+    if (a.includes("/") || a.includes("\\") || a.includes(".")) {
+      files.push(_normSep(a));
+    } else {
+      // Treat as part of description
+      description += (description ? " " : "") + a;
+    }
+  }
+
+  if (files.length === 0) {
+    print("  [ERR] No files specified. Usage: npx sticky-note claim <file> \"description\"");
+    return;
+  }
+
+  const currentUser = process.env.USER || process.env.USERNAME || _getGitUserName();
+  const userNames = _getCurrentUserNames();
+  const memory = readJsonSafe(memoryPath, { threads: [], claims: [] });
+  if (!memory.claims) memory.claims = [];
+
+  // Remove existing claims from this user for these files
+  memory.claims = memory.claims.filter(
+    (c) => !userNames.has(c.user) || !c.files.some((f) => files.includes(f))
+  );
+
+  memory.claims.push({
+    user: currentUser,
+    files,
+    description,
+    claimed_at: new Date().toISOString(),
+    branch: _getCurrentBranch(),
+  });
+
+  fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2));
+  print(`  ✅ Claimed ${files.join(", ")}${description ? ` — "${description}"` : ""}`);
+  print(`  Others will see this at session start. Commit + push to share.`);
+}
+
+function _getCurrentBranch() {
+  try {
+    return execSync("git rev-parse --abbrev-ref HEAD", {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+  } catch (_) {
+    return "";
+  }
+}
+
+// ──────────────────────────────────────────────
 // SWITCH command — safe branch switching
 // ──────────────────────────────────────────────
 
@@ -1954,6 +2230,12 @@ async function main() {
     case "checkpoint":
       cmdCheckpoint();
       break;
+    case "overlap":
+      cmdOverlap();
+      break;
+    case "claim":
+      cmdClaim();
+      break;
     case "--version":
     case "-v":
       print(`sticky-note v${VERSION}`);
@@ -1977,6 +2259,8 @@ async function main() {
       print("    reset              Wipe all threads and start fresh (--force, --keep-audit)");
       print("    get-line-attribution  File→thread attribution with line ranges (--file, --lines)");
       print("    checkpoint         Set work-topic checkpoint for attribution (--topic, --show, --clear)");
+      print("    overlap            Detect file overlaps with open/stuck threads");
+      print("    claim              Claim ownership of files you're working on (--list, --clear)");
       print("");
       print("  Options:");
       print("    --version  Show version");

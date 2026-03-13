@@ -47,6 +47,7 @@ const {
   markThreadInjected,
   clearActiveResumeThreadId,
   getActiveResumeThreadId,
+  normalizeSep,
 } = utils;
 
 // ── Stale-thread ageing ───────────────────────────────────
@@ -181,9 +182,26 @@ function loadAllPresence() {
   return data;
 }
 
-function formatPresence(presenceData) {
+function formatPresence(presenceData, threads) {
   const now = Date.now();
   const active = [];
+
+  // Build a map of user → most recent open/stuck thread
+  const userThreads = {};
+  for (const t of (threads || [])) {
+    if (t.status !== "open" && t.status !== "stuck") continue;
+    const user = t.user || t.author || "";
+    if (!user) continue;
+    const existing = userThreads[user];
+    if (!existing) {
+      userThreads[user] = t;
+    } else {
+      const existingTs = existing.last_activity_at || existing.created_at || "";
+      const thisTs = t.last_activity_at || t.created_at || "";
+      if (thisTs > existingTs) userThreads[user] = t;
+    }
+  }
+
   for (const [user, info] of Object.entries(presenceData || {})) {
     const lastSeen = info.last_seen || "";
     if (!lastSeen) continue;
@@ -192,7 +210,20 @@ function formatPresence(presenceData) {
       if (isNaN(ts)) continue;
       if (now - ts < 15 * 60 * 1000) {
         const files = (info.active_files || []).slice(0, 3).join(", ");
-        active.push(`- **${user}** active on: ${files}`);
+        const thread = userThreads[user];
+        let line = `- **${user}**`;
+        if (thread) {
+          const narrative = thread.narrative || thread.last_note || "";
+          const snip = narrative.length > 60
+            ? narrative.substring(0, 60) + "…"
+            : narrative;
+          const status = thread.status === "stuck" ? " [STUCK]" : "";
+          line += `${status}: ${snip || files}`;
+          if (snip && files) line += ` (${files})`;
+        } else {
+          line += ` active on: ${files}`;
+        }
+        active.push(line);
       }
     } catch (_) {
       continue;
@@ -200,6 +231,128 @@ function formatPresence(presenceData) {
   }
   if (active.length === 0) return "";
   return "\n## Active Now\n" + active.join("\n");
+}
+
+// ── Overlap detection ─────────────────────────────────────
+
+function getRecentlyModifiedFiles() {
+  const files = new Set();
+  const diffTargets = ["HEAD~5", "HEAD~1"];
+  for (const target of diffTargets) {
+    try {
+      const result = require("child_process").execSync(
+        `git diff --name-only ${target}`,
+        { encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] }
+      );
+      for (const f of result.trim().split(/\r?\n/)) {
+        const trimmed = f.trim();
+        if (trimmed) files.add(normalizeSep(trimmed));
+      }
+      break;
+    } catch (_) {}
+  }
+  try {
+    const result = require("child_process").execSync("git diff --name-only", {
+      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+    });
+    for (const f of result.trim().split(/\r?\n/)) {
+      const trimmed = f.trim();
+      if (trimmed) files.add(normalizeSep(trimmed));
+    }
+  } catch (_) {}
+  try {
+    const result = require("child_process").execSync(
+      "git diff --name-only --cached",
+      { encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] }
+    );
+    for (const f of result.trim().split(/\r?\n/)) {
+      const trimmed = f.trim();
+      if (trimmed) files.add(normalizeSep(trimmed));
+    }
+  } catch (_) {}
+  return files;
+}
+
+function detectOverlaps(threads, currentUser) {
+  const modifiedFiles = getRecentlyModifiedFiles();
+  if (modifiedFiles.size === 0) return { warnings: [], claims: [] };
+
+  const activeThreads = (threads || []).filter(
+    (t) => t.status === "open" || t.status === "stuck"
+  );
+
+  const warnings = [];
+  for (const thread of activeThreads) {
+    const threadUser = thread.user || thread.author || "";
+    if (threadUser === currentUser) continue; // skip own threads
+    const threadFiles = (thread.files_touched || []).map(normalizeSep);
+    const overlap = threadFiles.filter((f) => modifiedFiles.has(f));
+    if (overlap.length === 0) continue;
+    warnings.push({ thread, overlap });
+  }
+
+  // Sort: stuck first, then by overlap count
+  warnings.sort((a, b) => {
+    if (a.thread.status !== b.thread.status) {
+      return a.thread.status === "stuck" ? -1 : 1;
+    }
+    return b.overlap.length - a.overlap.length;
+  });
+
+  return { warnings, modifiedFiles };
+}
+
+function formatOverlapWarnings(threads, currentUser, memory) {
+  const { warnings, modifiedFiles } = detectOverlaps(threads, currentUser);
+  const claims = (memory.claims || []).filter((c) => {
+    if (c.user === currentUser) return false;
+    if (!modifiedFiles || modifiedFiles.size === 0) return false;
+    return (c.files || []).some((f) => modifiedFiles.has(normalizeSep(f)));
+  });
+
+  if (warnings.length === 0 && claims.length === 0) return "";
+
+  const lines = [
+    "## [STICKY-NOTE] ⚠️ OVERLAP DETECTED\n",
+    "Someone else is working on files you're touching:\n",
+  ];
+
+  for (const { thread, overlap } of warnings) {
+    const user = thread.user || thread.author || "unknown";
+    const status = thread.status === "stuck" ? "[STUCK]" : "[OPEN]";
+    const narrative = thread.narrative || thread.last_note || "";
+    const narrativeSnip = narrative.length > 100
+      ? narrative.substring(0, 100) + "…"
+      : narrative;
+    const branch = thread.branch ? ` on \`${thread.branch}\`` : "";
+    const threadId = (thread.id || "").substring(0, 8);
+
+    lines.push(`- ${status} **${user}**${branch}: ${overlap.join(", ")}`);
+    if (narrativeSnip) lines.push(`  _${narrativeSnip}_`);
+    const failed = thread.failed_approaches || [];
+    if (failed.length > 0) {
+      lines.push(`  ⚠️ ${failed.length} failed approach(es):`);
+      for (const fa of failed.slice(0, 2)) {
+        lines.push(`    - ${(fa.description || "").substring(0, 80)}`);
+      }
+    }
+    if (threadId) {
+      lines.push(`  → Resume: \`npx sticky-note resume ${threadId}\``);
+    }
+  }
+
+  for (const claim of claims) {
+    const ago = claim.claimed_at || "";
+    lines.push(
+      `- 📌 **${claim.user}** claimed: ${(claim.files || []).join(", ")}` +
+        (claim.description ? ` — "${claim.description}"` : "")
+    );
+  }
+
+  lines.push(
+    "\n**Consider coordinating with these teammates before starting work.**"
+  );
+  return lines.join("\n");
 }
 
 // ── Main ──────────────────────────────────────────────────
@@ -280,7 +433,10 @@ function main() {
   const threadContext = threadResult.text;
   const configContext = formatConfigForInjection(config);
   const presenceData = loadAllPresence();
-  const presenceContext = formatPresence(presenceData);
+  const presenceContext = formatPresence(presenceData, memory.threads || []);
+  const overlapContext = formatOverlapWarnings(
+    memory.threads || [], getUser(), memory
+  );
 
   // V2.5: Mark eagerly-injected stuck threads so PreToolUse won't re-inject
   for (const threadId of threadResult.threadIds) {
@@ -377,6 +533,9 @@ function main() {
     );
     parts.push(resumeLines.join("\n"));
   }
+
+  // Overlap warning comes first — most urgent signal
+  if (overlapContext) parts.push(overlapContext);
 
   if (threadContext) parts.push(threadContext);
   if (configContext) parts.push(configContext);
