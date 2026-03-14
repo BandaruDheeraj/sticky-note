@@ -590,6 +590,23 @@ function markThreadInjected(threadId, sessionId) {
   saveInjectedSet(data);
 }
 
+// ── Overlap-warned tracking (V2.6) ────────────────────────
+
+function isOverlapWarned(sessionId) {
+  const data = loadInjectedSet();
+  if (sessionId && data.session_id && data.session_id !== sessionId) {
+    return false;
+  }
+  return !!data.overlap_warned;
+}
+
+function markOverlapWarned(sessionId) {
+  const data = loadInjectedSet();
+  data.session_id = sessionId || data.session_id;
+  data.overlap_warned = true;
+  saveInjectedSet(data);
+}
+
 // ── Active resumed thread tracking (V2.5) ─────────────────
 
 const _activeResumePath = () => path.join(_stickyDir(), ".sticky-active-resume");
@@ -673,6 +690,9 @@ module.exports = {
   getActiveResumeThreadId,
   setActiveResumeThreadId,
   clearActiveResumeThreadId,
+  // V2.6: overlap warning tracking
+  isOverlapWarned,
+  markOverlapWarned,
   // V2.5: cross-platform path helper
   normalizeSep,
 };

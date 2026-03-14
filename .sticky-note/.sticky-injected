@@ -4,7 +4,13 @@
     "3fc62165-3a12-4ab6-ab7c-b148da672750",
     "75611752-0467-4947-9ea2-7e888277bfdb",
     "51ab477c-020f-4bf0-afcd-c6fbe890a6a2",
-    "067e68d1-d51a-412d-9ab6-c180dd9c0958"
+    "067e68d1-d51a-412d-9ab6-c180dd9c0958",
+    "demo-alice-overlap",
+    "eb30d7b7-a3bc-4be2-b695-355e452643fe",
+    "8894813f-5d8b-4212-8f5d-83d5893ad3f0",
+    "2e8d0b4c-d4d0-436b-9583-9935b1a608ee",
+    "bb99ca36-9a59-4c8e-a303-528101a05cdd"
   ],
-  "session_id": "test-stderr"
+  "session_id": "fcfe8c43-fa8c-457a-bdac-4d9da20af945",
+  "overlap_warned": false
 }
