@@ -1,6 +1,5 @@
 {
   "active_files": [
-    "..\\..\\..\\..\\AppData\\Local\\Temp\\1773359623102-copilot-tool-output-c37lpu.txt",
     "templates\\hooks\\session-start.js",
     "templates\\hooks\\inject-context.js",
     "templates\\hooks\\sticky-utils.js",
@@ -9,7 +8,8 @@
     "bin\\cli.js",
     "package.json",
     ".sticky-note\\audit\\dbandaru.jsonl",
-    ".github\\hooks\\hooks.json"
+    ".github\\hooks\\hooks.json",
+    "bin"
   ],
-  "last_seen": "2026-03-14T20:04:36.882Z"
+  "last_seen": "2026-03-14T20:16:39.087Z"
 }

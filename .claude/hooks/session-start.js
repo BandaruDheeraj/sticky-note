@@ -484,9 +484,13 @@ function main() {
     memory.threads || [], getUser(), memory
   );
 
-  // V2.5: Mark eagerly-injected stuck threads so PreToolUse won't re-inject
-  for (const threadId of threadResult.threadIds) {
-    markThreadInjected(threadId, sessionId);
+  // V2.5: Mark eagerly-injected stuck threads so PreToolUse won't re-inject.
+  // Skip for Copilot CLI — its sessionStart output is not surfaced to the AI,
+  // so marking threads as injected would prevent inject-context from delivering them.
+  if (!_isCopilotCli()) {
+    for (const threadId of threadResult.threadIds) {
+      markThreadInjected(threadId, sessionId);
+    }
   }
 
   appendAuditLine({
