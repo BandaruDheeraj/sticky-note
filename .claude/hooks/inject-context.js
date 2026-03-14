@@ -442,7 +442,7 @@ function main() {
   const scored = [];
   for (const t of live) {
     // V2.5: Skip threads already injected this session by PreToolUse or session-start
-    if (isThreadInjected(t.id)) continue;
+    if (isThreadInjected(t.id, sessionId)) continue;
 
     let s = scoreThread(t, recentlyModified, currentBranch, currentUser, keywords);
     if (resumeThreadId && t.id === resumeThreadId) {

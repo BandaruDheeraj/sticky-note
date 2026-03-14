@@ -169,7 +169,7 @@ function main() {
 
   // Filter out already-injected threads
   const newThreads = fileAttr.threads.filter(
-    (t) => !isThreadInjected(t.thread ? t.thread.id : t.id)
+    (t) => !isThreadInjected(t.thread ? t.thread.id : t.id, sessionId)
   );
 
   if (newThreads.length === 0) {

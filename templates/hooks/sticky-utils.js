@@ -569,8 +569,14 @@ function clearInjectedSet() {
   }
 }
 
-function isThreadInjected(threadId) {
+function isThreadInjected(threadId, sessionId) {
   const data = loadInjectedSet();
+  // Only consider threads injected in the SAME session — the file is shared
+  // across concurrent sessions and stale entries from other sessions must
+  // not suppress injection.
+  if (sessionId && data.session_id && data.session_id !== sessionId) {
+    return false;
+  }
   return (data.thread_ids || []).includes(threadId);
 }
 
