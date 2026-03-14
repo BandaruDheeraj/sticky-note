@@ -594,8 +594,16 @@ function markThreadInjected(threadId, sessionId) {
 
 function isOverlapWarned(sessionId) {
   const data = loadInjectedSet();
+  // Session-scoped check: different session → not warned
   if (sessionId && data.session_id && data.session_id !== sessionId) {
     return false;
+  }
+  // Time-based fallback: if warned more than 60s ago, treat as new session.
+  // Copilot CLI sessions share session IDs (via .sticky-session file), so
+  // we can't rely on session_id alone to distinguish separate sessions.
+  if (data.overlap_warned_at) {
+    const elapsed = Date.now() - new Date(data.overlap_warned_at).getTime();
+    if (elapsed > 60000) return false;
   }
   return !!data.overlap_warned;
 }
@@ -604,6 +612,7 @@ function markOverlapWarned(sessionId) {
   const data = loadInjectedSet();
   data.session_id = sessionId || data.session_id;
   data.overlap_warned = true;
+  data.overlap_warned_at = new Date().toISOString();
   saveInjectedSet(data);
 }
 

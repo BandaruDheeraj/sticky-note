@@ -590,31 +590,49 @@ function markThreadInjected(threadId, sessionId) {
   saveInjectedSet(data);
 }
 
-// ── Overlap-warned tracking (V2.6) ────────────────────────
+// ── Overlap signal file (V2.6.10) ─────────────────────────
+// Signal file approach: inject-context.js writes .overlap-pending with the
+// warning text. pre-tool-use.js reads+deletes it atomically and returns a
+// deny with the content. This avoids shared-state / TTL / session-ID issues.
 
-function isOverlapWarned(sessionId) {
-  const data = loadInjectedSet();
-  // Session-scoped check: different session → not warned
-  if (sessionId && data.session_id && data.session_id !== sessionId) {
+const _overlapPendingPath = () => path.join(_stickyDir(), ".overlap-pending");
+const _overlapDismissedPath = () => path.join(_stickyDir(), ".overlap-dismissed");
+
+function writeOverlapSignal(text) {
+  try {
+    fs.writeFileSync(_overlapPendingPath(), text, "utf-8");
+  } catch (_) { /* ignore */ }
+}
+
+function readAndDeleteOverlapSignal() {
+  try {
+    const content = fs.readFileSync(_overlapPendingPath(), "utf-8");
+    fs.unlinkSync(_overlapPendingPath());
+    return content || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function isOverlapDismissed(ttlMs) {
+  try {
+    const raw = fs.readFileSync(_overlapDismissedPath(), "utf-8").trim();
+    const elapsed = Date.now() - new Date(raw).getTime();
+    return elapsed < (ttlMs || 300000); // default 5 minutes
+  } catch (_) {
     return false;
   }
-  // Time-based fallback: if warned more than 60s ago, treat as new session.
-  // Copilot CLI sessions share session IDs (via .sticky-session file), so
-  // we can't rely on session_id alone to distinguish separate sessions.
-  if (data.overlap_warned_at) {
-    const elapsed = Date.now() - new Date(data.overlap_warned_at).getTime();
-    if (elapsed > 60000) return false;
-  }
-  return !!data.overlap_warned;
 }
 
-function markOverlapWarned(sessionId) {
-  const data = loadInjectedSet();
-  data.session_id = sessionId || data.session_id;
-  data.overlap_warned = true;
-  data.overlap_warned_at = new Date().toISOString();
-  saveInjectedSet(data);
+function markOverlapDismissed() {
+  try {
+    fs.writeFileSync(_overlapDismissedPath(), new Date().toISOString(), "utf-8");
+  } catch (_) { /* ignore */ }
 }
+
+// Legacy stubs — kept for API compat
+function isOverlapWarned() { return false; }
+function markOverlapWarned() { /* no-op */ }
 
 // ── Active resumed thread tracking (V2.5) ─────────────────
 
@@ -702,6 +720,11 @@ module.exports = {
   // V2.6: overlap warning tracking
   isOverlapWarned,
   markOverlapWarned,
+  // V2.6.10: overlap signal file
+  writeOverlapSignal,
+  readAndDeleteOverlapSignal,
+  isOverlapDismissed,
+  markOverlapDismissed,
   // V2.5: cross-platform path helper
   normalizeSep,
 };

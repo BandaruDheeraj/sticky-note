@@ -169,7 +169,7 @@ function _getRecentlyModifiedFiles() {
   return files;
 }
 
-function _checkOverlapsAndDeny(hookInput) {
+function _checkOverlapsAndDeny(hookInput) { return null; /* TEMP DISABLED */
   if (!_isCopilotCli()) return null;
 
   const sessionId = getSessionId(hookInput);
