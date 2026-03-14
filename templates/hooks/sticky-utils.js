@@ -590,49 +590,53 @@ function markThreadInjected(threadId, sessionId) {
   saveInjectedSet(data);
 }
 
-// ── Overlap signal file (V2.6.10) ─────────────────────────
-// Signal file approach: inject-context.js writes .overlap-pending with the
-// warning text. pre-tool-use.js reads+deletes it atomically and returns a
-// deny with the content. This avoids shared-state / TTL / session-ID issues.
+// ── Overlap warning tracking (V2.6.11) ────────────────────
+// Uses COPILOT_LOADER_PID to identify each Copilot CLI session uniquely.
+// Each session gets its own overlap-warned flag, preventing cross-session
+// poisoning. The flag file stores a JSON object keyed by PID.
 
-const _overlapPendingPath = () => path.join(_stickyDir(), ".overlap-pending");
-const _overlapDismissedPath = () => path.join(_stickyDir(), ".overlap-dismissed");
+const _overlapFlagPath = () => path.join(_stickyDir(), ".overlap-warned");
 
-function writeOverlapSignal(text) {
-  try {
-    fs.writeFileSync(_overlapPendingPath(), text, "utf-8");
-  } catch (_) { /* ignore */ }
+function _getCopilotPid() {
+  return process.env.COPILOT_LOADER_PID || null;
 }
 
-function readAndDeleteOverlapSignal() {
+function isOverlapWarned() {
+  const pid = _getCopilotPid();
+  if (!pid) return false;
   try {
-    const content = fs.readFileSync(_overlapPendingPath(), "utf-8");
-    fs.unlinkSync(_overlapPendingPath());
-    return content || null;
-  } catch (_) {
-    return null;
-  }
-}
-
-function isOverlapDismissed(ttlMs) {
-  try {
-    const raw = fs.readFileSync(_overlapDismissedPath(), "utf-8").trim();
-    const elapsed = Date.now() - new Date(raw).getTime();
-    return elapsed < (ttlMs || 300000); // default 5 minutes
+    const data = JSON.parse(fs.readFileSync(_overlapFlagPath(), "utf-8"));
+    return !!data[pid];
   } catch (_) {
     return false;
   }
 }
 
-function markOverlapDismissed() {
+function markOverlapWarned() {
+  const pid = _getCopilotPid();
+  if (!pid) return;
+  let data = {};
   try {
-    fs.writeFileSync(_overlapDismissedPath(), new Date().toISOString(), "utf-8");
+    data = JSON.parse(fs.readFileSync(_overlapFlagPath(), "utf-8"));
+  } catch (_) { /* empty or missing */ }
+  // Clean up stale PIDs (older than 1 hour)
+  const now = Date.now();
+  for (const [k, v] of Object.entries(data)) {
+    if (now - v > 3600000) delete data[k];
+  }
+  data[pid] = now;
+  try {
+    fs.writeFileSync(_overlapFlagPath(), JSON.stringify(data), "utf-8");
   } catch (_) { /* ignore */ }
 }
 
-// Legacy stubs — kept for API compat
-function isOverlapWarned() { return false; }
-function markOverlapWarned() { /* no-op */ }
+// Signal file helpers — kept for backward compat but no longer primary
+const _overlapPendingPath = () => path.join(_stickyDir(), ".overlap-pending");
+const _overlapDismissedPath = () => path.join(_stickyDir(), ".overlap-dismissed");
+function writeOverlapSignal(text) { try { fs.writeFileSync(_overlapPendingPath(), text, "utf-8"); } catch (_) {} }
+function readAndDeleteOverlapSignal() { try { const c = fs.readFileSync(_overlapPendingPath(), "utf-8"); fs.unlinkSync(_overlapPendingPath()); return c || null; } catch (_) { return null; } }
+function isOverlapDismissed(ttlMs) { try { const e = Date.now() - new Date(fs.readFileSync(_overlapDismissedPath(), "utf-8").trim()).getTime(); return e < (ttlMs || 300000); } catch (_) { return false; } }
+function markOverlapDismissed() { try { fs.writeFileSync(_overlapDismissedPath(), new Date().toISOString(), "utf-8"); } catch (_) {} }
 
 // ── Active resumed thread tracking (V2.5) ─────────────────
 

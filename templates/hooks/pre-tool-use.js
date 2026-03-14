@@ -61,8 +61,11 @@ const {
   appendAuditLine,
   isThreadInjected,
   markThreadInjected,
-  readAndDeleteOverlapSignal,
-  markOverlapDismissed,
+  isOverlapWarned,
+  markOverlapWarned,
+  getMemoryPath,
+  loadJson,
+  normalizeSep,
 } = utils;
 
 // ── File path extraction from tool input ──────────────────
@@ -133,49 +136,88 @@ function formatThreadForInjection(threadData, file) {
   return lines.join("\n");
 }
 
-// ── Overlap deny via signal file (Copilot CLI only) ───────
-// inject-context.js writes .overlap-pending with the warning text.
-// We read+delete it atomically and return a deny. No shared state,
-// no TTL, no session-ID issues.
+// ── Overlap deny via COPILOT_LOADER_PID (Copilot CLI only) ──
+// Each Copilot CLI session has a unique COPILOT_LOADER_PID env var.
+// On the first tool call, if overlaps exist, deny with the warning.
+// The warned state is keyed by PID so concurrent sessions don't interfere.
 
-function _checkOverlapSignal() {
-  if (!_isCopilotCli()) return null;
+const { execSync } = require("child_process");
 
-  const signalContent = readAndDeleteOverlapSignal();
-  if (!signalContent) return null;
-
-  // Extract a concise version for the deny reason
-  // The signal file contains the full markdown warning from detectAndFormatOverlaps
-  const lines = signalContent.split("\n").filter((l) => l.trim());
-  const denyLines = ["⚠️ OVERLAP DETECTED — someone else is working on files you're touching:"];
-  for (const line of lines) {
-    // Include lines that show user/file info (start with "- [")
-    if (line.trimStart().startsWith("- [")) {
-      denyLines.push("  " + line.trim().replace(/^- /, ""));
+function _getRecentlyModifiedFiles() {
+  const files = new Set();
+  for (const target of ["HEAD~5", "HEAD~1"]) {
+    try {
+      const result = execSync(`git diff --name-only ${target}`, {
+        encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+      });
+      for (const f of result.trim().split(/\r?\n/)) {
+        if (f.trim()) files.add(f.trim());
+      }
+      break;
+    } catch (_) { /* target doesn't exist */ }
+  }
+  try {
+    const result = execSync("git diff --name-only", {
+      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+    });
+    for (const f of result.trim().split(/\r?\n/)) {
+      if (f.trim()) files.add(f.trim());
     }
-  }
-  if (denyLines.length === 1) {
-    // Fallback: just use first 300 chars of signal
-    denyLines.push(signalContent.substring(0, 300));
-  }
-  denyLines.push("Consider coordinating before proceeding. This tool call will be auto-retried.");
+  } catch (_) { /* ignore */ }
+  return files;
+}
 
-  // Mark as dismissed so inject-context doesn't re-create signal for 5 minutes
-  markOverlapDismissed();
+function _checkOverlapsAndDeny() {
+  if (!_isCopilotCli()) return null;
+  if (!process.env.COPILOT_LOADER_PID) return null;
+  if (isOverlapWarned()) return null;
 
-  // Audit
+  let threads;
+  try {
+    const data = loadJson(getMemoryPath());
+    threads = data.threads || [];
+  } catch (_) {
+    return null;
+  }
+
+  const currentUser = getUser();
+  const modifiedFiles = _getRecentlyModifiedFiles();
+  if (modifiedFiles.size === 0) return null;
+
+  const warnings = [];
+  for (const thread of threads.filter((t) => t.status === "open" || t.status === "stuck")) {
+    const threadUser = thread.user || thread.author || "";
+    if (threadUser === currentUser) continue;
+    const threadFiles = (thread.files_touched || []).map(normalizeSep);
+    const overlap = threadFiles.filter((f) => modifiedFiles.has(f));
+    if (overlap.length > 0) warnings.push({ thread, overlap });
+  }
+
+  if (warnings.length === 0) return null;
+
+  const lines = ["⚠️ OVERLAP DETECTED — someone else is working on files you're touching:"];
+  for (const { thread, overlap } of warnings) {
+    const user = thread.user || thread.author || "unknown";
+    const status = thread.status === "stuck" ? "STUCK" : "OPEN";
+    const snip = (thread.narrative || thread.last_note || "").substring(0, 80);
+    lines.push(`  [${status}] ${user}: ${overlap.join(", ")}${snip ? " — " + snip : ""}`);
+  }
+  lines.push("Consider coordinating before proceeding. This tool call will be auto-retried.");
+
+  markOverlapWarned();
+
   try {
     appendAuditLine({
       type: "overlap_deny",
-      user: getUser(),
+      user: currentUser,
       ts: new Date().toISOString(),
-      session_id: getSessionId({}),
+      copilot_pid: process.env.COPILOT_LOADER_PID,
     });
   } catch (_) { /* ignore */ }
 
   return {
     permissionDecision: "deny",
-    permissionDecisionReason: denyLines.join("\n"),
+    permissionDecisionReason: lines.join("\n"),
   };
 }
 
@@ -195,8 +237,8 @@ function main() {
   const sessionId = getSessionId(hookInput);
 
   // ── Overlap deny gate (Copilot CLI only) ──
-  // Check if inject-context.js wrote a pending overlap signal file.
-  const denyResult = _checkOverlapSignal();
+  // Detect overlaps and deny on first tool call, keyed by COPILOT_LOADER_PID.
+  const denyResult = _checkOverlapsAndDeny();
   if (denyResult) {
     process.stdout.write(JSON.stringify(denyResult) + "\n");
     return;
