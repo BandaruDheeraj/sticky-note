@@ -1,6 +1,5 @@
 {
   "active_files": [
-    ".sticky-note\\audit\\dbandaru.jsonl",
     ".github\\hooks\\hooks.json",
     "bin",
     "templates\\copilot-instructions.md",
@@ -9,7 +8,8 @@
     "templates\\hooks\\sticky-utils.js",
     "templates\\hooks",
     "templates\\hooks\\inject-context.js",
-    "templates\\hooks\\pre-tool-use.js"
+    "templates\\hooks\\pre-tool-use.js",
+    "bin\\cli.js"
   ],
-  "last_seen": "2026-03-14T20:54:17.993Z"
+  "last_seen": "2026-03-14T21:07:54.376Z"
 }

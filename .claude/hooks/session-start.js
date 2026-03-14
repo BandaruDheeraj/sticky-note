@@ -394,6 +394,24 @@ function formatOverlapWarnings(threads, currentUser, memory) {
   lines.push(
     "\n**Consider coordinating with these teammates before starting work.**"
   );
+
+  // Write a visible banner directly to stderr so the user sees it
+  const stderrLines = ["\n⚠️  OVERLAP DETECTED — someone else is touching your files:"];
+  for (const { thread, overlap } of warnings) {
+    const user = thread.user || thread.author || "unknown";
+    const status = thread.status === "stuck" ? "STUCK" : "OPEN";
+    const narrative = thread.narrative || thread.last_note || "";
+    const narrativeSnip = narrative.length > 80
+      ? narrative.substring(0, 80) + "…"
+      : narrative;
+    stderrLines.push(
+      `   [${status}] ${user}: ${overlap.join(", ")}` +
+      (narrativeSnip ? ` — ${narrativeSnip}` : "")
+    );
+  }
+  stderrLines.push("");
+  process.stderr.write(stderrLines.join("\n") + "\n");
+
   return lines.join("\n");
 }
 

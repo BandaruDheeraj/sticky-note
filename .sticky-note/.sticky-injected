@@ -1,10 +1,10 @@
 {
   "thread_ids": [
     "0ac7c4b7-0a13-4def-b2eb-2724d5c452cb",
+    "3fc62165-3a12-4ab6-ab7c-b148da672750",
     "75611752-0467-4947-9ea2-7e888277bfdb",
     "51ab477c-020f-4bf0-afcd-c6fbe890a6a2",
-    "3fc62165-3a12-4ab6-ab7c-b148da672750",
     "067e68d1-d51a-412d-9ab6-c180dd9c0958"
   ],
-  "session_id": "fake-other-session"
+  "session_id": "test-stderr"
 }
