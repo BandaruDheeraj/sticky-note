@@ -120,6 +120,69 @@ function extractKeywords(prompt) {
   return keywords;
 }
 
+// ── Overlap detection (for Copilot CLI where session-start output is ignored) ──
+
+function detectAndFormatOverlaps(threads, currentUser) {
+  const modifiedFiles = getRecentlyModifiedFiles();
+  if (modifiedFiles.size === 0) return "";
+
+  const activeThreads = (threads || []).filter(
+    (t) => t.status === "open" || t.status === "stuck"
+  );
+
+  const warnings = [];
+  for (const thread of activeThreads) {
+    const threadUser = thread.user || thread.author || "";
+    if (threadUser === currentUser) continue;
+    const threadFiles = (thread.files_touched || []).map(normalizeSep);
+    const overlap = threadFiles.filter((f) => modifiedFiles.has(f));
+    if (overlap.length === 0) continue;
+    warnings.push({ thread, overlap });
+  }
+
+  if (warnings.length === 0) return "";
+
+  warnings.sort((a, b) => {
+    if (a.thread.status !== b.thread.status) {
+      return a.thread.status === "stuck" ? -1 : 1;
+    }
+    return b.overlap.length - a.overlap.length;
+  });
+
+  const lines = [
+    "## [STICKY-NOTE] ⚠️ OVERLAP DETECTED\n",
+    "Someone else is working on files you're touching:\n",
+  ];
+  for (const { thread, overlap } of warnings) {
+    const user = thread.user || thread.author || "unknown";
+    const status = thread.status === "stuck" ? "[STUCK]" : "[OPEN]";
+    const narrative = thread.narrative || thread.last_note || "";
+    const narrativeSnip = narrative.length > 100
+      ? narrative.substring(0, 100) + "…"
+      : narrative;
+    const branch = thread.branch ? ` on \`${thread.branch}\`` : "";
+    const threadId = (thread.id || "").substring(0, 8);
+
+    lines.push(`- ${status} **${user}**${branch}: ${overlap.join(", ")}`);
+    if (narrativeSnip) lines.push(`  _${narrativeSnip}_`);
+    const failed = thread.failed_approaches || [];
+    if (failed.length > 0) {
+      lines.push(`  ⚠️ ${failed.length} failed approach(es):`);
+      for (const fa of failed.slice(0, 2)) {
+        lines.push(`    - ${(fa.description || "").substring(0, 80)}`);
+      }
+    }
+    if (threadId) {
+      lines.push(`  → Resume: \`npx sticky-note resume ${threadId}\``);
+    }
+  }
+
+  lines.push(
+    "\n**Consider coordinating with these teammates before starting work.**\n"
+  );
+  return lines.join("\n");
+}
+
 // ── Scoring ───────────────────────────────────────────────
 
 function scoreThread(thread, recentlyModified, currentBranch, currentUser, promptKeywords) {
@@ -442,6 +505,13 @@ function main() {
   const scoringBlock = debugLines.join("\n");
 
   if (scored.length === 0) {
+    // Even with no scored threads, check for overlaps
+    const overlapWarning = detectAndFormatOverlaps(threads, currentUser);
+    if (overlapWarning) {
+      _auditInject("no_scored_threads", 0);
+      _emit(overlapWarning);
+      return;
+    }
     _auditInject("no_scored_threads", 0);
     _emit("");
     return;
@@ -491,6 +561,12 @@ function main() {
 
   let output = outputLines.join("\n").trim();
   output += scoringBlock;
+
+  // Prepend overlap warning if other users' threads touch the same files
+  const overlapWarning = detectAndFormatOverlaps(threads, currentUser);
+  if (overlapWarning) {
+    output = overlapWarning + "\n" + output;
+  }
 
   _auditInject(
     "injected",
