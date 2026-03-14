@@ -1,15 +1,15 @@
 {
   "active_files": [
-    ".claude\\hooks\\inject-context.js",
-    ".claude\\hooks\\pre-tool-use.js",
-    ".claude\\hooks\\session-start.js",
+    "..\\..\\..\\..\\..\\..",
+    "src",
+    "..\\..\\..\\..\\AppData\\Local\\Temp\\1773359623102-copilot-tool-output-c37lpu.txt",
+    "templates\\hooks\\session-start.js",
+    "templates\\hooks\\inject-context.js",
+    "templates\\hooks\\sticky-utils.js",
+    "..\\..\\..\\..\\.copilot\\session-state\\6ba0a6b6-d8e5-4a8a-9a45-ac4ddbe13a85\\plan.md",
+    "templates\\sticky-note-config.json",
     "bin\\cli.js",
-    ".git\\hooks",
-    ".gitattributes",
-    "templates\\hooks\\post-rewrite.js",
-    "templates\\hooks\\sticky-git-notes.js",
-    ".git\\hooks\\post-rewrite",
-    "templates\\hooks\\sticky-utils.js"
+    "package.json"
   ],
-  "last_seen": "2026-03-09T13:48:15.220Z"
+  "last_seen": "2026-03-14T19:24:51.381Z"
 }
