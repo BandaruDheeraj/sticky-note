@@ -1,7 +1,5 @@
 {
   "active_files": [
-    "..\\..\\..\\..\\..\\..",
-    "src",
     "..\\..\\..\\..\\AppData\\Local\\Temp\\1773359623102-copilot-tool-output-c37lpu.txt",
     "templates\\hooks\\session-start.js",
     "templates\\hooks\\inject-context.js",
@@ -9,7 +7,9 @@
     "..\\..\\..\\..\\.copilot\\session-state\\6ba0a6b6-d8e5-4a8a-9a45-ac4ddbe13a85\\plan.md",
     "templates\\sticky-note-config.json",
     "bin\\cli.js",
-    "package.json"
+    "package.json",
+    ".sticky-note\\audit\\dbandaru.jsonl",
+    ".github\\hooks\\hooks.json"
   ],
-  "last_seen": "2026-03-14T19:24:51.381Z"
+  "last_seen": "2026-03-14T19:47:49.699Z"
 }

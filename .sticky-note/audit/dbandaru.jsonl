@@ -2585,3 +2585,74 @@
 {"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:25:36.997Z","tool":"view","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":".sticky-note\\audit\\dbandaru.jsonl"}
 {"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:25:50.445Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
 {"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:26:03.429Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:26:17.495Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-14T19:26:23.808Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","status":"open","files_touched":["templates\\hooks\\session-start.js","templates\\sticky-note-config.json","bin\\cli.js","templates\\hooks\\inject-context.js","package.json",".sticky-note\\audit\\dbandaru.jsonl",".claude/hooks/on-stop.js",".claude/hooks/session-start.js",".sticky-note/.sticky-checkpoint"],"work_type":"general","commit_shas":["342697584c6f0b6b8701ab569c4b22494498a0ce"]}
+{"type":"commit","user":"dbandaru","ts":"2026-03-14T19:26:23.808Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","commit_sha":"342697584c6f0b6b8701ab569c4b22494498a0ce"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-14T19:26:47.246Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"ok how can I live test this works now?"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-14T19:26:48.159Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"ok how can I live test this works now?","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T19:26:51.926Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:27:12.491Z","tool":"report_intent","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:27:16.479Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:27:38.051Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:27:51.389Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T19:28:01.877Z","session_id":"fcfe8c43-fa8c-457a-bdac-4d9da20af945"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:28:02.896Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:28:16.560Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:28:29.625Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-14T19:28:35.075Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","status":"open","files_touched":["templates\\hooks\\session-start.js","templates\\sticky-note-config.json","bin\\cli.js","templates\\hooks\\inject-context.js","package.json",".sticky-note\\audit\\dbandaru.jsonl",".sticky-note/.sticky-checkpoint"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-14T19:34:34.261Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"how can I see that overlap detected myseld?"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-14T19:34:34.798Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"how can I see that overlap detected myseld?","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T19:34:38.356Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-14T19:34:57.563Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","status":"open","files_touched":["templates\\hooks\\session-start.js","templates\\sticky-note-config.json","bin\\cli.js","templates\\hooks\\inject-context.js","package.json",".sticky-note\\audit\\dbandaru.jsonl",".sticky-note/.sticky-checkpoint"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-14T19:37:03.328Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"yeah just started a new session on this repo in copilot, what do I have to do to see that message"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-14T19:37:04.342Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"yeah just started a new session on this repo in copilot, what do I have to do to see that message","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T19:37:08.063Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:37:25.886Z","tool":"report_intent","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:37:27.307Z","tool":"view","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":".github\\hooks\\hooks.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:37:32.959Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-14T19:37:43.634Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","status":"open","files_touched":["templates\\hooks\\session-start.js","templates\\sticky-note-config.json","bin\\cli.js","templates\\hooks\\inject-context.js","package.json",".sticky-note\\audit\\dbandaru.jsonl",".github\\hooks\\hooks.json",".sticky-note/.sticky-checkpoint"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-14T19:39:42.432Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"yeah inject a fake thread"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-14T19:39:42.979Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"yeah inject a fake thread","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T19:39:46.870Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:39:59.277Z","tool":"report_intent","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:40:02.718Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-14T19:40:09.016Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","status":"open","files_touched":["templates\\hooks\\session-start.js","templates\\sticky-note-config.json","bin\\cli.js","templates\\hooks\\inject-context.js","package.json",".sticky-note\\audit\\dbandaru.jsonl",".github\\hooks\\hooks.json",".sticky-note/.sticky-checkpoint"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-14T19:41:38.057Z","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","prompt":"read cli.js"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-14T19:41:38.916Z","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","prompt":"read cli.js","result":"injected","threads_scored":1,"threads_injected":1,"top_scores":[{"id":"demo-ali","score":15}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T19:41:42.630Z","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:41:50.970Z","tool":"report_intent","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:41:52.254Z","tool":"glob","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-14T19:41:56.405Z","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","status":"open","files_touched":[".sticky-note/.sticky-checkpoint"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-14T19:42:06.096Z","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","prompt":"give me an explanation of cli.js"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-14T19:42:06.947Z","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","prompt":"give me an explanation of cli.js","result":"injected","threads_scored":1,"threads_injected":1,"top_scores":[{"id":"a4b6ed90","score":8}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T19:42:09.952Z","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:42:20.678Z","tool":"report_intent","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:42:21.959Z","tool":"view","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:42:32.228Z","tool":"view","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:42:38.662Z","tool":"powershell","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:42:53.811Z","tool":"view","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:42:55.017Z","tool":"view","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:42:57.091Z","tool":"view","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:42:58.702Z","tool":"view","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:43:14.292Z","tool":"view","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:43:15.402Z","tool":"view","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:43:17.389Z","tool":"view","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:43:18.864Z","tool":"view","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:43:20.047Z","tool":"view","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","file":"bin\\cli.js"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-14T19:43:42.317Z","session_id":"d5437cc9-83e3-4dc6-b41a-6d06c67a4d24","status":"open","files_touched":["bin\\cli.js",".sticky-note/.sticky-checkpoint"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-14T19:44:53.641Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"nope nothing showed up  give me an explanation of cli.js\n\n◐ The user wants me to read and explain the cli.js file. Let me read it first.\n\n● Read bin\\cli.js\n  └ 1 line read\n\n◐ The file is 79KB - quite large. Let me read it in sections to understand its structure.\n\n● Let me read it in sections since it's a large file (79KB).\n\n● Read bin\\cli.js lines 1-100\n  └ 100 lines read\n\n● Count lines in cli.js\n  $ (Get-Content \"C:\\Users\\dbandaru\\OneDrive - Microsoft\\Desktop\\Projects\\sticky-note\\bin\\cli.js\").C"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-14T19:44:54.274Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"nope nothing showed up  give me an explanation of cli.js\n\n◐ The user wants me to read and explain the cli.js file. Let m","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T19:44:58.741Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:45:22.502Z","tool":"report_intent","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:45:26.103Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:45:28.219Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:46:04.241Z","tool":"grep","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\hooks\\session-start.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:46:22.136Z","tool":"grep","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\hooks\\inject-context.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:46:33.969Z","tool":"view","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\hooks\\session-start.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:46:44.106Z","tool":"view","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\hooks\\session-start.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:47:02.369Z","tool":"edit","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\hooks\\session-start.js","lines_changed":["14-26","29-29","591-591"],"checkpoint_topic":"nope nothing showed up  give me an explanation of cli.js\n\n◐ The user wants me to read and explain the cli.js file. Let me read it first.\n\n● Read bin\\cli.js\n  └ 1 line read\n\n◐ The file is 79KB - quite "}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:47:04.707Z","tool":"edit","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\hooks\\session-start.js","lines_changed":["14-26","29-29","591-591"],"checkpoint_topic":"nope nothing showed up  give me an explanation of cli.js\n\n◐ The user wants me to read and explain the cli.js file. Let me read it first.\n\n● Read bin\\cli.js\n  └ 1 line read\n\n◐ The file is 79KB - quite "}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T19:47:25.149Z","session_id":"fcfe8c43-fa8c-457a-bdac-4d9da20af945"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:47:27.948Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:47:35.409Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T19:47:49.692Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}

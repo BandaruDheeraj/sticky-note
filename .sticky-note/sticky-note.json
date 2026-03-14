@@ -532,7 +532,7 @@
       "branch": "main",
       "created_at": "2026-03-14T18:19:12.242Z",
       "closed_at": null,
-      "last_activity_at": "2026-03-14T19:23:29.144Z",
+      "last_activity_at": "2026-03-14T19:40:09.016Z",
       "files_touched": [
         "templates\\hooks\\session-start.js",
         "templates\\sticky-note-config.json",
@@ -540,10 +540,15 @@
         "templates/sticky-note-config.json",
         "bin\\cli.js",
         "templates\\hooks\\inject-context.js",
-        "package.json"
+        "package.json",
+        ".sticky-note\\audit\\dbandaru.jsonl",
+        ".claude/hooks/on-stop.js",
+        ".claude/hooks/session-start.js",
+        ".sticky-note/.sticky-checkpoint",
+        ".github\\hooks\\hooks.json"
       ],
-      "last_note": "are we ready to test this overlap feature live in this session? ... (7 prompts total) ... you have to use BandaruDheeraj",
-      "narrative": "are we ready to test this overlap feature live in this session? ... (7 prompts total) ... you have to use BandaruDheeraj",
+      "last_note": "are we ready to test this overlap feature live in this session? ... (12 prompts total) ... yeah inject a fake thread",
+      "narrative": "are we ready to test this overlap feature live in this session? ... (12 prompts total) ... yeah inject a fake thread",
       "failed_approaches": [],
       "handoff_summary": "",
       "related_session_ids": [],
@@ -553,40 +558,101 @@
       "work_type": "general",
       "activities": [
         "edited 3 file(s)",
-        "touched 5 file(s)",
-        "7 prompt(s)"
+        "touched 7 file(s)",
+        "12 prompt(s)"
       ],
       "tool_calls": {
-        "report_intent": 40,
-        "view": 24,
-        "sql": 7,
-        "powershell": 165,
-        "task": 16,
-        "ask_user": 15,
-        "edit": 15,
-        "grep": 8
+        "report_intent": 97,
+        "view": 56,
+        "sql": 12,
+        "powershell": 422,
+        "task": 31,
+        "ask_user": 30,
+        "edit": 30,
+        "grep": 28
       },
       "prompts": [
-        "yeah this doesn't seem right since all copilot cli threads can't just remain open forever?",
-        "test it end 2 end",
-        "are we ready to test this overlap feature live in this session?",
-        "describe to be again how we define if a thread is open vs. closed",
-        "yeah this doesn't seem right since all copilot cli threads can't just remain open forever?",
         "test it end 2 end",
         "yes, and just to confirm overlap only shows active open threads that overlap right we still lazy inject context from all relevant threads?",
+        "ok go ahead and merge this into main and push a new npm package",
+        "you have to use BandaruDheeraj",
+        "did you update the sticky note version here on this repo",
+        "ok how can I live test this works now?",
+        "how can I see that overlap detected myseld?",
+        "yeah just started a new session on this repo in copilot, what do I have to do to see that message",
         "are we ready to test this overlap feature live in this session?",
         "describe to be again how we define if a thread is open vs. closed",
         "yeah this doesn't seem right since all copilot cli threads can't just remain open forever?",
         "test it end 2 end",
         "yes, and just to confirm overlap only shows active open threads that overlap right we still lazy inject context from all relevant threads?",
         "ok go ahead and merge this into main and push a new npm package",
-        "are we ready to test this overlap feature live in this session?",
-        "describe to be again how we define if a thread is open vs. closed",
-        "yeah this doesn't seem right since all copilot cli threads can't just remain open forever?",
-        "test it end 2 end",
-        "yes, and just to confirm overlap only shows active open threads that overlap right we still lazy inject context from all relevant threads?",
-        "ok go ahead and merge this into main and push a new npm package",
-        "you have to use BandaruDheeraj"
+        "you have to use BandaruDheeraj",
+        "did you update the sticky note version here on this repo",
+        "ok how can I live test this works now?",
+        "how can I see that overlap detected myseld?",
+        "yeah just started a new session on this repo in copilot, what do I have to do to see that message",
+        "yeah inject a fake thread"
+      ],
+      "contributors": [
+        "dbandaru"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "demo-alice-overlap",
+      "status": "stuck",
+      "tool": "claude-code",
+      "user": "alice",
+      "branch": "main",
+      "narrative": "fixing auth bug in session-start hook - token refresh failing silently",
+      "files_touched": [
+        "templates/hooks/session-start.js",
+        "bin/cli.js",
+        "templates/hooks/inject-context.js"
+      ],
+      "created_at": "2026-03-14T19:40:01.514Z",
+      "last_activity_at": "2026-03-14T19:40:01.514Z",
+      "failed_approaches": [
+        "tried adding retry logic but tokens expire mid-request"
+      ],
+      "handoff_summary": "Need to investigate why refreshToken returns 200 but token is stale"
+    },
+    {
+      "id": "a4b6ed90-7882-4217-b47d-591fa0c74248",
+      "user": "dbandaru",
+      "project": "",
+      "status": "open",
+      "branch": "main",
+      "created_at": "2026-03-14T19:41:56.405Z",
+      "closed_at": null,
+      "last_activity_at": "2026-03-14T19:43:42.317Z",
+      "files_touched": [
+        ".sticky-note/.sticky-checkpoint",
+        "bin\\cli.js"
+      ],
+      "last_note": "read cli.js -> give me an explanation of cli.js",
+      "narrative": "read cli.js -> give me an explanation of cli.js",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "d5437cc9-83e3-4dc6-b41a-6d06c67a4d24",
+      "work_type": "general",
+      "activities": [
+        "touched 1 file(s)",
+        "2 prompt(s)"
+      ],
+      "tool_calls": {
+        "report_intent": 3,
+        "glob": 2,
+        "view": 11,
+        "powershell": 1
+      },
+      "prompts": [
+        "read cli.js",
+        "read cli.js",
+        "give me an explanation of cli.js"
       ],
       "contributors": [
         "dbandaru"

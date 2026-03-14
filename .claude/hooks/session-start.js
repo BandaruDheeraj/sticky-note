@@ -11,9 +11,22 @@
 const crypto = require("crypto");
 const path = require("path");
 
+function _isCopilotCli() {
+  return process.argv.includes("--copilot-cli") || !!process.env.COPILOT_CLI;
+}
+
+function _emit(text) {
+  if (text === undefined) text = "";
+  if (_isCopilotCli()) {
+    process.stdout.write(JSON.stringify({ additionalContext: text }) + "\n");
+  } else {
+    process.stdout.write(JSON.stringify({ output: text }) + "\n");
+  }
+}
+
 function _safeExit() {
   try {
-    process.stdout.write(JSON.stringify({ output: "" }) + "\n");
+    _emit("");
   } catch (_) {
     process.stdout.write('{"output":""}\n');
   }
@@ -575,7 +588,7 @@ function main() {
   if (presenceContext) parts.push(presenceContext);
 
   const output = parts.join("\n").trim();
-  process.stdout.write(JSON.stringify({ output }) + "\n");
+  _emit(output);
 }
 
 // ── Entry point ───────────────────────────────────────────
