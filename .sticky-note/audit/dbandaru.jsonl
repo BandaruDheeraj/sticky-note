@@ -3119,3 +3119,98 @@
 {"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:38:32.395Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
 {"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:39:08.842Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
 {"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:39:30.377Z","tool":"edit","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"package.json","lines_changed":["3-3"],"checkpoint_topic":"explain cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:40:04.359Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:40:48.946Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:41:22.039Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-14T22:41:54.302Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","status":"open","files_touched":["templates\\hooks\\session-start.js","templates\\sticky-note-config.json","bin\\cli.js","templates\\hooks\\inject-context.js","package.json",".sticky-note\\audit\\dbandaru.jsonl",".github\\hooks\\hooks.json","templates\\copilot-instructions.md","templates\\CLAUDE.md","templates\\hooks\\sticky-utils.js","templates\\hooks","templates\\hooks\\pre-tool-use.js",".claude/hooks/inject-context.js",".claude/hooks/pre-tool-use.js",".claude/hooks/sticky-utils.js",".sticky-note/.sticky-checkpoint","templates/hooks/inject-context.js","templates/hooks/pre-tool-use.js","templates/hooks/sticky-utils.js"],"work_type":"general","commit_shas":["e7ceecda05d08ee0e05a61e239f30fdebcd01196"]}
+{"type":"commit","user":"dbandaru","ts":"2026-03-14T22:41:54.302Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","commit_sha":"e7ceecda05d08ee0e05a61e239f30fdebcd01196"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-14T22:50:05.325Z","session_id":"7ead3a43-266a-4296-81ec-17707e754a1c","prompt":"explain cli.js"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-14T22:50:08.305Z","session_id":"7ead3a43-266a-4296-81ec-17707e754a1c","prompt":"explain cli.js","result":"injected","threads_scored":21,"threads_injected":5,"top_scores":[{"id":"0ac7c4b7","score":41.4},{"id":"3fc62165","score":39},{"id":"75611752","score":30.6},{"id":"51ab477c","score":30.3},{"id":"067e68d1","score":24.4}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T22:50:14.592Z","session_id":"7ead3a43-266a-4296-81ec-17707e754a1c"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:50:41.950Z","tool":"report_intent","session_id":"7ead3a43-266a-4296-81ec-17707e754a1c"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:50:45.544Z","tool":"glob","session_id":"7ead3a43-266a-4296-81ec-17707e754a1c"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:50:52.027Z","tool":"powershell","session_id":"7ead3a43-266a-4296-81ec-17707e754a1c"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:51:00.126Z","tool":"view","session_id":"7ead3a43-266a-4296-81ec-17707e754a1c","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:51:09.166Z","tool":"view","session_id":"7ead3a43-266a-4296-81ec-17707e754a1c","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:51:22.731Z","tool":"task","session_id":"7ead3a43-266a-4296-81ec-17707e754a1c"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:52:01.765Z","tool":"read_agent","session_id":"7ead3a43-266a-4296-81ec-17707e754a1c"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-14T22:52:16.568Z","session_id":"7ead3a43-266a-4296-81ec-17707e754a1c","status":"open","files_touched":["bin\\cli.js",".claude/hooks/inject-context.js",".claude/hooks/pre-tool-use.js",".claude/hooks/sticky-utils.js",".sticky-note/.sticky-checkpoint"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-14T22:52:49.375Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"nope still not seeing it  Environment loaded: 2 custom instructions, 1 MCP server, 1 plugin, 9 \n  skills\n\n● All permissions are now enabled. Tool, path, and URL requests will be\n   automatically approved.\n\n❯ explain cli.js\n\n◐ The user wants me to explain the `cli.js` file. Let me first check \n  for sticky-note context as instructed, and find the cli.js file.\n\n● Glob \"**/cli.js\"\n  └ 1 file found\n\n● Check for sticky-note context\n  $ if (Test-Path \".sticky-note\\sticky-note.json\") { Get-Content \n  \""}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-14T22:52:52.525Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"nope still not seeing it  Environment loaded: 2 custom instructions, 1 MCP server, 1 plugin, 9 \n  skills\n\n● All permissi","result":"injected","threads_scored":22,"threads_injected":5,"top_scores":[{"id":"0ac7c4b7","score":48.4},{"id":"75611752","score":47.6},{"id":"3fc62165","score":47},{"id":"51ab477c","score":37.3},{"id":"067e68d1","score":34.4}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T22:52:59.508Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:53:36.978Z","tool":"report_intent","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:53:56.167Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T22:55:16.719Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-14T23:09:49.433Z","session_id":"2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49","prompt":"explain cli.js"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-14T23:09:50.687Z","session_id":"2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49","prompt":"explain cli.js","result":"injected","threads_scored":22,"threads_injected":5,"top_scores":[{"id":"0ac7c4b7","score":41.4},{"id":"3fc62165","score":39},{"id":"75611752","score":30.6},{"id":"51ab477c","score":30.3},{"id":"067e68d1","score":24.4}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T23:09:55.186Z","session_id":"2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:10:15.225Z","tool":"report_intent","session_id":"2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:10:17.309Z","tool":"glob","session_id":"2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:10:25.315Z","tool":"powershell","session_id":"2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:10:39.224Z","tool":"view","session_id":"2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:10:44.767Z","tool":"powershell","session_id":"2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:10:57.140Z","tool":"view","session_id":"2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:11:01.166Z","tool":"powershell","session_id":"2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:11:14.641Z","tool":"task","session_id":"2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:13:06.836Z","tool":"read_agent","session_id":"2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-14T23:13:21.667Z","session_id":"2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49","status":"open","files_touched":["bin\\cli.js",".claude/hooks/inject-context.js",".claude/hooks/pre-tool-use.js",".claude/hooks/sticky-utils.js",".sticky-note/.sticky-checkpoint"],"work_type":"general"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:15:00.295Z","tool":"ask_user","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:15:43.447Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:16:37.275Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-14T23:17:26.134Z","session_id":"a57f5c06-9e31-4606-bd9f-b3e288329f93","prompt":"explain cli.js"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-14T23:17:28.490Z","session_id":"a57f5c06-9e31-4606-bd9f-b3e288329f93","prompt":"explain cli.js","result":"injected","threads_scored":23,"threads_injected":5,"top_scores":[{"id":"0ac7c4b7","score":41.4},{"id":"3fc62165","score":39},{"id":"75611752","score":30.6},{"id":"51ab477c","score":30.3},{"id":"067e68d1","score":24.4}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T23:17:34.128Z","session_id":"a57f5c06-9e31-4606-bd9f-b3e288329f93"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:17:55.338Z","tool":"task","session_id":"a57f5c06-9e31-4606-bd9f-b3e288329f93"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:17:58.024Z","tool":"report_intent","session_id":"a57f5c06-9e31-4606-bd9f-b3e288329f93"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:19:06.204Z","tool":"read_agent","session_id":"a57f5c06-9e31-4606-bd9f-b3e288329f93"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-14T23:19:17.801Z","session_id":"a57f5c06-9e31-4606-bd9f-b3e288329f93","status":"open","files_touched":[".claude/hooks/inject-context.js",".claude/hooks/pre-tool-use.js",".claude/hooks/sticky-utils.js",".sticky-note/.sticky-checkpoint"],"work_type":"general"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:19:35.527Z","tool":"ask_user","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:20:01.119Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:21:00.935Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:21:38.257Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"overlap_deny","user":"dbandaru","ts":"2026-03-14T23:22:00.106Z","copilot_pid":"30044"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:22:01.595Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:22:31.996Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-14T23:22:53.812Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","status":"open","files_touched":["templates\\hooks\\session-start.js","templates\\sticky-note-config.json","bin\\cli.js","templates\\hooks\\inject-context.js","package.json",".sticky-note\\audit\\dbandaru.jsonl",".github\\hooks\\hooks.json","templates\\copilot-instructions.md","templates\\CLAUDE.md","templates\\hooks\\sticky-utils.js","templates\\hooks","templates\\hooks\\pre-tool-use.js",".claude/hooks/inject-context.js",".claude/hooks/pre-tool-use.js",".claude/hooks/sticky-utils.js",".sticky-note/.sticky-checkpoint"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-14T23:23:56.284Z","session_id":"274e28e4-69bc-45ae-8710-fb4f6c746b2d","prompt":"explain cli.js"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-14T23:23:59.039Z","session_id":"274e28e4-69bc-45ae-8710-fb4f6c746b2d","prompt":"explain cli.js","result":"injected","threads_scored":24,"threads_injected":5,"top_scores":[{"id":"0ac7c4b7","score":41.4},{"id":"3fc62165","score":39},{"id":"75611752","score":30.6},{"id":"51ab477c","score":30.3},{"id":"067e68d1","score":24.4}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T23:24:04.300Z","session_id":"274e28e4-69bc-45ae-8710-fb4f6c746b2d"}
+{"type":"overlap_deny","user":"dbandaru","ts":"2026-03-14T23:24:14.794Z","copilot_pid":"22664"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:24:19.809Z","tool":"report_intent","session_id":"274e28e4-69bc-45ae-8710-fb4f6c746b2d"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:24:21.641Z","tool":"view","session_id":"274e28e4-69bc-45ae-8710-fb4f6c746b2d"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:24:23.720Z","tool":"glob","session_id":"274e28e4-69bc-45ae-8710-fb4f6c746b2d"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:24:30.444Z","tool":"view","session_id":"274e28e4-69bc-45ae-8710-fb4f6c746b2d","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:24:37.465Z","tool":"view","session_id":"274e28e4-69bc-45ae-8710-fb4f6c746b2d","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:24:48.018Z","tool":"task","session_id":"274e28e4-69bc-45ae-8710-fb4f6c746b2d"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:25:46.506Z","tool":"read_agent","session_id":"274e28e4-69bc-45ae-8710-fb4f6c746b2d"}
+{"type":"session_end","user":"dbandaru","ts":"2026-03-14T23:26:03.509Z","session_id":"274e28e4-69bc-45ae-8710-fb4f6c746b2d","status":"open","files_touched":["bin\\cli.js",".claude/hooks/inject-context.js",".claude/hooks/pre-tool-use.js",".claude/hooks/sticky-utils.js",".sticky-note/.sticky-checkpoint"],"work_type":"general"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-03-14T23:26:26.077Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"just ran it again not seeing any overlap banner?"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-03-14T23:26:27.612Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","prompt":"just ran it again not seeing any overlap banner?","result":"injected","threads_scored":25,"threads_injected":5,"top_scores":[{"id":"3fc62165","score":26},{"id":"0ac7c4b7","score":21.3},{"id":"51ab477c","score":20.3},{"id":"a0d6f133","score":18},{"id":"e4f890bb","score":18}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-03-14T23:26:31.905Z","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"overlap_deny","user":"dbandaru","ts":"2026-03-14T23:27:08.102Z","copilot_pid":"30044"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:27:10.893Z","tool":"report_intent","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:27:24.317Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:29:55.851Z","tool":"ask_user","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:30:29.663Z","tool":"report_intent","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:30:33.075Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:31:09.079Z","tool":"grep","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\copilot-instructions.md"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:31:45.690Z","tool":"view","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\hooks\\pre-tool-use.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:32:00.729Z","tool":"view","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\hooks\\pre-tool-use.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:32:11.274Z","tool":"view","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\hooks\\inject-context.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:32:21.682Z","tool":"view","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\hooks\\inject-context.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:32:33.351Z","tool":"view","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\hooks\\inject-context.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:32:43.977Z","tool":"view","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\copilot-instructions.md"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:33:16.831Z","tool":"edit","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\hooks\\pre-tool-use.js","lines_changed":["198-201","206-208","210-210"],"checkpoint_topic":"just ran it again not seeing any overlap banner?"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:33:31.625Z","tool":"edit","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\hooks\\inject-context.js","lines_changed":["153-155"],"checkpoint_topic":"just ran it again not seeing any overlap banner?"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:33:52.644Z","tool":"edit","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\copilot-instructions.md","lines_changed":["170-179","197-197"],"checkpoint_topic":"just ran it again not seeing any overlap banner?"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:34:19.268Z","tool":"grep","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\CLAUDE.md"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:34:36.257Z","tool":"edit","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"templates\\CLAUDE.md","lines_changed":["192-200","211-211"],"checkpoint_topic":"just ran it again not seeing any overlap banner?"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:34:48.473Z","tool":"view","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"package.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:35:02.546Z","tool":"edit","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890","file":"package.json","lines_changed":["3-3"],"checkpoint_topic":"just ran it again not seeing any overlap banner?"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:35:25.753Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:35:41.101Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:35:59.639Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:36:15.641Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"overlap_deny","user":"dbandaru","ts":"2026-03-14T23:36:26.072Z","copilot_pid":"30044"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:36:27.333Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-03-14T23:36:42.972Z","tool":"powershell","session_id":"01ac84d5-adc6-449f-ab9d-f06f10ad7890"}

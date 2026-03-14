@@ -1,6 +1,5 @@
 {
   "active_files": [
-    "templates\\hooks\\session-start.js",
     "templates\\CLAUDE.md",
     "templates\\hooks\\sticky-utils.js",
     "templates\\hooks",
@@ -9,7 +8,8 @@
     "bin\\cli.js",
     ".sticky-note\\sticky-note.json",
     ".github\\hooks\\hooks.json",
-    "package.json"
+    "package.json",
+    "templates\\copilot-instructions.md"
   ],
-  "last_seen": "2026-03-14T22:39:30.844Z"
+  "last_seen": "2026-03-14T23:36:42.978Z"
 }

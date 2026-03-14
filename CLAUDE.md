@@ -189,9 +189,15 @@ if set up by `npx sticky-note init`.
 ### ⚠️ Overlap warnings (CRITICAL — always surface these)
 
 Sticky-note hooks detect when your files overlap with other teammates'
-open or stuck threads. When you see `[STICKY-NOTE] ⚠️ OVERLAP DETECTED`
-in your injected context, you **MUST** start your response with this
-exact banner format before doing ANYTHING else:
+open or stuck threads. Overlap warnings arrive through TWO channels:
+
+1. **Injected context** — `[STICKY-NOTE] ⚠️ OVERLAP DETECTED` appears in
+   your hook output. This fires on every user prompt.
+2. **Tool call deny** — Your first tool call may be denied with a reason
+   containing "CRITICAL INSTRUCTION" and the overlap details.
+
+When you receive an overlap warning through EITHER channel, you **MUST**
+start your response with this exact banner format before doing ANYTHING else:
 
 ```
 ⚠️ Overlap detected: [user] is working on [files] — [narrative summary]
@@ -202,6 +208,7 @@ Rules:
 - This banner MUST be the **very first thing** in your response
 - Do NOT bury it at the end or in a footnote
 - Do NOT rephrase it as "Also noted..." or "By the way..."
+- If a tool call was denied with overlap info, display the warning then proceed
 - Then continue with the user's actual request normally
 
 This pattern exists to prevent two teammates from wasting hours on the

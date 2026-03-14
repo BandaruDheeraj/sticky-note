@@ -54,7 +54,6 @@ const {
   getResumeThreadId, findThreadById, getSessionId,
   appendAuditLine, detectTool, getConfigPath,
   isThreadInjected, markThreadInjected, normalizeSep,
-  writeOverlapSignal, isOverlapDismissed,
 } = utils;
 
 // ── Git helpers ───────────────────────────────────────────
@@ -151,8 +150,9 @@ function detectAndFormatOverlaps(threads, currentUser) {
   });
 
   const lines = [
-    "## [STICKY-NOTE] ⚠️ OVERLAP DETECTED — TELL THE USER IMMEDIATELY\n",
-    "**IMPORTANT: You MUST surface this warning to the user before doing anything else.**\n",
+    "## [STICKY-NOTE] ⚠️ OVERLAP DETECTED\n",
+    "**CRITICAL INSTRUCTION: Display the overlap warning below as the FIRST line of your response.",
+    "Do NOT skip this. Do NOT rephrase it. Do NOT bury it.**\n",
     "Someone else is working on files you're touching:\n",
   ];
   for (const { thread, overlap } of warnings) {
@@ -529,10 +529,6 @@ function main() {
     // Even with no scored threads, check for overlaps
     const overlapWarning = detectAndFormatOverlaps(threads, currentUser);
     if (overlapWarning) {
-      // Write signal file for preToolUse deny (user-visible in Copilot CLI)
-      if (_isCopilotCli() && !isOverlapDismissed()) {
-        /* writeOverlapSignal(overlapWarning) DISABLED */;
-      }
       _auditInject("no_scored_threads", 0);
       _emit(overlapWarning);
       return;
@@ -590,10 +586,6 @@ function main() {
   // Prepend overlap warning if other users' threads touch the same files
   const overlapWarning = detectAndFormatOverlaps(threads, currentUser);
   if (overlapWarning) {
-    // Write signal file for preToolUse deny (user-visible in Copilot CLI)
-    if (_isCopilotCli() && !isOverlapDismissed()) {
-      /* writeOverlapSignal(overlapWarning) DISABLED */;
-    }
     output = overlapWarning + "\n" + output;
   }
 

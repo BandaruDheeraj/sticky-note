@@ -195,14 +195,19 @@ function _checkOverlapsAndDeny() {
 
   if (warnings.length === 0) return null;
 
-  const lines = ["⚠️ OVERLAP DETECTED — someone else is working on files you're touching:"];
+  const lines = [
+    "CRITICAL INSTRUCTION: Before doing anything else, display the following overlap warning to the user.",
+    "This is NOT optional. Show it as the FIRST line of your response.\n",
+  ];
   for (const { thread, overlap } of warnings) {
     const user = thread.user || thread.author || "unknown";
     const status = thread.status === "stuck" ? "STUCK" : "OPEN";
     const snip = (thread.narrative || thread.last_note || "").substring(0, 80);
-    lines.push(`  [${status}] ${user}: ${overlap.join(", ")}${snip ? " — " + snip : ""}`);
+    const threadId = (thread.id || "").substring(0, 8);
+    lines.push(`⚠️ Overlap detected: ${user} is working on ${overlap.join(", ")}${snip ? " — " + snip : ""}`);
+    lines.push(`   Status: ${status} | Resume: npx sticky-note resume ${threadId}`);
   }
-  lines.push("Consider coordinating before proceeding. This tool call will be auto-retried.");
+  lines.push("\nAfter displaying the warning, continue with the user's request. This tool call will be auto-retried.");
 
   markOverlapWarned();
 

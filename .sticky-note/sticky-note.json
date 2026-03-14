@@ -308,9 +308,9 @@
       "project": "",
       "status": "closed",
       "branch": "main",
-      "created_at": "2026-03-11T20:27:55.590Z",
+      "created_at": "2026-03-11T20:27:55.59Z",
       "closed_at": "2026-03-14T18:39:37.448Z",
-      "last_activity_at": "2026-03-11T20:27:55.590Z",
+      "last_activity_at": "2026-03-11T20:27:55.59Z",
       "files_touched": [],
       "last_note": "create a new branch called",
       "narrative": "create a new branch called",
@@ -532,7 +532,7 @@
       "branch": "main",
       "created_at": "2026-03-14T18:19:12.242Z",
       "closed_at": null,
-      "last_activity_at": "2026-03-14T22:13:53.299Z",
+      "last_activity_at": "2026-03-14T23:22:53.812Z",
       "files_touched": [
         "templates\\hooks\\session-start.js",
         "templates\\sticky-note-config.json",
@@ -562,8 +562,8 @@
         "templates/hooks/pre-tool-use.js",
         "templates/hooks/sticky-utils.js"
       ],
-      "last_note": "are we ready to test this overlap feature live in this session? ... (24 prompts total) ... not sure how this worked for you during a test because this is not working at all in the live testin",
-      "narrative": "are we ready to test this overlap feature live in this session? ... (24 prompts total) ... not sure how this worked for you during a test because this is not working at all in the live testin",
+      "last_note": "are we ready to test this overlap feature live in this session? ... (26 prompts total) ... nope still not seeing it  Environment loaded: 2 custom instructions, 1 MCP server, 1 plugin, 9 \n  sk",
+      "narrative": "are we ready to test this overlap feature live in this session? ... (26 prompts total) ... nope still not seeing it  Environment loaded: 2 custom instructions, 1 MCP server, 1 plugin, 9 \n  sk",
       "failed_approaches": [],
       "handoff_summary": "",
       "related_session_ids": [],
@@ -572,21 +572,21 @@
       "session_id": "01ac84d5-adc6-449f-ab9d-f06f10ad7890",
       "work_type": "general",
       "activities": [
-        "edited 38 file(s)",
+        "edited 45 file(s)",
         "touched 12 file(s)",
-        "24 prompt(s)"
+        "26 prompt(s)"
       ],
       "tool_calls": {
-        "report_intent": 366,
-        "view": 432,
-        "sql": 24,
-        "powershell": 1567,
-        "task": 72,
-        "ask_user": 96,
-        "edit": 255,
-        "grep": 188,
-        "web_search": 10,
-        "web_fetch": 5
+        "report_intent": 433,
+        "view": 546,
+        "sql": 26,
+        "powershell": 1878,
+        "task": 80,
+        "ask_user": 114,
+        "edit": 345,
+        "grep": 230,
+        "web_search": 14,
+        "web_fetch": 7
       },
       "prompts": [
         "are we ready to test this overlap feature live in this session?",
@@ -624,8 +624,10 @@
       "narrative": "fixing auth bug in session-start hook - token refresh failing silently",
       "files_touched": [
         "templates/hooks/session-start.js",
-        "bin/cli.js",
-        "templates/hooks/inject-context.js"
+        "templates/hooks/inject-context.js",
+        "templates/hooks/pre-tool-use.js",
+        "templates/hooks/sticky-utils.js",
+        "bin/cli.js"
       ],
       "created_at": "2026-03-14T19:40:01.514Z",
       "last_activity_at": "2026-03-14T19:40:01.514Z",
@@ -725,7 +727,7 @@
       "branch": "main",
       "created_at": "2026-03-14T20:08:17.635Z",
       "closed_at": null,
-      "last_activity_at": "2026-03-14T20:11:03.550Z",
+      "last_activity_at": "2026-03-14T20:11:03.55Z",
       "files_touched": [
         ".sticky-note/.sticky-checkpoint",
         "bin",
@@ -1094,6 +1096,180 @@
       "prompts": [
         "explain cli.js",
         "explain cli.js",
+        "explain cli.js"
+      ],
+      "contributors": [
+        "dbandaru"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "5cd2803b-3253-42d3-9b85-368af048c7f4",
+      "user": "dbandaru",
+      "project": "",
+      "status": "open",
+      "branch": "main",
+      "created_at": "2026-03-14T22:52:16.568Z",
+      "closed_at": null,
+      "last_activity_at": "2026-03-14T22:52:16.568Z",
+      "files_touched": [
+        "bin\\cli.js",
+        ".claude/hooks/inject-context.js",
+        ".claude/hooks/pre-tool-use.js",
+        ".claude/hooks/sticky-utils.js",
+        ".sticky-note/.sticky-checkpoint"
+      ],
+      "last_note": "explain cli.js",
+      "narrative": "explain cli.js",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "7ead3a43-266a-4296-81ec-17707e754a1c",
+      "work_type": "general",
+      "activities": [
+        "touched 1 file(s)",
+        "1 prompt(s)"
+      ],
+      "tool_calls": {
+        "report_intent": 1,
+        "glob": 1,
+        "powershell": 1,
+        "view": 2,
+        "task": 1,
+        "read_agent": 1
+      },
+      "prompts": [
+        "explain cli.js"
+      ],
+      "contributors": [
+        "dbandaru"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "4ca8cab2-e7ea-46ac-800c-deed44509793",
+      "user": "dbandaru",
+      "project": "",
+      "status": "open",
+      "branch": "main",
+      "created_at": "2026-03-14T23:13:21.667Z",
+      "closed_at": null,
+      "last_activity_at": "2026-03-14T23:13:21.667Z",
+      "files_touched": [
+        "bin\\cli.js",
+        ".claude/hooks/inject-context.js",
+        ".claude/hooks/pre-tool-use.js",
+        ".claude/hooks/sticky-utils.js",
+        ".sticky-note/.sticky-checkpoint"
+      ],
+      "last_note": "explain cli.js",
+      "narrative": "explain cli.js",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "2ac9eb15-c10c-4ceb-adbc-f951b5bc9c49",
+      "work_type": "general",
+      "activities": [
+        "touched 1 file(s)",
+        "1 prompt(s)"
+      ],
+      "tool_calls": {
+        "report_intent": 1,
+        "glob": 1,
+        "powershell": 3,
+        "view": 2,
+        "task": 1,
+        "read_agent": 1
+      },
+      "prompts": [
+        "explain cli.js"
+      ],
+      "contributors": [
+        "dbandaru"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "e4f890bb-b742-47c4-a0bf-790aa12add42",
+      "user": "dbandaru",
+      "project": "",
+      "status": "open",
+      "branch": "main",
+      "created_at": "2026-03-14T23:19:17.801Z",
+      "closed_at": null,
+      "last_activity_at": "2026-03-14T23:19:17.801Z",
+      "files_touched": [
+        ".claude/hooks/inject-context.js",
+        ".claude/hooks/pre-tool-use.js",
+        ".claude/hooks/sticky-utils.js",
+        ".sticky-note/.sticky-checkpoint"
+      ],
+      "last_note": "explain cli.js",
+      "narrative": "explain cli.js",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "a57f5c06-9e31-4606-bd9f-b3e288329f93",
+      "work_type": "general",
+      "activities": [
+        "1 prompt(s)"
+      ],
+      "tool_calls": {
+        "task": 1,
+        "report_intent": 1,
+        "read_agent": 1
+      },
+      "prompts": [
+        "explain cli.js"
+      ],
+      "contributors": [
+        "dbandaru"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "a0d6f133-2a89-4302-a00b-de63b6c98547",
+      "user": "dbandaru",
+      "project": "",
+      "status": "open",
+      "branch": "main",
+      "created_at": "2026-03-14T23:26:03.509Z",
+      "closed_at": null,
+      "last_activity_at": "2026-03-14T23:26:03.509Z",
+      "files_touched": [
+        "bin\\cli.js",
+        ".claude/hooks/inject-context.js",
+        ".claude/hooks/pre-tool-use.js",
+        ".claude/hooks/sticky-utils.js",
+        ".sticky-note/.sticky-checkpoint"
+      ],
+      "last_note": "explain cli.js",
+      "narrative": "explain cli.js",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "274e28e4-69bc-45ae-8710-fb4f6c746b2d",
+      "work_type": "general",
+      "activities": [
+        "touched 1 file(s)",
+        "1 prompt(s)"
+      ],
+      "tool_calls": {
+        "report_intent": 1,
+        "view": 3,
+        "glob": 1,
+        "task": 1,
+        "read_agent": 1
+      },
+      "prompts": [
         "explain cli.js"
       ],
       "contributors": [
