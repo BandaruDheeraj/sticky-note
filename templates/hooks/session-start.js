@@ -76,6 +76,34 @@ function ageStaleThreads(memory, staleDays) {
   return changed;
 }
 
+// Auto-close Copilot CLI threads that have been inactive beyond a threshold.
+// Copilot CLI has no session-end signal, so threads stay open indefinitely.
+// This closes them after configurable inactivity (default 24h).
+function autoCloseCopilotCliThreads(memory, autoCloseHours) {
+  const now = Date.now();
+  let changed = false;
+  for (const thread of memory.threads || []) {
+    if (thread.status !== "open") continue;
+    if (thread.tool !== "copilot-cli") continue;
+    const tsField =
+      thread.last_activity_at || thread.updated_at || thread.created_at || "";
+    if (!tsField) continue;
+    try {
+      const ts = new Date(tsField).getTime();
+      if (isNaN(ts)) continue;
+      const diffHours = (now - ts) / (1000 * 60 * 60);
+      if (diffHours >= autoCloseHours) {
+        thread.status = "closed";
+        thread.closed_at = new Date().toISOString();
+        changed = true;
+      }
+    } catch (_) {
+      continue;
+    }
+  }
+  return changed;
+}
+
 // ── Formatting helpers ────────────────────────────────────
 
 function formatThreadsForInjection(threads, maxThreads, maxTokens) {
@@ -396,8 +424,13 @@ function main() {
   });
   const config = loadJson(getConfigPath(), { stale_days: 14 });
   const staleDays = config.stale_days != null ? config.stale_days : 14;
+  const autoCloseHours =
+    config.copilot_cli_auto_close_hours != null
+      ? config.copilot_cli_auto_close_hours
+      : 24;
 
   ageStaleThreads(memory, staleDays);
+  autoCloseCopilotCliThreads(memory, autoCloseHours);
 
   // ── Resume handling ───────────────────────────────────
   const resumeThreadId = getResumeThreadId();

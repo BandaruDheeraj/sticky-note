@@ -1,5 +1,6 @@
 {
   "stale_days": 14,
+  "copilot_cli_auto_close_hours": 24,
   "inject_token_budget": 1000,
   "mcp_servers": [],
   "skills": [],
