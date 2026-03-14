@@ -168,17 +168,29 @@ if set up by `npx sticky-note init`.
 
 Sticky-note hooks detect when your files overlap with other teammates'
 open or stuck threads. When you see `[STICKY-NOTE] ⚠️ OVERLAP DETECTED`
-in your injected context, you **MUST** immediately tell the user:
+in your injected context, you **MUST** start your response with this
+exact banner format before doing ANYTHING else:
 
-1. Which teammates are working on overlapping files
-2. What they're working on (the thread narrative)
-3. Whether they're stuck (and what failed)
-4. How to coordinate (resume command)
+```
+⚠️ Overlap detected: [user] is working on [files] — [narrative summary]
+   Status: [STUCK/OPEN] | Resume: npx sticky-note resume [id]
+```
 
-**Do NOT silently absorb this context.** The overlap warning exists to
-prevent two people from wasting hours on the same problem. Surface it
-BEFORE doing any other work, even if the user asked you to do something
-else first.
+Example:
+```
+⚠️ Overlap detected: alice is working on session-start.js, cli.js — fixing auth token refresh
+   Status: STUCK (tried retry logic, tokens expire mid-request) | Resume: npx sticky-note resume demo-ali
+```
+
+Rules:
+- This banner MUST be the **very first thing** in your response
+- Show it BEFORE your thinking indicators (◐, ●, etc.)
+- Do NOT bury it at the end or in a footnote
+- Do NOT rephrase it as "Also noted..." or "By the way..."
+- Then continue with the user's actual request normally
+
+This pattern exists to prevent two teammates from wasting hours on the
+same problem. Treat it like a system alert, not optional context.
 
 ### `[STICKY-NOTE]` tags
 
