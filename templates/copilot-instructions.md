@@ -164,6 +164,22 @@ after. A raw `git checkout` or `git switch` will fail if sticky-note
 files have uncommitted changes. The alias `git sw <branch>` also works
 if set up by `npx sticky-note init`.
 
+### ⚠️ Overlap warnings (CRITICAL — always surface these)
+
+Sticky-note hooks detect when your files overlap with other teammates'
+open or stuck threads. When you see `[STICKY-NOTE] ⚠️ OVERLAP DETECTED`
+in your injected context, you **MUST** immediately tell the user:
+
+1. Which teammates are working on overlapping files
+2. What they're working on (the thread narrative)
+3. Whether they're stuck (and what failed)
+4. How to coordinate (resume command)
+
+**Do NOT silently absorb this context.** The overlap warning exists to
+prevent two people from wasting hours on the same problem. Surface it
+BEFORE doing any other work, even if the user asked you to do something
+else first.
+
 ### `[STICKY-NOTE]` tags
 
 All sticky-note hooks prefix their output with `[STICKY-NOTE]`. When you

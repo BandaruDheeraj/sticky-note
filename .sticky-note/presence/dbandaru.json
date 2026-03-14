@@ -1,7 +1,5 @@
 {
   "active_files": [
-    "templates\\hooks\\session-start.js",
-    "templates\\hooks\\inject-context.js",
     "templates\\hooks\\sticky-utils.js",
     "..\\..\\..\\..\\.copilot\\session-state\\6ba0a6b6-d8e5-4a8a-9a45-ac4ddbe13a85\\plan.md",
     "templates\\sticky-note-config.json",
@@ -9,7 +7,9 @@
     "package.json",
     ".sticky-note\\audit\\dbandaru.jsonl",
     ".github\\hooks\\hooks.json",
-    "bin"
+    "bin",
+    "templates\\copilot-instructions.md",
+    "templates\\hooks\\session-start.js"
   ],
-  "last_seen": "2026-03-14T20:16:39.087Z"
+  "last_seen": "2026-03-14T20:29:58.535Z"
 }

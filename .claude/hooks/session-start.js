@@ -354,7 +354,8 @@ function formatOverlapWarnings(threads, currentUser, memory) {
   if (warnings.length === 0 && claims.length === 0) return "";
 
   const lines = [
-    "## [STICKY-NOTE] ⚠️ OVERLAP DETECTED\n",
+    "## [STICKY-NOTE] ⚠️ OVERLAP DETECTED — TELL THE USER IMMEDIATELY\n",
+    "**IMPORTANT: You MUST surface this warning to the user before doing anything else.**\n",
     "Someone else is working on files you're touching:\n",
   ];
 
