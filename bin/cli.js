@@ -864,7 +864,7 @@ function cmdStatus() {
   if (fs.existsSync(memoryPath)) {
     try {
       const memory = JSON.parse(fs.readFileSync(memoryPath, "utf-8"));
-      const threads = memory.threads || [];
+      const threads = (memory.threads || []).filter(Boolean);
       const schemaVersion = memory.version || "2";
 
       const openThreads = threads.filter((t) => t.status === "open").length;
@@ -1009,7 +1009,7 @@ function cmdThreads() {
   }
 
   const memory = readJsonSafe(memoryPath, { threads: [] });
-  const threads = memory.threads || [];
+  const threads = (memory.threads || []).filter(Boolean);
 
   // Filter: show open, stuck, closed (not expired)
   const live = threads.filter((t) => ["open", "stuck", "closed", "stale"].includes(t.status));
@@ -1067,7 +1067,7 @@ function cmdResume() {
   // resume --list: show resumable threads
   if (args.includes("--list") || args.length === 0) {
     const memory = readJsonSafe(memoryPath, { threads: [] });
-    const threads = memory.threads || [];
+    const threads = (memory.threads || []).filter(Boolean);
     const resumable = threads.filter((t) =>
       ["closed", "stuck", "open", "stale"].includes(t.status)
     );
@@ -1108,9 +1108,7 @@ function cmdResume() {
   // resume <thread-id>: set the resume signal
   const threadId = args[0];
   const memory = readJsonSafe(memoryPath, { threads: [] });
-  const threads = memory.threads || [];
-
-  // Support partial ID matching (first 8 chars)
+  const threads = (memory.threads || []).filter(Boolean);
   const match = threads.find((t) =>
     t.id === threadId || t.id.startsWith(threadId)
   );
@@ -1206,7 +1204,7 @@ function cmdReset() {
   const force = args.includes("--force");
 
   const memory = readJsonSafe(memoryPath, { version: "2", threads: [] });
-  const threadCount = (memory.threads || []).length;
+  const threadCount = (memory.threads || []).filter(Boolean).length;
 
   if (threadCount === 0) {
     print("  Nothing to reset -- 0 threads.");
@@ -1513,7 +1511,7 @@ function cmdOverlap() {
   const isMe = (user) => currentUserNames.has(user || "");
   const memory = readJsonSafe(memoryPath, { threads: [] });
   const threads = (memory.threads || []).filter(
-    (t) => t.status === "open" || t.status === "stuck"
+    (t) => t && (t.status === "open" || t.status === "stuck")
   );
 
   // Find overlaps
@@ -1862,7 +1860,7 @@ function cmdResumeThread() {
   }
 
   const memory = readJsonSafe(memoryPath, { threads: [] });
-  const threads = (memory.threads || []).filter((t) => t.status !== "expired");
+  const threads = (memory.threads || []).filter((t) => t && t.status !== "expired");
 
   // Load attribution engine for search
   let attribution;
@@ -2222,7 +2220,7 @@ function cmdGc() {
   const memory = readJsonSafe(memoryPath, { version: "2", threads: [] });
   const config = readJsonSafe(configPath, { stale_days: 14 });
   const staleDays = config.stale_days ?? 14;
-  const threads = memory.threads || [];
+  const threads = (memory.threads || []).filter(Boolean);
   const now = new Date();
 
   let tombstoned = 0;
