@@ -42,7 +42,14 @@ their next session by relevance.
 
 ---
 
-## What's New in V2.5
+## What's New in V2.6
+
+- **Overlap detection**: Warns when you're working on files another teammate has open/stuck threads on. Three delivery channels: injected context, stderr banner, and preToolUse deny (Copilot CLI)
+- **File claiming**: `npx sticky-note-cli claim src/auth.ts "refactoring auth flow"` — declare intent to work on files
+- **Auto-close Copilot CLI threads**: Threads from Copilot CLI sessions auto-close after configurable inactivity (default 24h), since Copilot CLI has no session-end signal
+- **PID-keyed session isolation**: Concurrent Copilot CLI sessions get independent overlap dedup via `COPILOT_LOADER_PID`
+
+### What's New in V2.5
 
 - **Smart injection (two-tier)**: Stuck threads injected eagerly at session start; all other threads injected lazily when you first touch a file they authored — via built-in git blame attribution
 - **Thread resume (local)**: `npx sticky-note-cli resume-thread --query "auth fix" --user alice` — natural language thread discovery with text similarity + file attribution ranking
@@ -148,7 +155,7 @@ injects the top 3–5 (under token budget) as additional context.
 
 | Signal | Weight | Description |
 |--------|--------|-------------|
-| File overlap | 3 | Thread files match your recent git changes |
+| File overlap | 3 per file (max 5) | Thread files match your recent git changes |
 | Branch match | 2 | Thread is on your current branch |
 | Recency | 2 | Decays 0.2 per day from last activity |
 | Stuck status | +2 | Boost for threads marked stuck |
@@ -321,6 +328,8 @@ npx sticky-note-cli resume --clear # Cancel active resume
 npx sticky-note-cli resume-thread  # Smart resume: --query, --user, --file (V2.5)
 npx sticky-note-cli audit          # Query merged audit trail (all users)
 npx sticky-note-cli who            # Show active and recent team members
+npx sticky-note-cli overlap        # Detect file overlaps with teammates (V2.6)
+npx sticky-note-cli claim <files>  # Declare intent to work on files (V2.6)
 npx sticky-note-cli switch <branch> # Safe branch switch (auto-stashes data)
 npx sticky-note-cli gc             # Tombstone expired threads
 npx sticky-note-cli reset          # Wipe all threads (--force, --keep-audit)
@@ -349,16 +358,20 @@ Edit `.sticky-note/sticky-note-config.json`:
 ```json
 {
   "stale_days": 14,
+  "copilot_cli_auto_close_hours": 24,
+  "inject_token_budget": 1000,
   "mcp_servers": [],
   "skills": [],
   "conventions": ["Use TypeScript strict mode", "Test before commit"],
-  "hook_version": "2.5.0"
+  "hook_version": "2.6.12"
 }
 ```
 
 | Key            | Description                              | Default |
 |----------------|------------------------------------------|---------|
 | `stale_days`   | Days before threads expire + gc cleanup  | `14`    |
+| `copilot_cli_auto_close_hours` | Hours before idle Copilot CLI threads auto-close | `24` |
+| `inject_token_budget` | Max tokens for per-prompt thread injection | `1000` |
 | `mcp_servers`  | Shared MCP server references             | `[]`    |
 | `skills`       | Team skill definitions                   | `[]`    |
 | `conventions`  | Team coding conventions (injected)       | `[]`    |

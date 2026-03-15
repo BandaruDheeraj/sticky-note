@@ -1,5 +1,44 @@
 # Changelog
 
+## V2.6.0–2.6.12 (main)
+
+### New: Overlap Detection
+- `npx sticky-note overlap` detects file overlaps with other users'
+  open/stuck threads.
+- `npx sticky-note claim` declares file ownership (`--list`, `--clear`).
+- `session-start.js` warns about overlaps at session start.
+- Overlap warnings injected via three channels: `additionalContext`,
+  stderr banner, and `preToolUse` deny (Copilot CLI only).
+
+### New: preToolUse Deny as User-Visible Message Channel
+- Copilot CLI's `additionalContext` is absorbed silently by the model.
+  The only reliable way to surface urgent messages to users is via
+  `preToolUse` deny with `permissionDecisionReason`.
+- Deny fires once per session, keyed by `COPILOT_LOADER_PID` to
+  isolate concurrent sessions (stored in `.overlap-warned` JSON).
+- Twelve iterations (v2.6.1–v2.6.12) to discover and stabilize this
+  pattern.
+
+### New: Auto-Close Inactive Copilot CLI Threads
+- Copilot CLI has no session-end signal, so threads stay open
+  indefinitely. `session-start.js` now auto-closes `copilot-cli`
+  threads after configurable inactivity (default 24h).
+- New config: `copilot_cli_auto_close_hours` in
+  `sticky-note-config.json`.
+
+### Fixed
+- Ghost injection: `session-start.js` was marking threads injected in
+  Copilot CLI even though `sessionStart` output was dropped. Now skips
+  `markThreadInjected` for Copilot CLI so `inject-context.js` can
+  deliver them.
+- Cross-session injection poisoning: `.sticky-injected` dedup now
+  checks `session_id` before skipping, preventing one session's
+  injections from suppressing another's.
+- Concurrent session isolation: overlap dedup keyed by PID instead of
+  shared session ID.
+
+---
+
 ## V2.5.0 (feature/v2.5)
 
 ### New: Built-in Attribution Engine

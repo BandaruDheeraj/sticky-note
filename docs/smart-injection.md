@@ -51,15 +51,23 @@ Session starts
 │
 ├─ EAGER: inject stuck threads → mark as injected
 │
-└─ Tool call fires
+├─ OVERLAP CHECK (inject-context.js, every prompt)
+│  │
+│  ├─ Detect file overlaps with other users' open/stuck threads
+│  ├─ Format warning → inject via additionalContext + stderr
+│  └─ On first tool call (Copilot CLI only) → preToolUse deny with warning
+│
+└─ Tool call fires (pre-tool-use.js)
    │
-   ├─ File in injected_this_session? → skip
-   ├─ No blame data for file?        → skip
-   ├─ No thread for SHA?             → skip
+   ├─ Overlap deny pending?             → deny with warning, mark warned
+   ├─ File in injected_this_session?    → skip
+   ├─ No blame data for file?           → skip
+   ├─ No thread for SHA?               → skip
    └─ Thread found → inject with line ranges, mark as injected
 
 UserPromptSubmit fires (inject-context.js)
 │
+├─ Overlap detection → prepend warning if overlaps found
 └─ Score remaining threads (skip already-injected)
    └─ Inject top N under token budget
 ```
@@ -83,7 +91,13 @@ Three injection points all respect this set:
 - **pre-tool-use.js** — marks file-attributed threads as injected
 - **inject-context.js** — skips threads already in the set
 
-The set is cleared at session start.
+The set is cleared at session start. For Copilot CLI (where `sessionStart`
+fires per-turn), the set is preserved across turns to avoid re-injection.
+
+Overlap deny dedup is separate: tracked via `.sticky-note/.overlap-warned`,
+keyed by `COPILOT_LOADER_PID` so concurrent sessions don't interfere.
+See [Making Sticky Note work with Copilot CLI](./making-sticky-note-work-with-copilot-cli.md#challenge-8-getting-messages-to-the-user)
+for the full story.
 
 ---
 
@@ -99,6 +113,45 @@ to sessions, so attribution survives history rewrites:
 | 3 | File + date heuristic | ✅ Always works | Slower |
 
 Run `npx sticky-note update` to configure Git Notes rewrite automatically.
+
+---
+
+## Overlap detection (V2.6)
+
+V2.6 added a third injection trigger: **file overlap warnings**. When
+you start working and another user has an open or stuck thread touching
+the same files, you get warned before you start editing.
+
+### How overlaps are detected
+
+On every prompt, `inject-context.js` compares your recently modified
+files (from `git diff HEAD~5`, unstaged, and staged changes) against
+the `files_touched` lists of other users' open/stuck threads. Any
+intersection triggers a warning.
+
+### Three-channel delivery
+
+Getting overlap warnings in front of the user turned out to be harder
+than detecting them. The AI model often silently absorbs injected
+context without relaying it. We ended up with three channels:
+
+1. **`additionalContext`** — formatted markdown warning injected via
+   `inject-context.js` on every prompt. The AI *might* surface it.
+2. **stderr** — concise banner written directly to the terminal. The
+   user sees it scroll past in hook output regardless of AI behavior.
+3. **preToolUse deny** (Copilot CLI only) — the first tool call of
+   a session is denied with the overlap warning as the reason. The AI
+   *must* report why the tool call failed, guaranteeing visibility.
+
+The deny channel fires once per session, keyed by
+`COPILOT_LOADER_PID` to isolate concurrent sessions.
+
+### Auto-closing stale Copilot CLI threads
+
+Copilot CLI has no reliable session-end signal, so threads stay `"open"`
+indefinitely. To prevent stale threads from triggering false overlap
+warnings, `session-start.js` auto-closes any `copilot-cli` thread
+inactive for longer than `copilot_cli_auto_close_hours` (default: 24).
 
 ---
 
@@ -123,7 +176,8 @@ In `.sticky-note/sticky-note-config.json`:
 ```json
 {
   "inject_token_budget": 1000,
-  "stale_days": 14
+  "stale_days": 14,
+  "copilot_cli_auto_close_hours": 24
 }
 ```
 

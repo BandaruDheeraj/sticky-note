@@ -125,10 +125,13 @@ When a SHA has no notes and no audit match (common after squash merges),
 the engine falls back to a heuristic:
 
 1. Get the commit's author date
-2. Check if the squash commit message contains original SHAs (many squash
-   merges include them) — if so, try Tier 1 and 2 on those
+2. Extract the commit message and scan for referenced SHAs (7–40 hex
+   chars). Many squash merges include the original commit SHAs in the
+   message body. If found, retry Tier 1 and 2 on those SHAs first.
 3. Last resort: find threads whose `files_touched[]` includes the file
-   and whose activity window overlaps the commit date (±24 hours)
+   and whose activity window overlaps the commit date. The window is
+   asymmetric: thread start minus 1 hour to thread end plus 24 hours,
+   biased toward catching work that preceded the commit.
 
 This tier is slower (requires `git log` calls) but catches cases the
 other tiers miss.
