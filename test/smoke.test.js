@@ -291,6 +291,22 @@ try {
     }
   });
 
+  run("doctor detects broken config JSON", () => {
+    const configPath = path.join(tmpDir, ".sticky-note", "sticky-note-config.json");
+    const backup = fs.readFileSync(configPath, "utf-8");
+    fs.writeFileSync(configPath, "{ not valid json !!!");
+    try {
+      cli(["doctor"]);
+      assert.ok(false, "Expected doctor to exit 1 with broken config");
+    } catch (err) {
+      const out = err.stdout || "";
+      assert.ok(out.includes("[FAIL]"), "Should report failure for broken JSON");
+      assert.ok(out.includes("invalid JSON"), "Should mention invalid JSON");
+    } finally {
+      fs.writeFileSync(configPath, backup);
+    }
+  });
+
   // ── resume tests ──
 
   run("resume --list with no threads shows empty message", () => {
