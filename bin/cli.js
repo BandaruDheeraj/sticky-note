@@ -19,6 +19,7 @@
  *   npx sticky-note checkpoint           Set work-topic checkpoint for attribution
  *   npx sticky-note overlap              Detect file overlaps with open/stuck threads
  *   npx sticky-note claim                Claim ownership of files you're working on
+ *   npx sticky-note doctor               Check for common setup issues
  */
 
 const fs = require("fs");
@@ -2258,6 +2259,227 @@ function cmdGc() {
 }
 
 // ──────────────────────────────────────────────
+// DOCTOR command
+// ──────────────────────────────────────────────
+
+function cmdDoctor() {
+  printBanner();
+  print("  🩺 Doctor — checking your sticky-note setup\n");
+
+  let okCount = 0;
+  let warnCount = 0;
+  let failCount = 0;
+
+  function ok(msg) { okCount++; print(`    [OK]   ${msg}`); }
+  function warn(msg) { warnCount++; print(`    [WARN] ${msg}`); }
+  function fail(msg) { failCount++; print(`    [FAIL] ${msg}`); }
+
+  const cwd = process.cwd();
+  const stickyDir = path.join(cwd, ".sticky-note");
+  const claudeHooksDir = path.join(cwd, ".claude", "hooks");
+  const settingsPath = path.join(cwd, ".claude", "settings.json");
+  const hooksJsonPath = path.join(cwd, ".github", "hooks", "hooks.json");
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+  const configPath = path.join(stickyDir, "sticky-note-config.json");
+  const gitignorePath = path.join(cwd, ".gitignore");
+  const gitattrsPath = path.join(cwd, ".gitattributes");
+
+  // ── 1. Git repo ──
+  print("  Environment:");
+  if (isGitRepo()) {
+    ok("Git repository detected");
+  } else {
+    fail("Not a git repository — run `git init` first");
+  }
+
+  // ── 2. Initialized ──
+  print("\n  Initialization:");
+  if (fs.existsSync(stickyDir)) {
+    ok(".sticky-note/ directory exists");
+  } else {
+    fail(".sticky-note/ missing — run `npx sticky-note init`");
+    printDoctorSummary(okCount, warnCount, failCount);
+    if (failCount > 0) process.exit(1);
+    return;
+  }
+
+  // ── 3. Hook scripts ──
+  print("\n  Hook scripts:");
+  if (fs.existsSync(claudeHooksDir)) {
+    ok(".claude/hooks/ directory exists");
+    let missingHooks = 0;
+    for (const file of HOOK_FILES) {
+      if (!fs.existsSync(path.join(claudeHooksDir, file))) {
+        fail(`Missing hook: .claude/hooks/${file}`);
+        missingHooks++;
+      }
+    }
+    if (missingHooks === 0) {
+      ok(`All ${HOOK_FILES.length} hook scripts present`);
+    }
+  } else {
+    fail(".claude/hooks/ directory missing — run `npx sticky-note init`");
+  }
+
+  // ── 4. settings.json (Claude Code) ──
+  print("\n  Config files:");
+  if (fs.existsSync(settingsPath)) {
+    try {
+      const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+      if (settings.hooks && Object.keys(settings.hooks).length > 0) {
+        ok(".claude/settings.json — valid with hooks configured");
+      } else {
+        warn(".claude/settings.json — missing `hooks` key (Claude Code hooks won't fire)");
+      }
+    } catch {
+      fail(".claude/settings.json — invalid JSON");
+    }
+  } else {
+    warn(".claude/settings.json not found (needed for Claude Code hooks)");
+  }
+
+  // ── 5. hooks.json (Copilot CLI) ──
+  if (fs.existsSync(hooksJsonPath)) {
+    try {
+      const hooksJson = JSON.parse(fs.readFileSync(hooksJsonPath, "utf-8"));
+      if (hooksJson.hooks || hooksJson.version !== undefined) {
+        ok(".github/hooks/hooks.json — valid");
+      } else {
+        warn(".github/hooks/hooks.json — parsed but missing expected keys");
+      }
+    } catch {
+      fail(".github/hooks/hooks.json — invalid JSON");
+    }
+  } else {
+    warn(".github/hooks/hooks.json not found (needed for Copilot CLI hooks)");
+  }
+
+  // ── 6. sticky-note.json ──
+  print("\n  Data files:");
+  if (fs.existsSync(memoryPath)) {
+    try {
+      const memory = JSON.parse(fs.readFileSync(memoryPath, "utf-8"));
+      if (memory.version && Array.isArray(memory.threads)) {
+        ok(`sticky-note.json — valid (schema v${memory.version}, ${memory.threads.length} thread(s))`);
+      } else {
+        warn("sticky-note.json — parsed but missing `version` or `threads` array");
+      }
+    } catch {
+      fail("sticky-note.json — invalid JSON (data may be corrupted)");
+    }
+  } else {
+    fail("sticky-note.json missing — run `npx sticky-note init`");
+  }
+
+  // ── 7. sticky-note-config.json ──
+  if (fs.existsSync(configPath)) {
+    try {
+      const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      if (typeof config.stale_days === "number" && config.hook_version) {
+        ok(`sticky-note-config.json — valid (hook_version=${config.hook_version})`);
+        if (config.hook_version !== VERSION) {
+          warn(`hook_version is ${config.hook_version}, CLI is v${VERSION} — run \`npx sticky-note update\``);
+        }
+      } else {
+        warn("sticky-note-config.json — missing expected fields (stale_days or hook_version)");
+      }
+    } catch {
+      fail("sticky-note-config.json — invalid JSON");
+    }
+  } else {
+    fail("sticky-note-config.json missing — run `npx sticky-note init`");
+  }
+
+  // ── 8. .gitignore checks ──
+  print("\n  Git integration:");
+  if (fs.existsSync(gitignorePath)) {
+    const gitignoreContent = fs.readFileSync(gitignorePath, "utf-8");
+    const lines = gitignoreContent.split(/\r?\n/).map((l) => l.trim());
+    if (lines.includes(".claude/") || lines.includes(".claude")) {
+      fail(".gitignore contains broad `.claude/` ignore — hooks won't be shared via git");
+    } else {
+      ok(".gitignore does not broadly ignore .claude/");
+    }
+
+    const ignoreAdditions = fs
+      .readFileSync(path.join(TEMPLATES_DIR, "gitignore-additions.txt"), "utf-8")
+      .trim()
+      .split(/\r?\n/)
+      .filter((l) => l.trim() && !l.startsWith("#"));
+    const missing = ignoreAdditions.filter((e) => !gitignoreContent.includes(e.trim()));
+    if (missing.length === 0) {
+      ok(".gitignore has all required sticky-note entries");
+    } else {
+      warn(`.gitignore missing ${missing.length} entr${missing.length === 1 ? "y" : "ies"} — run \`npx sticky-note update\``);
+      for (const m of missing) {
+        print(`           └ ${m}`);
+      }
+    }
+  } else {
+    warn(".gitignore not found — transient files may be committed");
+  }
+
+  // ── 9. .gitattributes merge rule ──
+  const mergeRule = ".sticky-note/sticky-note.json merge=sticky-note";
+  if (fs.existsSync(gitattrsPath)) {
+    const gitattrsContent = fs.readFileSync(gitattrsPath, "utf-8");
+    if (gitattrsContent.includes(mergeRule)) {
+      ok(".gitattributes has custom merge driver rule");
+    } else if (gitattrsContent.includes("merge=union")) {
+      warn(".gitattributes still uses merge=union — run `npx sticky-note update` to upgrade");
+    } else {
+      warn(".gitattributes missing merge rule for sticky-note.json");
+    }
+  } else {
+    warn(".gitattributes not found — merge conflicts on sticky-note.json won't auto-resolve");
+  }
+
+  // ── 10. Git merge driver config ──
+  try {
+    const driver = execFileSync("git", ["config", "--get", "merge.sticky-note.driver"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    if (driver) {
+      ok("Git merge driver configured");
+    } else {
+      warn("Git merge driver registered but empty — run `npx sticky-note init`");
+    }
+  } catch {
+    warn("Git merge driver not configured — run `npx sticky-note init` to set up");
+  }
+
+  // ── 11. Git hooks (.git/hooks/post-rewrite) ──
+  const postRewritePath = path.join(cwd, ".git", "hooks", "post-rewrite");
+  if (fs.existsSync(postRewritePath)) {
+    ok(".git/hooks/post-rewrite installed (attribution survives rebase)");
+  } else {
+    warn(".git/hooks/post-rewrite missing — attribution may not survive rebase");
+  }
+
+  printDoctorSummary(okCount, warnCount, failCount);
+  if (failCount > 0) process.exit(1);
+}
+
+function printDoctorSummary(okCount, warnCount, failCount) {
+  print("\n  ─────────────────────────────────────");
+  const parts = [];
+  parts.push(`${okCount} passed`);
+  if (warnCount > 0) parts.push(`${warnCount} warning(s)`);
+  if (failCount > 0) parts.push(`${failCount} failure(s)`);
+  const icon = failCount > 0 ? "❌" : warnCount > 0 ? "⚠️" : "✅";
+  print(`  ${icon} ${parts.join(", ")}`);
+
+  if (failCount > 0) {
+    print("\n  Run `npx sticky-note init` to fix critical issues,");
+    print("  or `npx sticky-note update` to refresh hooks and config.\n");
+  } else if (warnCount > 0) {
+    print("\n  Run `npx sticky-note update` to address warnings.\n");
+  } else {
+    print("\n  Your sticky-note setup looks healthy! 🎉\n");
+  }
+}
+
+// ──────────────────────────────────────────────
 // Main
 // ──────────────────────────────────────────────
 
@@ -2311,6 +2533,9 @@ async function main() {
     case "claim":
       cmdClaim();
       break;
+    case "doctor":
+      cmdDoctor();
+      break;
     case "--version":
     case "-v":
       print(`sticky-note v${VERSION}`);
@@ -2336,6 +2561,7 @@ async function main() {
       print("    checkpoint         Set work-topic checkpoint for attribution (--topic, --show, --clear)");
       print("    overlap            Detect file overlaps with open/stuck threads");
       print("    claim              Claim ownership of files you're working on (--list, --clear)");
+      print("    doctor             Check for common setup issues and misconfigurations");
       print("");
       print("  Options:");
       print("    --version  Show version");

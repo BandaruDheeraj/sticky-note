@@ -251,6 +251,44 @@ try {
     );
   });
 
+  run("doctor runs before init (reports failures)", () => {
+    const bareDir = fs.mkdtempSync(path.join(os.tmpdir(), "sticky-doctor-bare-"));
+    try {
+      execSync("git init", { cwd: bareDir, stdio: "pipe" });
+      cli(["doctor"], { cwd: bareDir });
+      assert.ok(false, "Expected doctor to exit with code 1 in bare repo");
+    } catch (err) {
+      const out = err.stdout || "";
+      assert.ok(out.includes("[FAIL]"), "Should report failures in bare repo");
+      assert.ok(out.includes("Doctor"), "Should show Doctor heading");
+    } finally {
+      fs.rmSync(bareDir, { recursive: true, force: true });
+    }
+  });
+
+  run("doctor runs after init (healthy setup)", () => {
+    const out = cli(["doctor"]);
+    assert.ok(out.includes("Doctor"), "Should show Doctor heading");
+    assert.ok(out.includes("[OK]"), "Should have passing checks");
+    assert.ok(!out.includes("[FAIL]"), "Should have no failures in properly set up repo");
+  });
+
+  run("doctor detects missing hook file", () => {
+    const hookPath = path.join(tmpDir, ".claude", "hooks", "session-start.js");
+    const backup = fs.readFileSync(hookPath);
+    fs.unlinkSync(hookPath);
+    try {
+      cli(["doctor"]);
+      assert.ok(false, "Expected doctor to exit 1 with missing hook");
+    } catch (err) {
+      const out = err.stdout || "";
+      assert.ok(out.includes("session-start.js"), "Should name the missing hook");
+      assert.ok(out.includes("[FAIL]"), "Should report as failure");
+    } finally {
+      fs.writeFileSync(hookPath, backup);
+    }
+  });
+
 } finally {
   cleanup();
 }
