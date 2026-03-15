@@ -181,6 +181,20 @@ try {
     assert.strictEqual(after.project, "test-marker", "Should preserve existing data");
   });
 
+  run("update outputs success and refreshes hooks", () => {
+    const out = cli(["update"]);
+    assert.ok(out.includes("Scripts updated"), "Should print scripts updated message");
+    assert.ok(out.includes("[OK]"), "Should have [OK] status lines");
+    // Verify hook files were (re)written
+    const hooksDir = path.join(tmpDir, ".claude", "hooks");
+    for (const file of ["session-start.js", "session-end.js", "inject-context.js"]) {
+      assert.ok(
+        fs.existsSync(path.join(hooksDir, file)),
+        `Hook file ${file} should exist after update`
+      );
+    }
+  });
+
   run("gc runs without error", () => {
     const out = cli(["gc"]);
     assert.ok(out.length > 0, "Should produce output");

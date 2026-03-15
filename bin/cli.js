@@ -1,15 +1,24 @@
 #!/usr/bin/env node
 
 /**
- * sticky-note CLI — V2
+ * sticky-note CLI — V2.5
  *
  * Commands:
- *   npx sticky-note init      Interactive setup, creates V2 hook files
- *   npx sticky-note update    Update scripts only
- *   npx sticky-note status    Diagnostic: threads, audit, hook health
- *   npx sticky-note threads   List open/stuck threads
- *   npx sticky-note audit     Query audit trail (JSONL)
- *   npx sticky-note gc        Manual tombstone sweep
+ *   npx sticky-note init                 Interactive setup, creates V2.5 hooks and config
+ *   npx sticky-note update               Update hook scripts (preserves data)
+ *   npx sticky-note status               Diagnostic: threads, audit, attribution health
+ *   npx sticky-note threads              List open/stuck threads
+ *   npx sticky-note resume               Resume a previous thread (--list, --clear, <id>)
+ *   npx sticky-note resume-thread        Smart thread resume (--query, --user, --file, --json)
+ *   npx sticky-note audit                Query audit trail (--file, --user, --since, --session)
+ *   npx sticky-note who                  Show active and recent team members
+ *   npx sticky-note switch               Safe branch switching (auto-stashes .sticky-note/)
+ *   npx sticky-note gc                   Manual tombstone sweep for expired threads
+ *   npx sticky-note reset                Wipe all threads and start fresh (--force, --keep-audit)
+ *   npx sticky-note get-line-attribution File→thread attribution with line ranges
+ *   npx sticky-note checkpoint           Set work-topic checkpoint for attribution
+ *   npx sticky-note overlap              Detect file overlaps with open/stuck threads
+ *   npx sticky-note claim                Claim ownership of files you're working on
  */
 
 const fs = require("fs");
