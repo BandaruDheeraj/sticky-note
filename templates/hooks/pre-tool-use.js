@@ -175,7 +175,7 @@ function _checkOverlapsAndDeny() {
   let threads;
   try {
     const data = loadJson(getMemoryPath());
-    threads = data.threads || [];
+    threads = (data.threads || []).filter(Boolean);
   } catch (_) {
     return null;
   }

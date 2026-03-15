@@ -213,7 +213,7 @@ async function main() {
   const narrative = buildNarrativeFromAudit(auditData);
   const workType = classifyWorkType(auditData);
 
-  const threads = memory.threads || [];
+  const threads = (memory.threads || []).filter(Boolean);
   let found = false;
 
   for (const thread of threads) {

@@ -408,7 +408,7 @@ function main() {
   }
 
   const memory = loadJson(getMemoryPath(), { version: "2", threads: [] });
-  const threads = memory.threads || [];
+  const threads = (memory.threads || []).filter(Boolean);
 
   const live = threads.filter(
     (t) => t.status === "open" || t.status === "stuck" || t.status === "closed"

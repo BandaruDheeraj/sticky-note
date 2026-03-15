@@ -214,8 +214,8 @@ function saveJson(filePath, data) {
 function saveMemoryMerged(memoryPath, memory) {
   try {
     const onDisk = loadJson(memoryPath, { threads: [] });
-    const onDiskThreads = Array.isArray(onDisk.threads) ? onDisk.threads : [];
-    const inMemoryThreads = Array.isArray(memory.threads) ? memory.threads : [];
+    const onDiskThreads = Array.isArray(onDisk.threads) ? onDisk.threads.filter(Boolean) : [];
+    const inMemoryThreads = Array.isArray(memory.threads) ? memory.threads.filter(Boolean) : [];
     const inMemoryIds = new Set(inMemoryThreads.map((t) => t.id));
 
     for (const diskThread of onDiskThreads) {

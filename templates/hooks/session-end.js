@@ -765,7 +765,7 @@ function main() {
     filesTouched = [...new Set([...filesTouched, ...gitFiles])];
   }
 
-  const threads = memory.threads || [];
+  const threads = (memory.threads || []).filter(Boolean);
   memory.threads = threads;
   let existing = null;
 
