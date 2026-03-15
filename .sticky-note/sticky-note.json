@@ -532,7 +532,7 @@
       "branch": "main",
       "created_at": "2026-03-14T18:19:12.242Z",
       "closed_at": null,
-      "last_activity_at": "2026-03-14T23:22:53.812Z",
+      "last_activity_at": "2026-03-14T23:38:16.731Z",
       "files_touched": [
         "templates\\hooks\\session-start.js",
         "templates\\sticky-note-config.json",
@@ -560,10 +560,11 @@
         ".claude/hooks/pre-tool-use.js",
         ".claude/hooks/sticky-utils.js",
         "templates/hooks/pre-tool-use.js",
-        "templates/hooks/sticky-utils.js"
+        "templates/hooks/sticky-utils.js",
+        ".sticky-note/.overlap-warned"
       ],
-      "last_note": "are we ready to test this overlap feature live in this session? ... (26 prompts total) ... nope still not seeing it  Environment loaded: 2 custom instructions, 1 MCP server, 1 plugin, 9 \n  sk",
-      "narrative": "are we ready to test this overlap feature live in this session? ... (26 prompts total) ... nope still not seeing it  Environment loaded: 2 custom instructions, 1 MCP server, 1 plugin, 9 \n  sk",
+      "last_note": "are we ready to test this overlap feature live in this session? ... (27 prompts total) ... just ran it again not seeing any overlap banner?",
+      "narrative": "are we ready to test this overlap feature live in this session? ... (27 prompts total) ... just ran it again not seeing any overlap banner?",
       "failed_approaches": [],
       "handoff_summary": "",
       "related_session_ids": [],
@@ -572,21 +573,21 @@
       "session_id": "01ac84d5-adc6-449f-ab9d-f06f10ad7890",
       "work_type": "general",
       "activities": [
-        "edited 45 file(s)",
+        "edited 50 file(s)",
         "touched 12 file(s)",
-        "26 prompt(s)"
+        "27 prompt(s)"
       ],
       "tool_calls": {
-        "report_intent": 433,
-        "view": 546,
-        "sql": 26,
-        "powershell": 1878,
-        "task": 80,
-        "ask_user": 114,
-        "edit": 345,
-        "grep": 230,
-        "web_search": 14,
-        "web_fetch": 7
+        "report_intent": 469,
+        "view": 610,
+        "sql": 27,
+        "powershell": 2050,
+        "task": 84,
+        "ask_user": 125,
+        "edit": 395,
+        "grep": 253,
+        "web_search": 16,
+        "web_fetch": 8
       },
       "prompts": [
         "are we ready to test this overlap feature live in this session?",
@@ -615,27 +616,7 @@
       ],
       "resume_history": []
     },
-    {
-      "id": "demo-alice-overlap",
-      "status": "stuck",
-      "tool": "claude-code",
-      "user": "alice",
-      "branch": "main",
-      "narrative": "fixing auth bug in session-start hook - token refresh failing silently",
-      "files_touched": [
-        "templates/hooks/session-start.js",
-        "templates/hooks/inject-context.js",
-        "templates/hooks/pre-tool-use.js",
-        "templates/hooks/sticky-utils.js",
-        "bin/cli.js"
-      ],
-      "created_at": "2026-03-14T19:40:01.514Z",
-      "last_activity_at": "2026-03-14T19:40:01.514Z",
-      "failed_approaches": [
-        "tried adding retry logic but tokens expire mid-request"
-      ],
-      "handoff_summary": "Need to investigate why refreshToken returns 200 but token is stale"
-    },
+    null,
     {
       "id": "a4b6ed90-7882-4217-b47d-591fa0c74248",
       "user": "dbandaru",
@@ -1271,6 +1252,135 @@
       },
       "prompts": [
         "explain cli.js"
+      ],
+      "contributors": [
+        "dbandaru"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "e848a2e3-7045-47e5-8c37-239499a50159",
+      "user": "dbandaru",
+      "project": "",
+      "status": "open",
+      "branch": "main",
+      "created_at": "2026-03-14T23:57:08.229Z",
+      "closed_at": null,
+      "last_activity_at": "2026-03-14T23:57:08.229Z",
+      "files_touched": [
+        ".sticky-note/.overlap-warned",
+        ".sticky-note/.sticky-checkpoint"
+      ],
+      "last_note": "explain clis.js",
+      "narrative": "explain clis.js",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "c18abd0b-ea61-4f66-a8e7-ec10f89d58d5",
+      "work_type": "general",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": [
+        "explain clis.js"
+      ],
+      "contributors": [
+        "dbandaru"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "d0d9aef2-5bd0-4607-8e6d-150259ffad57",
+      "user": "dbandaru",
+      "project": "",
+      "status": "open",
+      "branch": "main",
+      "created_at": "2026-03-15T00:00:12.621Z",
+      "closed_at": null,
+      "last_activity_at": "2026-03-15T03:51:01.710Z",
+      "files_touched": [
+        "bin\\cli.js",
+        ".sticky-note/.overlap-warned",
+        ".sticky-note/.sticky-checkpoint",
+        "docs",
+        ".sticky-note",
+        ".sticky-note\\sticky-note.json",
+        "docs\\making-sticky-note-work-with-copilot-cli.md",
+        "docs\\smart-injection.md",
+        "docs\\how-git-blame-attribution-works.md",
+        "docs\\branch-switching.md",
+        "docs\\thread-resume.md",
+        "CHANGELOG.md",
+        "docs\\publishing.md",
+        "..\\..\\..\\..\\.copilot\\session-state\\853cd01b-6b7e-4ff4-96bd-0bbe8b23f833\\plan.md",
+        "docs/making-sticky-note-work-with-copilot-cli.md",
+        "docs/smart-injection.md",
+        "..\\..\\..\\..\\AppData\\Local\\Temp\\1773534032116-copilot-tool-output-zz3ovc.txt",
+        "templates\\hooks\\session-start.js",
+        "templates\\hooks\\sticky-utils.js",
+        "README.md",
+        "docs/branch-switching.md",
+        "docs/how-git-blame-attribution-works.md",
+        ".sticky-note/audit",
+        ".claude",
+        ".github/hooks",
+        ".claude/settings.json",
+        "templates\\gitignore-additions.txt",
+        "package.json",
+        "bin/cli.js"
+      ],
+      "last_note": "explain cli.js ... (9 prompts total) ... yes, but does mean both me and Matt will need to run sticky-note init on the same repo?",
+      "narrative": "explain cli.js ... (9 prompts total) ... yes, but does mean both me and Matt will need to run sticky-note init on the same repo?",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "853cd01b-6b7e-4ff4-96bd-0bbe8b23f833",
+      "work_type": "general",
+      "activities": [
+        "edited 22 file(s)",
+        "touched 22 file(s)",
+        "9 prompt(s)"
+      ],
+      "tool_calls": {
+        "report_intent": 103,
+        "view": 327,
+        "glob": 17,
+        "powershell": 163,
+        "task": 49,
+        "read_agent": 75,
+        "create": 8,
+        "sql": 68,
+        "edit": 126,
+        "grep": 52,
+        "web_fetch": 6,
+        "github-mcp-server-get_commit": 3,
+        "github-mcp-server-get_file_contents": 12,
+        "ask_user": 2
+      },
+      "prompts": [
+        "yes commit and push the documentation changes and also tell me how i can update the sticky notes I have on the MOBA repo",
+        "how come the conflict warning didn't come up   ▘▘ ▝▝    ~\\OneDrive - Microsoft\\Desktop\\Projects\\Personal-Projects…\n\n❯ make a new branch for 'fix/sleep-window'\n\n● Bash(git checkout -b fix/sleep-window)\n  ⎿  Switched to a new branch 'fix/sleep-window'\n\n● Now on fix/sleep-window.\n\n❯ right now the eatin",
+        "are sticky notes not automatically included in git pull https://github.com/mhardmon1/MOBA/commit/7e15b1ea6437f8b5486f7815569a088bfa896dfe , Matt here did some work why are his threads not considered",
+        "explain cli.js",
+        "can you update the blogs with all the changes we have made that are pertinent to the blogs, especially the copilot cli one and what we have learned about providing user facing messages using hooks",
+        "can you make sure all the blogs are completely up to date with the current version of our sticky notes even before 2.6 I think we wrote a lot of them before we made a lot of changes",
+        "ok great is the npm package up to date with this veresion and can I start using this on other repos?",
+        "yes commit and push the documentation changes and also tell me how i can update the sticky notes I have on the MOBA repo",
+        "how come the conflict warning didn't come up   ▘▘ ▝▝    ~\\OneDrive - Microsoft\\Desktop\\Projects\\Personal-Projects…\n\n❯ make a new branch for 'fix/sleep-window'\n\n● Bash(git checkout -b fix/sleep-window)\n  ⎿  Switched to a new branch 'fix/sleep-window'\n\n● Now on fix/sleep-window.\n\n❯ right now the eatin",
+        "are sticky notes not automatically included in git pull https://github.com/mhardmon1/MOBA/commit/7e15b1ea6437f8b5486f7815569a088bfa896dfe , Matt here did some work why are his threads not considered",
+        "so matt can't just have sticky note immediately installed when he pulls from main?",
+        "explain cli.js",
+        "can you update the blogs with all the changes we have made that are pertinent to the blogs, especially the copilot cli one and what we have learned about providing user facing messages using hooks",
+        "can you make sure all the blogs are completely up to date with the current version of our sticky notes even before 2.6 I think we wrote a lot of them before we made a lot of changes",
+        "ok great is the npm package up to date with this veresion and can I start using this on other repos?",
+        "yes commit and push the documentation changes and also tell me how i can update the sticky notes I have on the MOBA repo",
+        "how come the conflict warning didn't come up   ▘▘ ▝▝    ~\\OneDrive - Microsoft\\Desktop\\Projects\\Personal-Projects…\n\n❯ make a new branch for 'fix/sleep-window'\n\n● Bash(git checkout -b fix/sleep-window)\n  ⎿  Switched to a new branch 'fix/sleep-window'\n\n● Now on fix/sleep-window.\n\n❯ right now the eatin",
+        "are sticky notes not automatically included in git pull https://github.com/mhardmon1/MOBA/commit/7e15b1ea6437f8b5486f7815569a088bfa896dfe , Matt here did some work why are his threads not considered",
+        "so matt can't just have sticky note immediately installed when he pulls from main?",
+        "yes, but does mean both me and Matt will need to run sticky-note init on the same repo?"
       ],
       "contributors": [
         "dbandaru"
