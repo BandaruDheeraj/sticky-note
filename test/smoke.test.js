@@ -307,6 +307,22 @@ try {
     }
   });
 
+  run("doctor detects broken sticky-note.json", () => {
+    const memoryPath = path.join(tmpDir, ".sticky-note", "sticky-note.json");
+    const backup = fs.readFileSync(memoryPath, "utf-8");
+    fs.writeFileSync(memoryPath, "{ not valid json !!!");
+    try {
+      cli(["doctor"]);
+      assert.ok(false, "Expected doctor to exit 1 with broken sticky-note.json");
+    } catch (err) {
+      const out = err.stdout || "";
+      assert.ok(out.includes("[FAIL]"), "Should report failure for broken JSON");
+      assert.ok(out.includes("invalid JSON"), "Should mention invalid JSON");
+    } finally {
+      fs.writeFileSync(memoryPath, backup);
+    }
+  });
+
   // ── resume tests ──
 
   run("resume --list with no threads shows empty message", () => {
@@ -558,6 +574,71 @@ try {
 
     data.threads = [];
     fs.writeFileSync(snPath, JSON.stringify(data, null, 2) + "\n");
+  });
+
+  // ── audit with data tests ──
+
+  run("audit shows entries from audit file\", () => {
+    const auditDir = path.join(tmpDir, ".sticky-note", "audit");
+    const auditFile = path.join(auditDir, "smokeuser.jsonl");
+    fs.mkdirSync(auditDir, { recursive: true });
+    const entry = { ts: new Date().toISOString(), user: "smokeuser", type: "session-start", tool: "claude-code" };
+    fs.writeFileSync(auditFile, JSON.stringify(entry) + "\n");
+
+    const out = cli(["audit"]);
+    assert.ok(out.includes("smokeuser"), "Should display the user from the audit entry");
+    assert.ok(out.includes("session-start"), "Should display the action type");
+
+    fs.unlinkSync(auditFile);
+  });
+
+  // ── who with presence data ──
+
+  run("who shows user from presence file", () => {
+    const presenceDir = path.join(tmpDir, ".sticky-note", "presence");
+    const presenceFile = path.join(presenceDir, "presenceuser.json");
+    fs.mkdirSync(presenceDir, { recursive: true });
+    const presence = { last_seen: new Date().toISOString(), active_files: ["src/foo.js"] };
+    fs.writeFileSync(presenceFile, JSON.stringify(presence, null, 2) + "\n");
+
+    const out = cli(["who"]);
+    assert.ok(out.includes("presenceuser"), "Should display user name from presence file");
+    assert.ok(out.includes("ACTIVE") || out.includes("IDLE"), "Should show activity status");
+
+    fs.unlinkSync(presenceFile);
+  });
+
+  // ── gc tombstone test ──
+
+  run("gc tombstones old closed threads", () => {
+    const snPath = path.join(tmpDir, ".sticky-note", "sticky-note.json");
+    const data = JSON.parse(fs.readFileSync(snPath, "utf-8"));
+    const oldDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    data.threads = [
+      {
+        id: "gc-test-thread-111-222-333-4444",
+        status: "closed",
+        user: "gcuser",
+        branch: "main",
+        files_touched: ["src/old.js"],
+        created_at: oldDate,
+        closed_at: oldDate,
+        last_activity_at: oldDate,
+        narrative: "old closed work"
+      }
+    ];
+    fs.writeFileSync(snPath, JSON.stringify(data, null, 2) + "\n");
+
+    const out = cli(["gc"]);
+    assert.ok(out.includes("Tombstoned") || out.includes("tombstone"), "Should report tombstoning");
+
+    const after = JSON.parse(fs.readFileSync(snPath, "utf-8"));
+    const thread = after.threads[0];
+    assert.strictEqual(thread.status, "expired", "Thread should be tombstoned to expired");
+    assert.ok(!thread.narrative, "Tombstoned thread should not retain narrative");
+
+    after.threads = [];
+    fs.writeFileSync(snPath, JSON.stringify(after, null, 2) + "\n");
   });
 
   // ── unknown command ──
