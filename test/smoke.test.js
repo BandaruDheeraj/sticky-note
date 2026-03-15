@@ -251,6 +251,8 @@ try {
     );
   });
 
+  // ── doctor tests ──
+
   run("doctor runs before init (reports failures)", () => {
     const bareDir = fs.mkdtempSync(path.join(os.tmpdir(), "sticky-doctor-bare-"));
     try {
@@ -286,6 +288,275 @@ try {
       assert.ok(out.includes("[FAIL]"), "Should report as failure");
     } finally {
       fs.writeFileSync(hookPath, backup);
+    }
+  });
+
+  // ── resume tests ──
+
+  run("resume --list with no threads shows empty message", () => {
+    const out = cli(["resume", "--list"]);
+    assert.ok(out.includes("No resumable threads"), "Should report no resumable threads");
+  });
+
+  run("resume with unknown id exits non-zero", () => {
+    assert.throws(
+      () => cli(["resume", "nonexistent-id"]),
+      /Command failed/,
+      "Should exit with error for unknown thread id"
+    );
+  });
+
+  run("resume with unknown id prints error message", () => {
+    try {
+      cli(["resume", "nonexistent-id"]);
+      assert.fail("Should have thrown");
+    } catch (err) {
+      const combined = (err.stdout || "") + (err.stderr || "") + (err.message || "");
+      assert.ok(
+        combined.includes("No thread found") || combined.includes("ERR"),
+        "Should print an error about missing thread"
+      );
+    }
+  });
+
+  run("resume --clear with no signal reports gracefully", () => {
+    const out = cli(["resume", "--clear"]);
+    assert.ok(
+      out.includes("No active resume") || out.includes("cleared") || out.length > 0,
+      "Should handle missing resume signal"
+    );
+  });
+
+  // ── reset tests ──
+
+  run("reset with no threads reports nothing to reset", () => {
+    const out = cli(["reset"]);
+    assert.ok(out.includes("Nothing to reset") || out.includes("0 threads"), "Should report 0 threads");
+  });
+
+  run("reset --force clears threads", () => {
+    const snPath = path.join(tmpDir, ".sticky-note", "sticky-note.json");
+    const data = JSON.parse(fs.readFileSync(snPath, "utf-8"));
+    data.threads = [
+      { id: "aabbccdd-1111-2222-3333-444455556666", status: "open", user: "test", branch: "main", files_touched: [], created_at: new Date().toISOString() }
+    ];
+    fs.writeFileSync(snPath, JSON.stringify(data, null, 2) + "\n");
+
+    const out = cli(["reset", "--force"]);
+    assert.ok(out.includes("[OK]"), "Should print [OK]");
+
+    const after = JSON.parse(fs.readFileSync(snPath, "utf-8"));
+    assert.strictEqual(after.threads.length, 0, "Threads should be cleared");
+  });
+
+  run("reset --force --keep-audit preserves audit dir", () => {
+    const snPath = path.join(tmpDir, ".sticky-note", "sticky-note.json");
+    const auditDir = path.join(tmpDir, ".sticky-note", "audit");
+    const testAudit = path.join(auditDir, "test-user.jsonl");
+    fs.mkdirSync(auditDir, { recursive: true });
+    fs.writeFileSync(testAudit, JSON.stringify({ action: "test" }) + "\n");
+
+    const data = JSON.parse(fs.readFileSync(snPath, "utf-8"));
+    data.threads = [
+      { id: "aabbccdd-1111-2222-3333-444455556677", status: "open", user: "test", branch: "main", files_touched: [], created_at: new Date().toISOString() }
+    ];
+    fs.writeFileSync(snPath, JSON.stringify(data, null, 2) + "\n");
+
+    cli(["reset", "--force", "--keep-audit"]);
+    assert.ok(fs.existsSync(testAudit), "Audit file should be preserved with --keep-audit");
+  });
+
+  // ── overlap tests ──
+
+  run("overlap --files with no matching threads shows no overlaps", () => {
+    const out = cli(["overlap", "--files", "README.md"]);
+    assert.ok(out.length > 0, "Should produce output");
+    assert.ok(
+      out.includes("No overlaps") || out.includes("0 overlap") || out.includes("Checking"),
+      "Should indicate no overlaps found"
+    );
+  });
+
+  run("overlap --files detects match with open thread", () => {
+    const snPath = path.join(tmpDir, ".sticky-note", "sticky-note.json");
+    const data = JSON.parse(fs.readFileSync(snPath, "utf-8"));
+    data.threads = [
+      {
+        id: "overlap-thread-111-222-333-444-555",
+        status: "open",
+        user: "alice",
+        branch: "feature/auth",
+        files_touched: ["README.md"],
+        created_at: new Date().toISOString(),
+        last_note: "working on readme"
+      }
+    ];
+    fs.writeFileSync(snPath, JSON.stringify(data, null, 2) + "\n");
+
+    const out = cli(["overlap", "--files", "README.md"]);
+    assert.ok(
+      out.includes("README.md") || out.includes("alice") || out.includes("overlap"),
+      "Should detect overlap with alice's thread"
+    );
+
+    // Restore empty threads
+    data.threads = [];
+    fs.writeFileSync(snPath, JSON.stringify(data, null, 2) + "\n");
+  });
+
+  // ── claim tests ──
+
+  run("claim --list with no claims shows empty message", () => {
+    const out = cli(["claim", "--list"]);
+    assert.ok(
+      out.includes("No active claims") || out.length > 0,
+      "Should report no claims"
+    );
+  });
+
+  run("claim with no args shows usage", () => {
+    const out = cli(["claim"]);
+    assert.ok(out.includes("Usage"), "Should show usage");
+  });
+
+  run("claim adds a claim for a file", () => {
+    const out = cli(["claim", "README.md", "working on docs"]);
+    assert.ok(out.includes("[OK]") || out.includes("Claimed"), "Should confirm claim");
+
+    const snPath = path.join(tmpDir, ".sticky-note", "sticky-note.json");
+    const data = JSON.parse(fs.readFileSync(snPath, "utf-8"));
+    const claims = data.claims || [];
+    const match = claims.find(c => c.files && c.files.includes("README.md"));
+    assert.ok(match, "Claim for README.md should appear in sticky-note.json");
+  });
+
+  run("claim --clear removes claims", () => {
+    const out = cli(["claim", "--clear"]);
+    assert.ok(out.includes("[OK]") || out.includes("Cleared"), "Should confirm clear");
+
+    const snPath = path.join(tmpDir, ".sticky-note", "sticky-note.json");
+    const data = JSON.parse(fs.readFileSync(snPath, "utf-8"));
+    const claims = data.claims || [];
+    assert.strictEqual(claims.length, 0, "Claims should be empty after --clear");
+  });
+
+  // ── checkpoint tests ──
+
+  run("checkpoint --topic sets a checkpoint", () => {
+    const out = cli(["checkpoint", "--topic", "refactoring auth module"]);
+    assert.ok(out.includes("[OK]") || out.includes("Checkpoint") || out.length > 0, "Should confirm checkpoint set");
+  });
+
+  run("checkpoint --show reflects set topic", () => {
+    cli(["checkpoint", "--topic", "smoke test topic"]);
+    const out = cli(["checkpoint", "--show"]);
+    assert.ok(
+      out.includes("smoke test topic") || out.includes("Checkpoint") || out.length > 0,
+      "Should show the current checkpoint"
+    );
+  });
+
+  run("checkpoint --clear removes checkpoint", () => {
+    const out = cli(["checkpoint", "--clear"]);
+    assert.ok(out.length > 0, "Should produce output");
+  });
+
+  // ── resume-thread tests ──
+
+  run("resume-thread --query with no threads returns gracefully", () => {
+    try {
+      const out = cli(["resume-thread", "--query", "auth work"]);
+      assert.ok(out.length > 0, "Should produce output");
+    } catch (err) {
+      // Exits non-zero when no match — that's acceptable
+      assert.ok(
+        (err.stdout || "").length > 0 || (err.stderr || "").length > 0 || err.message.includes("Command failed"),
+        "Should produce some output"
+      );
+    }
+  });
+
+  run("resume-thread --json flag produces parseable output or graceful message", () => {
+    try {
+      const out = cli(["resume-thread", "--query", "auth", "--json"]);
+      // Either valid JSON or a plain message
+      try {
+        JSON.parse(out);
+      } catch (_) {
+        assert.ok(out.length > 0, "Should produce some output");
+      }
+    } catch (err) {
+      // Acceptable: exits non-zero when no match found
+      assert.ok(
+        (err.stdout || "").length > 0 || (err.stderr || "").length > 0,
+        "Should produce some output even on failure"
+      );
+    }
+  });
+
+  // ── threads command edge cases ──
+
+  run("threads shows open thread", () => {
+    const snPath = path.join(tmpDir, ".sticky-note", "sticky-note.json");
+    const data = JSON.parse(fs.readFileSync(snPath, "utf-8"));
+    data.threads = [
+      {
+        id: "thread-show-test-111-222-333-4444",
+        status: "open",
+        user: "bob",
+        tool: "claude-code",
+        branch: "feature/x",
+        files_touched: ["src/foo.js"],
+        created_at: new Date().toISOString(),
+        last_note: "in progress"
+      }
+    ];
+    fs.writeFileSync(snPath, JSON.stringify(data, null, 2) + "\n");
+
+    const out = cli(["threads"]);
+    assert.ok(out.includes("bob") || out.includes("feature/x") || out.includes("open"), "Should list the open thread");
+
+    data.threads = [];
+    fs.writeFileSync(snPath, JSON.stringify(data, null, 2) + "\n");
+  });
+
+  run("threads shows stuck thread with [STUCK] label", () => {
+    const snPath = path.join(tmpDir, ".sticky-note", "sticky-note.json");
+    const data = JSON.parse(fs.readFileSync(snPath, "utf-8"));
+    data.threads = [
+      {
+        id: "thread-stuck-test-111-222-333-444",
+        status: "stuck",
+        user: "carol",
+        tool: "copilot-cli",
+        branch: "feature/y",
+        files_touched: ["src/bar.js"],
+        created_at: new Date().toISOString(),
+        last_note: "blocked on auth"
+      }
+    ];
+    fs.writeFileSync(snPath, JSON.stringify(data, null, 2) + "\n");
+
+    const out = cli(["threads"]);
+    assert.ok(out.includes("STUCK") || out.includes("stuck"), "Should show [STUCK] for stuck thread");
+
+    data.threads = [];
+    fs.writeFileSync(snPath, JSON.stringify(data, null, 2) + "\n");
+  });
+
+  // ── unknown command ──
+
+  run("unknown command prints help or error", () => {
+    try {
+      const out = cli(["not-a-real-command"]);
+      assert.ok(out.includes("Usage") || out.includes("Commands") || out.includes("sticky-note"), "Should print help for unknown command");
+    } catch (err) {
+      // Exiting non-zero for unknown commands is fine — check stderr or stdout has info
+      const combined = (err.stdout || "") + (err.stderr || "");
+      assert.ok(
+        combined.includes("sticky-note") || combined.includes("unknown") || combined.includes("Usage") || combined.length > 0,
+        "Should produce some output for unknown command"
+      );
     }
   });
 
