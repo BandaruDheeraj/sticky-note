@@ -1,5 +1,15 @@
 # Changelog
 
+## V2.6.13
+
+### Fix: Teammate hook sharing (zero-config onboarding)
+- `init` and `update` now detect overly broad `.claude/` gitignore entries
+  and replace them with targeted `.claude/settings.local.json` ignore.
+- `init` runs `git add --force .claude/hooks/ .claude/settings.json` so
+  hook scripts are committed even if previously ignored.
+- `update` does the same gitignore cleanup and force-add.
+- Teammates now get working hooks on `git pull` — no `init` required.
+
 ## V2.6.0–2.6.12 (main)
 
 ### New: Overlap Detection

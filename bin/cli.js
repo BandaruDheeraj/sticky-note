@@ -526,12 +526,29 @@ async function cmdInit() {
     gitignoreContent = fs.readFileSync(gitignorePath, "utf-8");
   }
 
+  // Fix overly broad .claude/ ignore that blocks hook sharing
+  let gitignoreChanged = false;
+  if (gitignoreContent) {
+    const lines = gitignoreContent.split(/\r?\n/);
+    const filtered = lines.filter((line) => {
+      const trimmed = line.trim();
+      // Remove lines that ignore all of .claude/ (but keep targeted entries)
+      return trimmed !== ".claude/" && trimmed !== ".claude";
+    });
+    if (filtered.length !== lines.length) {
+      gitignoreContent = filtered.join("\n");
+      fs.writeFileSync(gitignorePath, gitignoreContent);
+      gitignoreChanged = true;
+      print("  [OK] .gitignore: removed broad .claude/ ignore (hooks will be shared via git)");
+    }
+  }
+
   const missingEntries = ignoreAdditions.filter((e) => !gitignoreContent.includes(e.trim()));
   if (missingEntries.length > 0) {
     const block = "\n# Sticky Note\n" + missingEntries.join("\n") + "\n";
     fs.appendFileSync(gitignorePath, block);
     print("  [OK] .gitignore updated");
-  } else {
+  } else if (!gitignoreChanged) {
     print("  ⏭️  .gitignore already configured");
   }
 
@@ -623,6 +640,17 @@ async function cmdInit() {
     print("  [OK] .git/hooks/post-rewrite (attribution survives rebase)");
   }
 
+  // Force-add .claude/hooks/ and .claude/settings.json so git tracks them
+  // (needed if .claude/ was previously in .gitignore)
+  try {
+    execFileSync("git", ["add", "--force", ".claude/hooks/", ".claude/settings.json"], {
+      cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
+    });
+    print("  [OK] .claude/hooks/ and .claude/settings.json staged for git");
+  } catch (err) {
+    debugLog("git add --force .claude/ failed: " + (err.message || err));
+  }
+
   // Done!
   print("\n  ✨ Sticky Note V2 initialized!\n");
   print("  Next steps:");
@@ -699,6 +727,44 @@ function cmdUpdate() {
 
   // Upgrade .gitattributes from merge=union to custom driver
   const gitattrsPath = path.join(process.cwd(), ".gitattributes");
+
+  // Fix overly broad .claude/ gitignore that blocks hook sharing
+  const gitignorePath = path.join(process.cwd(), ".gitignore");
+  if (fs.existsSync(gitignorePath)) {
+    let gitignoreContent = fs.readFileSync(gitignorePath, "utf-8");
+    const lines = gitignoreContent.split(/\r?\n/);
+    const filtered = lines.filter((line) => {
+      const trimmed = line.trim();
+      return trimmed !== ".claude/" && trimmed !== ".claude";
+    });
+    if (filtered.length !== lines.length) {
+      fs.writeFileSync(gitignorePath, filtered.join("\n"));
+      print("  [OK] .gitignore: removed broad .claude/ ignore (hooks will be shared via git)");
+
+      // Ensure targeted ignores are present
+      const ignoreAdditions = fs
+        .readFileSync(path.join(TEMPLATES_DIR, "gitignore-additions.txt"), "utf-8")
+        .trim()
+        .split(/\r?\n/)
+        .filter((l) => l.trim() && !l.startsWith("#"));
+      const updatedContent = fs.readFileSync(gitignorePath, "utf-8");
+      const missing = ignoreAdditions.filter((e) => !updatedContent.includes(e.trim()));
+      if (missing.length > 0) {
+        fs.appendFileSync(gitignorePath, "\n# Sticky Note\n" + missing.join("\n") + "\n");
+      }
+
+      // Force-add previously ignored hook files so git starts tracking them
+      try {
+        execFileSync("git", ["add", "--force", ".claude/hooks/", ".claude/settings.json"], {
+          cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
+        });
+        print("  [OK] git add --force .claude/hooks/ .claude/settings.json");
+      } catch (err) {
+        debugLog("git add --force .claude/ failed: " + (err.message || err));
+      }
+    }
+  }
+
   if (fs.existsSync(gitattrsPath)) {
     let gitattrsContent = fs.readFileSync(gitattrsPath, "utf-8");
     const oldRule = ".sticky-note/sticky-note.json merge=union";
