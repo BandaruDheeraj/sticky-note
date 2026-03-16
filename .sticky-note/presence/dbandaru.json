@@ -1,15 +1,15 @@
 {
   "active_files": [
-    "templates\\CLAUDE.md",
+    "templates",
+    ".gitignore",
+    "templates\\gitignore-additions.txt",
     "templates\\hooks\\sticky-utils.js",
-    "templates\\hooks",
-    "templates\\hooks\\inject-context.js",
-    "templates\\hooks\\pre-tool-use.js",
-    "bin\\cli.js",
-    ".sticky-note\\sticky-note.json",
-    ".github\\hooks\\hooks.json",
     "package.json",
-    "templates\\copilot-instructions.md"
+    "..\\..\\..\\..\\.copilot\\session-state\\c6545bf9-06f2-4972-9209-a0d429fce043\\plan.md",
+    "templates\\sticky-note-config.json",
+    "templates\\hooks\\post-commit",
+    "templates\\hooks\\session-end.js",
+    "test\\smoke.test.js"
   ],
-  "last_seen": "2026-03-14T23:36:42.978Z"
+  "last_seen": "2026-03-16T22:39:04.271Z"
 }
