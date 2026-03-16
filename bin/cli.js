@@ -91,6 +91,116 @@ function makeExecutable(filePath) {
   }
 }
 
+const STICKY_PRE_COMMIT_MARKER = "# [sticky-note:auto-stage]";
+const STICKY_PRE_COMMIT_END    = "# [/sticky-note:auto-stage]";
+
+/**
+ * Install a pre-commit git hook that auto-stages .sticky-note/ tracked files.
+ * If an existing pre-commit hook is present, our block is prepended (or updated)
+ * so it chains cleanly with linters, husky, etc.
+ */
+function installPreCommitHook() {
+  try {
+    const gitDir = path.join(process.cwd(), ".git");
+    if (!fs.existsSync(gitDir)) return false;
+    const hooksDir = path.join(gitDir, "hooks");
+    mkdirSafe(hooksDir);
+    const dest = path.join(hooksDir, "pre-commit");
+
+    const stickyBlock = [
+      STICKY_PRE_COMMIT_MARKER,
+      '# Auto-stage .sticky-note/ files so they ride along with every commit.',
+      '_sn_root="$(git rev-parse --show-toplevel 2>/dev/null)"',
+      'if [ -d "$_sn_root/.sticky-note" ]; then',
+      '  [ -f "$_sn_root/.sticky-note/sticky-note.json" ] && git add "$_sn_root/.sticky-note/sticky-note.json" 2>/dev/null || true',
+      '  [ -d "$_sn_root/.sticky-note/audit" ] && git add "$_sn_root/.sticky-note/audit/" 2>/dev/null || true',
+      '  [ -d "$_sn_root/.sticky-note/presence" ] && git add "$_sn_root/.sticky-note/presence/" 2>/dev/null || true',
+      'fi',
+      STICKY_PRE_COMMIT_END,
+    ].join("\n");
+
+    if (fs.existsSync(dest)) {
+      let existing = fs.readFileSync(dest, "utf-8");
+      const startIdx = existing.indexOf(STICKY_PRE_COMMIT_MARKER);
+      const endIdx   = existing.indexOf(STICKY_PRE_COMMIT_END);
+
+      if (startIdx !== -1 && endIdx !== -1) {
+        // Update our existing block in-place
+        existing = existing.slice(0, startIdx) + stickyBlock + existing.slice(endIdx + STICKY_PRE_COMMIT_END.length);
+      } else {
+        // Prepend our block after the shebang (or at the top)
+        const shebangMatch = existing.match(/^#!.*\n/);
+        if (shebangMatch) {
+          existing = shebangMatch[0] + stickyBlock + "\n" + existing.slice(shebangMatch[0].length);
+        } else {
+          existing = "#!/bin/sh\n" + stickyBlock + "\n" + existing;
+        }
+      }
+      fs.writeFileSync(dest, existing, "utf-8");
+    } else {
+      // No existing hook — create a fresh one
+      fs.writeFileSync(dest, "#!/bin/sh\n" + stickyBlock + "\n", "utf-8");
+    }
+    makeExecutable(dest);
+    return true;
+  } catch (err) {
+    debugLog("installPreCommitHook failed: " + (err.message || err));
+    return false;
+  }
+}
+
+const STICKY_POST_COMMIT_MARKER = "# [sticky-note:auto-sync]";
+const STICKY_POST_COMMIT_END    = "# [/sticky-note:auto-sync]";
+
+/**
+ * Install a post-commit git hook that auto-commits leftover .sticky-note/ changes.
+ * Uses the same prepend/update strategy as installPreCommitHook.
+ */
+function installPostCommitHook() {
+  try {
+    const gitDir = path.join(process.cwd(), ".git");
+    if (!fs.existsSync(gitDir)) return false;
+    const hooksDir = path.join(gitDir, "hooks");
+    mkdirSafe(hooksDir);
+    const dest = path.join(hooksDir, "post-commit");
+    const src = path.join(TEMPLATES_DIR, "hooks", "post-commit");
+    const template = fs.existsSync(src) ? fs.readFileSync(src, "utf-8") : "";
+
+    // Extract just the body (skip shebang + first comment line from template)
+    const bodyLines = template.split("\n").filter(l => !l.startsWith("#!/"));
+    const stickyBlock = [
+      STICKY_POST_COMMIT_MARKER,
+      ...bodyLines,
+      STICKY_POST_COMMIT_END,
+    ].join("\n");
+
+    if (fs.existsSync(dest)) {
+      let existing = fs.readFileSync(dest, "utf-8");
+      const startIdx = existing.indexOf(STICKY_POST_COMMIT_MARKER);
+      const endIdx   = existing.indexOf(STICKY_POST_COMMIT_END);
+
+      if (startIdx !== -1 && endIdx !== -1) {
+        existing = existing.slice(0, startIdx) + stickyBlock + existing.slice(endIdx + STICKY_POST_COMMIT_END.length);
+      } else {
+        const shebangMatch = existing.match(/^#!.*\n/);
+        if (shebangMatch) {
+          existing = shebangMatch[0] + stickyBlock + "\n" + existing.slice(shebangMatch[0].length);
+        } else {
+          existing = "#!/bin/sh\n" + stickyBlock + "\n" + existing;
+        }
+      }
+      fs.writeFileSync(dest, existing, "utf-8");
+    } else {
+      fs.writeFileSync(dest, "#!/bin/sh\n" + stickyBlock + "\n", "utf-8");
+    }
+    makeExecutable(dest);
+    return true;
+  } catch (err) {
+    debugLog("installPostCommitHook failed: " + (err.message || err));
+    return false;
+  }
+}
+
 function installGitHook(hookName) {
   try {
     const gitDir = path.join(process.cwd(), ".git");
@@ -640,6 +750,16 @@ async function cmdInit() {
     print("  [OK] .git/hooks/post-rewrite (attribution survives rebase)");
   }
 
+  // Install pre-commit hook (auto-stage .sticky-note/ files)
+  if (installPreCommitHook()) {
+    print("  [OK] .git/hooks/pre-commit (auto-stage .sticky-note/ files)");
+  }
+
+  // Install post-commit hook (auto-commit leftover .sticky-note/ changes)
+  if (installPostCommitHook()) {
+    print("  [OK] .git/hooks/post-commit (auto-sync .sticky-note/ after commit)");
+  }
+
   // Force-add .claude/hooks/ and .claude/settings.json so git tracks them
   // (needed if .claude/ was previously in .gitignore)
   try {
@@ -709,6 +829,12 @@ function cmdUpdate() {
   // Update git hooks (.git/hooks/)
   if (installGitHook("post-rewrite")) {
     print("  [OK] .git/hooks/post-rewrite (attribution survives rebase)");
+  }
+  if (installPreCommitHook()) {
+    print("  [OK] .git/hooks/pre-commit (auto-stage .sticky-note/ files)");
+  }
+  if (installPostCommitHook()) {
+    print("  [OK] .git/hooks/post-commit (auto-sync .sticky-note/ after commit)");
   }
 
   // Update hook_version in config
@@ -2247,6 +2373,63 @@ function cmdGc() {
 }
 
 // ──────────────────────────────────────────────
+// sync — commit and optionally push .sticky-note/ files
+// ──────────────────────────────────────────────
+
+function cmdSync() {
+  const args = process.argv.slice(3);
+  const doPush = args.includes("--push");
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  if (!fs.existsSync(stickyDir)) {
+    print("  [ERR] No .sticky-note/ directory found. Run 'npx sticky-note init' first.");
+    process.exit(1);
+  }
+
+  printBanner();
+  print("  Syncing .sticky-note/ files...\n");
+
+  try {
+    const status = execSync(
+      'git status --porcelain -- ".sticky-note/sticky-note.json" ".sticky-note/audit/" ".sticky-note/presence/"',
+      { encoding: "utf-8", cwd: process.cwd() }
+    ).trim();
+    if (!status) {
+      print("  [OK] Nothing to sync — .sticky-note/ files are clean.");
+      print("");
+      return;
+    }
+
+    // Write recursion guard
+    const guardPath = path.join(stickyDir, ".sticky-syncing");
+    fs.writeFileSync(guardPath, process.pid.toString(), "utf-8");
+
+    try {
+      execFileSync("git", [
+        "add", "--", ".sticky-note/sticky-note.json",
+        ".sticky-note/audit/", ".sticky-note/presence/"
+      ], { cwd: process.cwd(), timeout: 10000, stdio: ["pipe", "pipe", "pipe"] });
+
+      execFileSync("git", [
+        "commit", "--no-verify", "-m", "chore(sticky-note): sync thread data"
+      ], { cwd: process.cwd(), timeout: 15000, stdio: ["pipe", "pipe", "pipe"] });
+      print("  ✅ Committed .sticky-note/ changes.");
+
+      if (doPush) {
+        execFileSync("git", ["push"], {
+          cwd: process.cwd(), timeout: 30000, stdio: ["pipe", "pipe", "pipe"],
+        });
+        print("  ✅ Pushed to remote.");
+      }
+    } finally {
+      try { fs.unlinkSync(guardPath); } catch (_) {}
+    }
+  } catch (err) {
+    print("  ⚠️  Sync failed: " + (err.message || err));
+  }
+  print("");
+}
+
+// ──────────────────────────────────────────────
 // Main
 // ──────────────────────────────────────────────
 
@@ -2300,6 +2483,9 @@ async function main() {
     case "claim":
       cmdClaim();
       break;
+    case "sync":
+      cmdSync();
+      break;
     case "--version":
     case "-v":
       print(`sticky-note v${VERSION}`);
@@ -2325,6 +2511,7 @@ async function main() {
       print("    checkpoint         Set work-topic checkpoint for attribution (--topic, --show, --clear)");
       print("    overlap            Detect file overlaps with open/stuck threads");
       print("    claim              Claim ownership of files you're working on (--list, --clear)");
+      print("    sync               Commit .sticky-note/ changes to git (--push to also push)");
       print("");
       print("  Options:");
       print("    --version  Show version");

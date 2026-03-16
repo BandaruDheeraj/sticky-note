@@ -1,6 +1,5 @@
 {
   "active_files": [
-    "templates",
     ".gitignore",
     "templates\\gitignore-additions.txt",
     "templates\\hooks\\sticky-utils.js",
@@ -9,7 +8,8 @@
     "templates\\sticky-note-config.json",
     "templates\\hooks\\post-commit",
     "templates\\hooks\\session-end.js",
-    "test\\smoke.test.js"
+    "test\\smoke.test.js",
+    "bin\\cli.js"
   ],
-  "last_seen": "2026-03-16T22:39:04.271Z"
+  "last_seen": "2026-03-16T22:41:45.494Z"
 }

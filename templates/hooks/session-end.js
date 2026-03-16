@@ -58,6 +58,7 @@ const {
   clearActiveResumeThreadId,
   clearInjectedSet,
   normalizeSep,
+  syncStickyNote,
 } = utils;
 
 // ── Constants ─────────────────────────────────────────────
@@ -934,6 +935,16 @@ function main() {
     clearInjectedSet();
   }
   saveMemoryMerged(memoryPath, memory);
+
+  // Auto-sync: commit (and optionally push) .sticky-note/ changes
+  const config = loadJson(getConfigPath(), {});
+  if (config.auto_sync !== false) {
+    try {
+      syncStickyNote({ push: config.auto_push === true });
+    } catch (_) {
+      // Non-fatal — sync failure shouldn't block session-end
+    }
+  }
 
   const fileCount = filesTouched.length;
   const commitCount = commitShas.length;

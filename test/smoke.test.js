@@ -237,6 +237,55 @@ try {
     );
   });
 
+  // ── Sync & auto-commit tests ──
+
+  // Commit sticky-note files first so we have a clean baseline
+  try {
+    execSync('git add -A && git commit -m "setup sticky-note files"', { cwd: tmpDir, stdio: "pipe" });
+  } catch (_) { /* may already be committed */ }
+
+  run("sync command works with clean tree", () => {
+    const out = cli(["sync"]);
+    assert.ok(out.includes("Nothing to sync") || out.includes("clean"), "Should report nothing to sync");
+  });
+
+  run("sync command commits dirty .sticky-note/ files", () => {
+    // Dirty the sticky-note.json
+    const snPath = path.join(tmpDir, ".sticky-note", "sticky-note.json");
+    const data = JSON.parse(fs.readFileSync(snPath, "utf-8"));
+    data.project = "sync-test";
+    fs.writeFileSync(snPath, JSON.stringify(data, null, 2) + "\n");
+
+    const out = cli(["sync"]);
+    assert.ok(out.includes("Committed") || out.includes("✅"), "Should commit changes");
+
+    // Verify git log has the sync commit
+    const log = execSync("git log --oneline -1", { cwd: tmpDir, encoding: "utf-8" });
+    assert.ok(log.includes("sticky-note"), "Last commit should be sticky-note sync");
+  });
+
+  run("post-commit hook template exists", () => {
+    const hookPath = path.join(TEMPLATES, "hooks", "post-commit");
+    assert.ok(fs.existsSync(hookPath), "post-commit template should exist");
+    const content = fs.readFileSync(hookPath, "utf-8");
+    assert.ok(content.includes("sticky-syncing"), "Should have recursion guard");
+    assert.ok(content.includes("sticky-note"), "Should reference sticky-note");
+  });
+
+  run("config template has auto_sync options", () => {
+    const configTemplate = JSON.parse(
+      fs.readFileSync(path.join(TEMPLATES, "sticky-note-config.json"), "utf-8")
+    );
+    assert.strictEqual(configTemplate.auto_sync, true, "auto_sync should default to true");
+    assert.strictEqual(configTemplate.auto_push, false, "auto_push should default to false");
+  });
+
+  run("syncStickyNote utility exists in sticky-utils", () => {
+    const utilsPath = path.join(TEMPLATES, "hooks", "sticky-utils.js");
+    const utils = require(utilsPath);
+    assert.ok(typeof utils.syncStickyNote === "function", "syncStickyNote should be exported");
+  });
+
 } finally {
   cleanup();
 }

@@ -140,6 +140,73 @@ function clearSessionFile() {
   }
 }
 
+// ── Git sync (auto-commit/push .sticky-note/ files) ──────
+
+function _gitRepoRoot() {
+  try {
+    return execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Stage, commit, and optionally push .sticky-note/ files.
+ * Returns { committed: bool, pushed: bool, skipped: bool, error?: string }
+ */
+function syncStickyNote(opts) {
+  const push = opts && opts.push;
+  const result = { committed: false, pushed: false, skipped: false };
+  try {
+    const root = _gitRepoRoot();
+    if (!root) { result.skipped = true; return result; }
+
+    const syncGuard = path.join(_stickyDir(), ".sticky-syncing");
+    if (fs.existsSync(syncGuard)) { result.skipped = true; return result; }
+
+    // Check for dirty .sticky-note/ files (staged or unstaged)
+    const status = execFileSync("git", [
+      "status", "--porcelain", "--", ".sticky-note/sticky-note.json",
+      ".sticky-note/audit/", ".sticky-note/presence/"
+    ], { encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] }).trim();
+
+    if (!status) { result.skipped = true; return result; }
+
+    // Write guard to prevent recursive post-commit triggers
+    fs.writeFileSync(syncGuard, process.pid.toString(), "utf-8");
+
+    try {
+      // Stage the relevant files
+      execFileSync("git", [
+        "add", "--", ".sticky-note/sticky-note.json",
+        ".sticky-note/audit/", ".sticky-note/presence/"
+      ], { timeout: 10000, stdio: ["pipe", "pipe", "pipe"] });
+
+      // Commit only what was staged
+      execFileSync("git", [
+        "commit", "-m", "chore(sticky-note): sync thread data", "--no-verify"
+      ], { timeout: 15000, stdio: ["pipe", "pipe", "pipe"] });
+      result.committed = true;
+
+      // Push if requested
+      if (push) {
+        execFileSync("git", ["push"], {
+          timeout: 30000, stdio: ["pipe", "pipe", "pipe"],
+        });
+        result.pushed = true;
+      }
+    } finally {
+      try { fs.unlinkSync(syncGuard); } catch (_) {}
+    }
+  } catch (err) {
+    result.error = err.message;
+    logHookError("syncStickyNote", err);
+  }
+  return result;
+}
+
 // ── Git HEAD snapshot (for files_touched fallback) ────────
 
 function saveHeadSha() {
@@ -747,5 +814,7 @@ module.exports = {
   markOverlapDismissed,
   // V2.5: cross-platform path helper
   normalizeSep,
+  // V2.7: auto-sync
+  syncStickyNote,
 };
 // tier1 test

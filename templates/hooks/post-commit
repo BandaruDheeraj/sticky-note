@@ -1,0 +1,36 @@
+#!/bin/sh
+# Sticky Note — post-commit hook
+# Auto-commits .sticky-note/ changes that weren't included in the user's commit.
+# Installed by `npx sticky-note init`. Safe to remove if you prefer manual sync.
+
+_sn_root="$(git rev-parse --show-toplevel 2>/dev/null)"
+[ -z "$_sn_root" ] && exit 0
+
+# Recursion guard — if we're already syncing, bail out
+_sn_guard="$_sn_root/.sticky-note/.sticky-syncing"
+[ -f "$_sn_guard" ] && exit 0
+
+# Check for dirty .sticky-note/ files (unstaged changes that weren't in the commit)
+_sn_dirty="$(git status --porcelain -- \
+  "$_sn_root/.sticky-note/sticky-note.json" \
+  "$_sn_root/.sticky-note/audit/" \
+  "$_sn_root/.sticky-note/presence/" 2>/dev/null)"
+[ -z "$_sn_dirty" ] && exit 0
+
+# Write guard file
+echo $$ > "$_sn_guard"
+
+# Stage and commit
+git add -- \
+  "$_sn_root/.sticky-note/sticky-note.json" \
+  "$_sn_root/.sticky-note/audit/" \
+  "$_sn_root/.sticky-note/presence/" 2>/dev/null
+
+git commit --no-verify -m "chore(sticky-note): sync thread data" -- \
+  "$_sn_root/.sticky-note/sticky-note.json" \
+  "$_sn_root/.sticky-note/audit/" \
+  "$_sn_root/.sticky-note/presence/" 2>/dev/null
+
+# Clean up guard
+rm -f "$_sn_guard" 2>/dev/null
+exit 0
