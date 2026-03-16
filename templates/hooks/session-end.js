@@ -949,6 +949,7 @@ function main() {
 
 try {
   main();
-} catch (_) {
+} catch (err) {
+  try { utils.logHookError("session-end", err); } catch (_) {}
   _safeExit();
 }

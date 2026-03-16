@@ -50,6 +50,7 @@ const {
   saveMemoryMerged,
   appendAuditLine,
   getUser,
+  getBranch,
   getSessionId,
   getResumeThreadId,
   findThreadById,
@@ -68,7 +69,7 @@ const {
 function ageStaleThreads(memory, staleDays) {
   const now = Date.now();
   let changed = false;
-  for (const thread of memory.threads || []) {
+  for (const thread of (memory.threads || []).filter(Boolean)) {
     if (thread.status !== "open" && thread.status !== "stuck") continue;
     const tsField =
       thread.last_activity_at || thread.updated_at || thread.created_at || "";
@@ -95,7 +96,7 @@ function ageStaleThreads(memory, staleDays) {
 function autoCloseCopilotCliThreads(memory, autoCloseHours) {
   const now = Date.now();
   let changed = false;
-  for (const thread of memory.threads || []) {
+  for (const thread of (memory.threads || []).filter(Boolean)) {
     if (thread.status !== "open") continue;
     if (thread.tool !== "copilot-cli") continue;
     const tsField =
@@ -468,7 +469,7 @@ function main() {
   const resumeThreadId = getResumeThreadId();
   let resumedThread = null;
   if (resumeThreadId) {
-    const threads = memory.threads || [];
+    const threads = (memory.threads || []).filter(Boolean);
     resumedThread = findThreadById(threads, resumeThreadId);
     if (resumedThread) {
       resumedThread.status = "open";
@@ -493,14 +494,54 @@ function main() {
     }
   }
 
+  // ── Create "open" thread for this session ──────────────
+  // Ensures a thread exists even if SessionEnd never fires (Ctrl+C, crash).
+  // session-end.js, on-stop.js, and on-error.js will find and update this
+  // thread by session_id. Copilot CLI fires SessionStart per-turn, so skip
+  // creation on subsequent turns (thread already exists from the first turn).
+  if (!resumedThread) {
+    const threads = (memory.threads || []).filter(Boolean);
+    memory.threads = threads;
+    const existingForSession = threads.find((t) => t.session_id === sessionId);
+    if (!existingForSession) {
+      const user = getUser();
+      const branch = getBranch();
+      threads.push({
+        id: crypto.randomUUID(),
+        user,
+        project: memory.project || "",
+        status: "open",
+        branch,
+        created_at: new Date().toISOString(),
+        closed_at: null,
+        last_activity_at: new Date().toISOString(),
+        files_touched: [],
+        last_note: "",
+        narrative: "",
+        failed_approaches: [],
+        handoff_summary: "",
+        related_session_ids: [],
+        resume_chain: [],
+        tool: aiTool,
+        session_id: sessionId,
+        work_type: "",
+        activities: [],
+        tool_calls: {},
+        prompts: [],
+        contributors: [user],
+        resume_history: [],
+      });
+    }
+  }
+
   // ── Build context pieces ──────────────────────────────
-  const threadResult = formatThreadsForInjection(memory.threads || []);
+  const threadResult = formatThreadsForInjection((memory.threads || []).filter(Boolean));
   const threadContext = threadResult.text;
   const configContext = formatConfigForInjection(config);
   const presenceData = loadAllPresence();
-  const presenceContext = formatPresence(presenceData, memory.threads || []);
+  const presenceContext = formatPresence(presenceData, (memory.threads || []).filter(Boolean));
   const overlapContext = formatOverlapWarnings(
-    memory.threads || [], getUser(), memory
+    (memory.threads || []).filter(Boolean), getUser(), memory
   );
 
   // V2.5: Mark eagerly-injected stuck threads so PreToolUse won't re-inject.
@@ -618,6 +659,7 @@ function main() {
 
 try {
   main();
-} catch (_) {
+} catch (err) {
+  try { utils.logHookError("session-start", err); } catch (_) {}
   _safeExit();
 }

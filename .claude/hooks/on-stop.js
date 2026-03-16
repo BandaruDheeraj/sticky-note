@@ -213,11 +213,11 @@ async function main() {
   const narrative = buildNarrativeFromAudit(auditData);
   const workType = classifyWorkType(auditData);
 
-  const threads = memory.threads || [];
+  const threads = (memory.threads || []).filter(Boolean);
   let found = false;
 
   for (const thread of threads) {
-    if (thread.session_id === sessionId && (thread.status === "open" || thread.status === "stuck")) {
+    if (thread.session_id === sessionId) {
       thread.last_activity_at = now;
       // Enrich with extracted data
       if (allFiles.length) {
@@ -250,35 +250,9 @@ async function main() {
       break;
     }
   }
-
-  if (!found && sessionId !== "unknown") {
-    const storedPrompts = (auditData.prompts || []).slice(0, 20).map((p) => p.substring(0, 300));
-    const thread = {
-      id: crypto.randomUUID(),
-      user,
-      project: memory.project || "",
-      status: "closed",
-      branch: getBranch(),
-      created_at: now,
-      closed_at: now,
-      last_activity_at: now,
-      files_touched: allFiles,
-      last_note: reason ? reason.substring(0, 200) : (narrative || "Session stopped"),
-      narrative,
-      failed_approaches: [],
-      handoff_summary: "",
-      related_session_ids: [],
-      tool: detectTool(hookInput),
-      session_id: sessionId,
-      work_type: workType,
-      tool_calls: auditData.tools || {},
-      prompts: storedPrompts,
-      contributors: [user],
-      resume_history: [],
-    };
-    thread.handoff_summary = buildHandoffSummary(thread, reason);
-    threads.push(thread);
-  }
+  // If no thread exists for this session, skip — session-start.js creates the
+  // thread now. Creating standalone threads from Stop events produced duplicates
+  // when session-end.js had already closed the thread (status filter mismatch).
 
   const auditEntry = {
     type: "stop",
@@ -310,4 +284,7 @@ async function main() {
   process.exit(0);
 }
 
-main().catch(() => safeExit());
+main().catch((err) => {
+  try { utils.logHookError("on-stop", err); } catch (_) {}
+  safeExit();
+});

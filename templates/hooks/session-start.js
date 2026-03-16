@@ -50,6 +50,7 @@ const {
   saveMemoryMerged,
   appendAuditLine,
   getUser,
+  getBranch,
   getSessionId,
   getResumeThreadId,
   findThreadById,
@@ -493,6 +494,46 @@ function main() {
     }
   }
 
+  // ── Create "open" thread for this session ──────────────
+  // Ensures a thread exists even if SessionEnd never fires (Ctrl+C, crash).
+  // session-end.js, on-stop.js, and on-error.js will find and update this
+  // thread by session_id. Copilot CLI fires SessionStart per-turn, so skip
+  // creation on subsequent turns (thread already exists from the first turn).
+  if (!resumedThread) {
+    const threads = (memory.threads || []).filter(Boolean);
+    memory.threads = threads;
+    const existingForSession = threads.find((t) => t.session_id === sessionId);
+    if (!existingForSession) {
+      const user = getUser();
+      const branch = getBranch();
+      threads.push({
+        id: crypto.randomUUID(),
+        user,
+        project: memory.project || "",
+        status: "open",
+        branch,
+        created_at: new Date().toISOString(),
+        closed_at: null,
+        last_activity_at: new Date().toISOString(),
+        files_touched: [],
+        last_note: "",
+        narrative: "",
+        failed_approaches: [],
+        handoff_summary: "",
+        related_session_ids: [],
+        resume_chain: [],
+        tool: aiTool,
+        session_id: sessionId,
+        work_type: "",
+        activities: [],
+        tool_calls: {},
+        prompts: [],
+        contributors: [user],
+        resume_history: [],
+      });
+    }
+  }
+
   // ── Build context pieces ──────────────────────────────
   const threadResult = formatThreadsForInjection((memory.threads || []).filter(Boolean));
   const threadContext = threadResult.text;
@@ -618,6 +659,7 @@ function main() {
 
 try {
   main();
-} catch (_) {
+} catch (err) {
+  try { utils.logHookError("session-start", err); } catch (_) {}
   _safeExit();
 }

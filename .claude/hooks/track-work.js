@@ -37,12 +37,16 @@ try {
 
 const {
   getConfigPath,
+  getMemoryPath,
   getUserPresencePath,
   loadJson,
   saveJson,
+  saveMemoryMerged,
   appendAuditLine,
   getUser,
+  getBranch,
   getSessionId,
+  normalizeSep,
 } = utils;
 
 const WRITE_TOOLS = new Set([
@@ -302,6 +306,35 @@ function main() {
     }
   }
 
+  // ── Progressive thread update ────────────────────────────
+  // Update the session's open thread with files_touched and branch changes
+  // so data survives even if SessionEnd never fires (Ctrl+C, crash).
+  if (filePath) {
+    try {
+      const memoryPath = getMemoryPath();
+      const memory = loadJson(memoryPath, { version: "2", project: "", threads: [] });
+      const threads = (memory.threads || []).filter(Boolean);
+      const sessionThread = threads.find((t) => t.session_id === sessionId);
+      if (sessionThread) {
+        const normalized = normalizeSep(filePath);
+        const touched = sessionThread.files_touched || [];
+        if (!touched.includes(normalized)) {
+          touched.push(normalized);
+          sessionThread.files_touched = touched;
+        }
+        // Update branch if it changed mid-session
+        const currentBranch = getBranch();
+        if (currentBranch && currentBranch !== sessionThread.branch) {
+          sessionThread.branch = currentBranch;
+        }
+        sessionThread.last_activity_at = now;
+        saveMemoryMerged(memoryPath, memory);
+      }
+    } catch (_) {
+      // Best-effort — don't break the hook if thread update fails
+    }
+  }
+
   // Build status message for transparency
   const linePart = lineRanges && lineRanges.length > 0 ? ` (lines ${lineRanges.map(r => `${r.start}-${r.end}`).join(", ")})` : "";
   const statusMsg = `[STICKY-NOTE] Tracked ${toolName}${filePath ? " on " + filePath : ""}${linePart}`;
@@ -316,6 +349,7 @@ function main() {
 
 try {
   main();
-} catch (_) {
+} catch (err) {
+  try { utils.logHookError("track-work", err); } catch (_) {}
   safeExit();
 }

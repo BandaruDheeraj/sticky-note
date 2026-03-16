@@ -42,6 +42,21 @@ function _stickyDir() {
   return path.join(scriptDir, "..", "..", ".sticky-note");
 }
 
+// ── Error logging ─────────────────────────────────────────
+
+function logHookError(hookName, error) {
+  try {
+    const logPath = path.join(_stickyDir(), ".sticky-errors.log");
+    const ts = new Date().toISOString();
+    const msg = error instanceof Error ? error.stack || error.message : String(error);
+    const line = `[${ts}] ${hookName}: ${msg}\n`;
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    fs.appendFileSync(logPath, line, "utf-8");
+  } catch (_) {
+    // Last resort — can't even log the error
+  }
+}
+
 const _paths = {
   memory: "sticky-note.json",
   config: "sticky-note-config.json",
@@ -671,6 +686,7 @@ module.exports = {
   ERROR_PATTERNS,
   RETRY_PATTERNS,
   FILE_PATH_PATTERN,
+  logHookError,
   getMemoryPath,
   getConfigPath,
   getAuditPath,
