@@ -2430,6 +2430,25 @@ function cmdSync() {
   print("");
 }
 
+// MCP-SERVER command — launch the stdio MCP server
+function cmdMcpServer() {
+  const mcpServerPath = path.join(__dirname, "mcp-server.js");
+  if (!fs.existsSync(mcpServerPath)) {
+    print("  [ERR] mcp-server.js not found");
+    process.exit(1);
+  }
+  // Forward to the MCP server script, passing remaining args + --project
+  const args = ["--project", process.cwd(), ...process.argv.slice(3)];
+  const { execFileSync } = require("child_process");
+  try {
+    execFileSync(process.execPath, [mcpServerPath, ...args], {
+      stdio: "inherit",
+    });
+  } catch (err) {
+    if (err.status) process.exit(err.status);
+  }
+}
+
 // ──────────────────────────────────────────────
 // Main
 // ──────────────────────────────────────────────
@@ -2487,6 +2506,9 @@ async function main() {
     case "sync":
       cmdSync();
       break;
+    case "mcp-server":
+      cmdMcpServer();
+      break;
     case "--version":
     case "-v":
       print(`sticky-note v${VERSION}`);
@@ -2513,6 +2535,7 @@ async function main() {
       print("    overlap            Detect file overlaps with open/stuck threads");
       print("    claim              Claim ownership of files you're working on (--list, --clear)");
       print("    sync               Commit .sticky-note/ changes to git (--push to also push)");
+    print("    mcp-server         Launch the sticky-note MCP server (stdio JSON-RPC)");
       print("");
       print("  Options:");
       print("    --version  Show version");

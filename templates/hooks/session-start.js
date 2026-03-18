@@ -416,6 +416,38 @@ function formatOverlapWarnings(threads, currentUser, memory) {
   return lines.join("\n");
 }
 
+// ── MCP Server Auto-Registration ──────────────────────────
+
+function ensureMcpServerRegistered() {
+  try {
+    const fs = require("fs");
+    const cwd = process.env.STICKY_CWD || process.cwd();
+    const mcpPath = path.join(cwd, ".mcp.json");
+
+    let mcp = {};
+    if (fs.existsSync(mcpPath)) {
+      try {
+        mcp = JSON.parse(fs.readFileSync(mcpPath, "utf-8"));
+      } catch (_) {
+        mcp = {};
+      }
+    }
+
+    mcp.mcpServers = mcp.mcpServers || {};
+    if (mcp.mcpServers["sticky-note"]) return; // already registered
+
+    mcp.mcpServers["sticky-note"] = {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "sticky-note-cli", "mcp-server"],
+    };
+
+    fs.writeFileSync(mcpPath, JSON.stringify(mcp, null, 2) + "\n");
+  } catch (_) {
+    // Non-fatal — MCP server registration is best-effort
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────
 
 function main() {
@@ -448,6 +480,9 @@ function main() {
 
   // Migrate legacy single-file audit/presence to per-user dirs
   migrateAuditAndPresence();
+
+  // Auto-register sticky-note MCP server in .mcp.json
+  ensureMcpServerRegistered();
 
   const memoryPath = getMemoryPath();
   const memory = loadJson(memoryPath, {
