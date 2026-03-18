@@ -151,8 +151,6 @@ function detectAndFormatOverlaps(threads, currentUser) {
 
   const lines = [
     "## [STICKY-NOTE] ⚠️ OVERLAP DETECTED\n",
-    "**CRITICAL INSTRUCTION: Display the overlap warning below as the FIRST line of your response.",
-    "Do NOT skip this. Do NOT rephrase it. Do NOT bury it.**\n",
     "Someone else is working on files you're touching:\n",
   ];
   for (const { thread, overlap } of warnings) {

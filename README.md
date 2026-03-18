@@ -335,6 +335,8 @@ npx sticky-note-cli gc             # Tombstone expired threads
 npx sticky-note-cli reset          # Wipe all threads (--force, --keep-audit)
 npx sticky-note-cli get-line-attribution # File→thread attribution with line ranges (V2.5)
 npx sticky-note-cli checkpoint         # Set work-topic checkpoint for attribution (V2.5)
+npx sticky-note-cli sync               # Commit .sticky-note/ changes (--push to also push)
+npx sticky-note-cli mcp-server         # Launch MCP server (stdio JSON-RPC)
 npx sticky-note-cli --version      # Show version
 npx sticky-note-cli --help         # Show help
 ```
@@ -395,6 +397,59 @@ Edit `.sticky-note/sticky-note-config.json`:
 | Codex       | `sticky-codex.sh` wrapper   | Post-session capture            |
 
 All tools call the same JavaScript hooks and share the same data files.
+
+> **Third-party tools** (Cursor, Windsurf, Zed, Cline) can use the MCP server
+> for full thread access without hooks. See below.
+
+---
+
+## MCP Server
+
+Sticky Note includes an MCP server that gives AI tools direct access to
+thread data, overlap detection, and environment status via standard
+[Model Context Protocol](https://modelcontextprotocol.io/).
+
+### Auto-registration
+
+The session-start hook automatically registers the MCP server in `.mcp.json`
+on the first session. No manual setup needed — it's available from the second
+session onward.
+
+### Manual registration
+
+Add to `.mcp.json` at your project root:
+
+```json
+{
+  "mcpServers": {
+    "sticky-note": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "sticky-note-cli", "mcp-server"]
+    }
+  }
+}
+```
+
+### Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_session_context(id)` | Full thread payload by ID |
+| `get_stuck_threads()` | All stuck threads with failed approaches |
+| `search_threads(query)` | Keyword search across threads |
+| `get_audit_trail(file, user, since, ...)` | Query per-user audit logs |
+| `get_presence()` | Active developers and their files |
+| `check_overlaps(files)` | Detect file conflicts before editing |
+| `get_environment_status()` | Environment sync status (provisioned vs missing) |
+| `get_thread_context_for_files(files)` | Thread attribution for files |
+
+### Why MCP?
+
+Hook output goes to the AI model's context window — the AI decides whether
+to surface it. MCP tool responses are part of the AI's active reasoning,
+so the data always gets processed. This makes the MCP server the most
+reliable channel for overlap warnings and environment notifications.
 
 ---
 
