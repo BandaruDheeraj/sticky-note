@@ -113,6 +113,7 @@ function installPreCommitHook() {
       '_sn_root="$(git rev-parse --show-toplevel 2>/dev/null)"',
       'if [ -d "$_sn_root/.sticky-note" ]; then',
       '  [ -f "$_sn_root/.sticky-note/sticky-note.json" ] && git add "$_sn_root/.sticky-note/sticky-note.json" 2>/dev/null || true',
+      '  [ -f "$_sn_root/.sticky-note/merge-driver.js" ] && git add "$_sn_root/.sticky-note/merge-driver.js" 2>/dev/null || true',
       '  [ -d "$_sn_root/.sticky-note/audit" ] && git add "$_sn_root/.sticky-note/audit/" 2>/dev/null || true',
       '  [ -d "$_sn_root/.sticky-note/presence" ] && git add "$_sn_root/.sticky-note/presence/" 2>/dev/null || true',
       'fi',
