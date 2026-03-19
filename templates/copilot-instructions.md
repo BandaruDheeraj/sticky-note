@@ -177,12 +177,22 @@ Hooks also inject overlap context through two fallback channels:
 2. **Tool call deny** — Your first tool call may be denied with overlap
    details (Copilot CLI only). After the deny, the tool is auto-retried.
 
-When you detect an overlap (via MCP tool or hook), surface it to the user:
+When you detect an overlap (via MCP tool or hook), surface it to the user
+using this styled banner format:
 
 ```
-⚠️ Overlap detected: [user] is working on [files] — [narrative summary]
-   Status: [STUCK/OPEN] | Resume: npx sticky-note resume [id]
+⚠️ ━━━ OVERLAP DETECTED ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  🔴 [user] (STUCK) · [branch]
+     Files: [file1], [file2], [file3]
+     "[narrative summary]"
+     → Resume: npx sticky-note resume [id]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
+
+Use 🔴 for STUCK threads, 🟡 for OPEN threads. For multiple overlaps,
+add additional entries between the bars.
 
 ## Sticky Note MCP Server
 

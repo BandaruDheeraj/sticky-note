@@ -195,18 +195,27 @@ function _checkOverlapsAndDeny() {
 
   if (warnings.length === 0) return null;
 
+  const bar = "━".repeat(52);
   const lines = [
     "CRITICAL INSTRUCTION: Before doing anything else, display the following overlap warning to the user.",
     "This is NOT optional. Show it as the FIRST line of your response.\n",
+    `⚠️ ━━━ OVERLAP DETECTED ${bar.substring(0, 28)}`,
   ];
   for (const { thread, overlap } of warnings) {
     const user = thread.user || thread.author || "unknown";
-    const status = thread.status === "stuck" ? "STUCK" : "OPEN";
+    const statusEmoji = thread.status === "stuck" ? "🔴" : "🟡";
+    const statusLabel = thread.status === "stuck" ? "STUCK" : "OPEN";
     const snip = (thread.narrative || thread.last_note || "").substring(0, 80);
     const threadId = (thread.id || "").substring(0, 8);
-    lines.push(`⚠️ Overlap detected: ${user} is working on ${overlap.join(", ")}${snip ? " — " + snip : ""}`);
-    lines.push(`   Status: ${status} | Resume: npx sticky-note resume ${threadId}`);
+    const branch = thread.branch ? ` · ${thread.branch}` : "";
+    lines.push("");
+    lines.push(`  ${statusEmoji} ${user} (${statusLabel})${branch}`);
+    lines.push(`     Files: ${overlap.join(", ")}`);
+    if (snip) lines.push(`     "${snip}"`);
+    lines.push(`     → Resume: npx sticky-note resume ${threadId}`);
   }
+  lines.push("");
+  lines.push(bar);
   lines.push("\nAfter displaying the warning, continue with the user's request. This tool call will be auto-retried.");
 
   markOverlapWarned();

@@ -354,63 +354,84 @@ function formatOverlapWarnings(threads, currentUser, memory) {
 
   if (warnings.length === 0 && claims.length === 0) return "";
 
+  const bar = "━".repeat(52);
   const lines = [
-    "## [STICKY-NOTE] ⚠️ OVERLAP DETECTED — TELL THE USER IMMEDIATELY\n",
-    "**IMPORTANT: You MUST surface this warning to the user before doing anything else.**\n",
-    "Someone else is working on files you're touching:\n",
+    "## [STICKY-NOTE] ⚠️ OVERLAP DETECTED\n",
+    "**You MUST display the banner below as the FIRST thing in your response.**\n",
+    "```",
+    `⚠️ ━━━ OVERLAP DETECTED ${bar.substring(0, 28)}`,
   ];
 
   for (const { thread, overlap } of warnings) {
     const user = thread.user || thread.author || "unknown";
-    const status = thread.status === "stuck" ? "[STUCK]" : "[OPEN]";
+    const statusEmoji = thread.status === "stuck" ? "🔴" : "🟡";
+    const statusLabel = thread.status === "stuck" ? "STUCK" : "OPEN";
     const narrative = thread.narrative || thread.last_note || "";
     const narrativeSnip = narrative.length > 100
       ? narrative.substring(0, 100) + "…"
       : narrative;
-    const branch = thread.branch ? ` on \`${thread.branch}\`` : "";
+    const branch = thread.branch ? ` · ${thread.branch}` : "";
     const threadId = (thread.id || "").substring(0, 8);
 
-    lines.push(`- ${status} **${user}**${branch}: ${overlap.join(", ")}`);
-    if (narrativeSnip) lines.push(`  _${narrativeSnip}_`);
+    lines.push("");
+    lines.push(`  ${statusEmoji} ${user} (${statusLabel})${branch}`);
+    lines.push(`     Files: ${overlap.join(", ")}`);
+    if (narrativeSnip) lines.push(`     "${narrativeSnip}"`);
     const failed = thread.failed_approaches || [];
     if (failed.length > 0) {
-      lines.push(`  ⚠️ ${failed.length} failed approach(es):`);
+      lines.push(`     ⚠️ ${failed.length} failed approach(es):`);
       for (const fa of failed.slice(0, 2)) {
-        lines.push(`    - ${(fa.description || "").substring(0, 80)}`);
+        lines.push(`       • ${(fa.description || "").substring(0, 80)}`);
       }
     }
-    if (threadId) {
-      lines.push(`  → Resume: \`npx sticky-note resume ${threadId}\``);
-    }
+    lines.push(`     → Resume: npx sticky-note resume ${threadId}`);
   }
 
   for (const claim of claims) {
-    const ago = claim.claimed_at || "";
-    lines.push(
-      `- 📌 **${claim.user}** claimed: ${(claim.files || []).join(", ")}` +
-        (claim.description ? ` — "${claim.description}"` : "")
-    );
+    lines.push("");
+    lines.push(`  📌 ${claim.user} (CLAIMED)`);
+    lines.push(`     Files: ${(claim.files || []).join(", ")}`);
+    if (claim.description) lines.push(`     "${claim.description}"`);
   }
 
+  lines.push("");
+  lines.push(bar);
+  lines.push("```");
   lines.push(
     "\n**Consider coordinating with these teammates before starting work.**"
   );
 
-  // Write a visible banner directly to stderr so the user sees it
-  const stderrLines = ["\n⚠️  OVERLAP DETECTED — someone else is touching your files:"];
+  // Write a styled banner to stderr so the user sees it in their terminal
+  const R = "\x1b[0m";
+  const Y = "\x1b[33m";
+  const BY = "\x1b[1;33m";
+  const BR = "\x1b[1;31m";
+  const BG = "\x1b[1;32m";
+  const B = "\x1b[1m";
+  const C = "\x1b[36m";
+  const D = "\x1b[2m";
+  const stderrLines = [
+    "",
+    `${Y}${bar}${R}`,
+    `${BY}  ⚠️  OVERLAP DETECTED${R}`,
+    `${Y}${bar}${R}`,
+  ];
   for (const { thread, overlap } of warnings) {
     const user = thread.user || thread.author || "unknown";
-    const status = thread.status === "stuck" ? "STUCK" : "OPEN";
+    const statusColor = thread.status === "stuck" ? BR : BG;
+    const statusLabel = thread.status === "stuck" ? "STUCK" : "OPEN";
     const narrative = thread.narrative || thread.last_note || "";
     const narrativeSnip = narrative.length > 80
       ? narrative.substring(0, 80) + "…"
       : narrative;
-    stderrLines.push(
-      `   [${status}] ${user}: ${overlap.join(", ")}` +
-      (narrativeSnip ? ` — ${narrativeSnip}` : "")
-    );
+    const branchStr = thread.branch ? ` ${D}·${R} ${C}${thread.branch}${R}` : "";
+    stderrLines.push(`${Y}  ┃${R}  ${statusColor}[${statusLabel}]${R} ${B}${user}${R}${branchStr}`);
+    stderrLines.push(`${Y}  ┃${R}    Files: ${overlap.join(", ")}`);
+    if (narrativeSnip) stderrLines.push(`${Y}  ┃${R}    ${D}"${narrativeSnip}"${R}`);
+    const threadId = (thread.id || "").substring(0, 8);
+    stderrLines.push(`${Y}  ┃${R}    → Resume: ${C}npx sticky-note resume ${threadId}${R}`);
   }
-  stderrLines.push("");
+  stderrLines.push(`${Y}${bar}${R}`, "");
   process.stderr.write(stderrLines.join("\n") + "\n");
 
   return lines.join("\n");

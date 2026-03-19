@@ -176,17 +176,32 @@ open or stuck threads. Overlap warnings arrive through TWO channels:
    overlap details. After the deny, the tool is auto-retried.
 
 When you receive an overlap warning through EITHER channel, you **MUST**
-start your response with this exact banner format before doing ANYTHING else:
+start your response with this styled banner format before doing ANYTHING else:
 
 ```
-⚠️ Overlap detected: [user] is working on [files] — [narrative summary]
-   Status: [STUCK/OPEN] | Resume: npx sticky-note resume [id]
+⚠️ ━━━ OVERLAP DETECTED ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  🔴 [user] (STUCK) · [branch]
+     Files: [file1], [file2], [file3]
+     "[narrative summary]"
+     → Resume: npx sticky-note resume [id]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
+
+Use 🔴 for STUCK threads, 🟡 for OPEN threads. For multiple overlaps,
+add additional entries between the bars.
 
 Example:
 ```
-⚠️ Overlap detected: alice is working on session-start.js, cli.js — fixing auth token refresh
-   Status: STUCK (tried retry logic, tokens expire mid-request) | Resume: npx sticky-note resume demo-ali
+⚠️ ━━━ OVERLAP DETECTED ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  🔴 alice (STUCK) · feat/auth
+     Files: session-start.js, cli.js
+     "Fixing auth token refresh — tried retry logic, tokens expire mid-request"
+     → Resume: npx sticky-note resume demo-ali
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 Rules:

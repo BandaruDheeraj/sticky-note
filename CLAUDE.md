@@ -200,9 +200,18 @@ When you receive an overlap warning through EITHER channel, you **MUST**
 start your response with this exact banner format before doing ANYTHING else:
 
 ```
-⚠️ Overlap detected: [user] is working on [files] — [narrative summary]
-   Status: [STUCK/OPEN] | Resume: npx sticky-note resume [id]
+⚠️ ━━━ OVERLAP DETECTED ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  🔴 [user] (STUCK) · [branch]
+     Files: [file1], [file2], [file3]
+     "[narrative summary]"
+     → Resume: npx sticky-note resume [id]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
+
+Use 🔴 for STUCK threads, 🟡 for OPEN threads. For multiple overlaps,
+add additional entries between the bars.
 
 Rules:
 - This banner MUST be the **very first thing** in your response
