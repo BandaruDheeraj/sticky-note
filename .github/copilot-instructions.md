@@ -215,6 +215,25 @@ Rules:
 This pattern exists to prevent two teammates from wasting hours on the
 same problem. Treat it like a system alert, not optional context.
 
+## Sticky Note MCP Server
+
+You have access to a `sticky-note` MCP server. Use it:
+
+1. **At session start**: Call `get_stuck_threads()` and `get_environment_status()`
+   to check for team blockers and environment changes. Surface any warnings.
+
+2. **Before editing files**: Call `check_overlaps(files)` with the files you
+   plan to edit. If overlaps exist, warn the user before proceeding.
+
+3. **For prior work context**: Call `get_thread_context_for_files(files)` or
+   `search_threads(query)` to find relevant thread history.
+
+4. **For audit history**: Call `get_audit_trail(file)` to understand who
+   changed a file and when.
+
+These tools are the primary way sticky-note communicates with you.
+Hook-injected context supplements but does not replace MCP tool calls.
+
 ### `[STICKY-NOTE]` tags
 
 All sticky-note hooks prefix their output with `[STICKY-NOTE]`. When you
