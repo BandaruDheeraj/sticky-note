@@ -761,6 +761,22 @@ async function cmdInit() {
     print("  [OK] .git/hooks/post-commit (auto-sync .sticky-note/ after commit)");
   }
 
+  // Create environment directory structure
+  const envDir = path.join(stickyNoteDir, "environment");
+  const envManifestSrc = path.join(TEMPLATES_DIR, "environment", "manifest.json");
+  const envManifestDest = path.join(envDir, "manifest.json");
+  mkdirSafe(path.join(envDir, "skills"));
+  mkdirSafe(path.join(envDir, "agents"));
+  mkdirSafe(path.join(envDir, "commands"));
+  if (!fs.existsSync(envManifestDest)) {
+    if (fs.existsSync(envManifestSrc)) {
+      copyFile(envManifestSrc, envManifestDest);
+    } else {
+      fs.writeFileSync(envManifestDest, JSON.stringify({ version: "1", mcp_servers: {} }, null, 2) + "\n");
+    }
+  }
+  print("  [OK] Created environment directory (.sticky-note/environment/)");
+
   // Force-add .claude/hooks/ and .claude/settings.json so git tracks them
   // (needed if .claude/ was previously in .gitignore)
   try {
@@ -2450,6 +2466,456 @@ function cmdMcpServer() {
 }
 
 // ──────────────────────────────────────────────
+// bootstrap — interactive MCP server provisioning with secret resolution
+// ──────────────────────────────────────────────
+
+async function cmdBootstrap() {
+  const cwd = process.cwd();
+  const manifestPath = path.join(cwd, ".sticky-note", "environment", "manifest.json");
+  const mcpJsonPath = path.join(cwd, ".mcp.json");
+  const dotEnvPath = path.join(cwd, ".env");
+  const dotEnvExamplePath = path.join(cwd, ".env.example");
+
+  printBanner();
+  print("  🔧 Bootstrap — MCP Server Provisioning\n");
+
+  // 1. Read manifest
+  if (!fs.existsSync(manifestPath)) {
+    print("  No environment manifest found. Run `npx sticky-note init` first.");
+    return;
+  }
+
+  const manifest = readJsonSafe(manifestPath, null);
+  if (!manifest) {
+    print("  [ERR] Failed to parse manifest.json");
+    return;
+  }
+
+  const mcpServers = manifest.mcp_servers || {};
+  const envVarsMeta = manifest.env_vars || {};
+  const serverEntries = Object.entries(mcpServers);
+
+  if (serverEntries.length === 0) {
+    print("  No MCP servers defined in manifest. Nothing to provision.");
+    return;
+  }
+
+  // 2. Find all ${ENV_VAR} placeholders across server configs
+  const placeholders = new Set();
+  for (const [, config] of serverEntries) {
+    const envEntries = config.env || {};
+    for (const val of Object.values(envEntries)) {
+      if (typeof val === "string" && val.startsWith("${") && val.endsWith("}")) {
+        placeholders.add(val.slice(2, -1));
+      }
+    }
+  }
+
+  // 3. Parse .env file
+  function parseDotEnv(filePath) {
+    const vars = {};
+    try {
+      const content = fs.readFileSync(filePath, "utf-8");
+      for (const line of content.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const eqIdx = trimmed.indexOf("=");
+        if (eqIdx === -1) continue;
+        const key = trimmed.slice(0, eqIdx).trim();
+        let value = trimmed.slice(eqIdx + 1).trim();
+        // Strip surrounding quotes
+        if ((value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+        vars[key] = value;
+      }
+    } catch {
+      // .env doesn't exist — that's fine
+    }
+    return vars;
+  }
+
+  const dotEnvVars = parseDotEnv(dotEnvPath);
+
+  // 4. Resolve each placeholder
+  const resolved = {};
+  const promptedVars = {};
+
+  if (placeholders.size > 0) {
+    print(`  Found ${placeholders.size} environment variable(s) to resolve:\n`);
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    for (const varName of placeholders) {
+      const meta = envVarsMeta[varName] || {};
+      const desc = meta.description || varName;
+      const docsUrl = meta.docs_url || null;
+
+      // Priority: process.env → .env file → interactive prompt
+      if (process.env[varName]) {
+        resolved[varName] = process.env[varName];
+        print(`  ✅ ${varName}: found in shell environment`);
+      } else if (dotEnvVars[varName]) {
+        resolved[varName] = dotEnvVars[varName];
+        print(`  ✅ ${varName}: found in .env file`);
+      } else {
+        // Interactive prompt
+        if (docsUrl) {
+          print(`  📖 ${desc}`);
+          print(`     Docs: ${docsUrl}`);
+        }
+        const value = await ask(rl, `Enter value for ${varName}`, "");
+        if (value) {
+          resolved[varName] = value;
+          promptedVars[varName] = value;
+          print(`  ✅ ${varName}: set via prompt`);
+        } else {
+          print(`  ⚠️  ${varName}: skipped (no value provided)`);
+        }
+      }
+    }
+
+    // 5. Offer to save prompted values to .env
+    if (Object.keys(promptedVars).length > 0) {
+      print("");
+      const saveChoice = await ask(rl, "Save missing values to .env?", "yes");
+      if (saveChoice.toLowerCase() === "yes" || saveChoice.toLowerCase() === "y") {
+        let envContent = "";
+        try {
+          envContent = fs.readFileSync(dotEnvPath, "utf-8");
+          if (!envContent.endsWith("\n")) envContent += "\n";
+        } catch {
+          // .env doesn't exist yet
+        }
+        for (const [key, val] of Object.entries(promptedVars)) {
+          envContent += `${key}=${val}\n`;
+        }
+        fs.writeFileSync(dotEnvPath, envContent, "utf-8");
+        print(`  ✅ Saved ${Object.keys(promptedVars).length} variable(s) to .env`);
+      }
+    }
+
+    rl.close();
+  }
+
+  // 6. Provision MCP servers to .mcp.json
+  let mcpJson = { mcpServers: {} };
+  try {
+    mcpJson = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8"));
+    mcpJson.mcpServers = mcpJson.mcpServers || {};
+  } catch {
+    // .mcp.json doesn't exist or is invalid — start fresh
+  }
+
+  let provisioned = 0;
+  let skipped = 0;
+
+  for (const [name, config] of serverEntries) {
+    // Build the server entry with resolved env vars
+    const serverEntry = {
+      type: config.type || "stdio",
+      command: config.command,
+      args: config.args || [],
+    };
+
+    if (config.env) {
+      const resolvedEnv = {};
+      let hasUnresolved = false;
+      for (const [envKey, envVal] of Object.entries(config.env)) {
+        if (typeof envVal === "string" && envVal.startsWith("${") && envVal.endsWith("}")) {
+          const varName = envVal.slice(2, -1);
+          if (resolved[varName]) {
+            resolvedEnv[envKey] = resolved[varName];
+          } else {
+            hasUnresolved = true;
+          }
+        } else {
+          resolvedEnv[envKey] = envVal;
+        }
+      }
+      if (hasUnresolved) {
+        print(`  ⚠️  ${name}: skipped (unresolved secrets)`);
+        skipped++;
+        continue;
+      }
+      serverEntry.env = resolvedEnv;
+    }
+
+    mcpJson.mcpServers[name] = serverEntry;
+    provisioned++;
+  }
+
+  fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2) + "\n");
+
+  // 7. Generate .env.example from manifest env_vars
+  if (Object.keys(envVarsMeta).length > 0) {
+    const lines = [
+      "# Environment variables for this project",
+      "# Generated by sticky-note bootstrap",
+      "#",
+      "# Copy this file to .env and fill in your values.",
+      "",
+    ];
+    for (const [varName, meta] of Object.entries(envVarsMeta)) {
+      if (meta.description) lines.push(`# ${meta.description}`);
+      if (meta.docs_url) lines.push(`# Docs: ${meta.docs_url}`);
+      if (meta.required === false) {
+        lines.push(`# ${varName}=`);
+      } else {
+        lines.push(`${varName}=`);
+      }
+      lines.push("");
+    }
+    fs.writeFileSync(dotEnvExamplePath, lines.join("\n"), "utf-8");
+    print(`  ✅ Generated .env.example`);
+  }
+
+  // 8. Print summary
+  print("");
+  print("  ── Summary ──");
+  print(`  Provisioned: ${provisioned} server(s)`);
+  if (skipped > 0) print(`  Skipped:     ${skipped} server(s) (missing secrets)`);
+  print(`  Config:      ${mcpJsonPath}`);
+  print("");
+}
+
+// ──────────────────────────────────────────────
+// env — environment management subcommands
+// ──────────────────────────────────────────────
+
+async function cmdEnv() {
+  const args = process.argv.slice(3);
+  const subcommand = args[0];
+
+  switch (subcommand) {
+    case "status":
+      cmdEnvStatus();
+      break;
+    case "add-server":
+      await cmdEnvAddServer();
+      break;
+    default:
+      printBanner();
+      print("  Usage: npx sticky-note env <subcommand>\n");
+      print("  Subcommands:");
+      print("    status       Show what's provisioned vs missing vs needs-secrets");
+      print("    add-server   Interactively add an MCP server to the manifest");
+      print("");
+      break;
+  }
+}
+
+function cmdEnvStatus() {
+  const cwd = process.cwd();
+  const envDir = path.join(cwd, ".sticky-note", "environment");
+  const manifestPath = path.join(envDir, "manifest.json");
+  const mcpJsonPath = path.join(cwd, ".mcp.json");
+
+  printBanner();
+  print("  📊 Environment Status\n");
+
+  if (!fs.existsSync(manifestPath)) {
+    print("  No environment manifest found. Run `npx sticky-note init` first.");
+    print("");
+    return;
+  }
+
+  const manifest = readJsonSafe(manifestPath, {});
+  const mcpConfig = readJsonSafe(mcpJsonPath, { mcpServers: {} });
+  const registeredServers = Object.keys(mcpConfig.mcpServers || {});
+
+  // MCP servers status
+  const mcpServers = manifest.mcp_servers || {};
+  const serverNames = Object.keys(mcpServers);
+
+  if (serverNames.length === 0) {
+    print("  MCP Servers: (none defined)");
+  } else {
+    print("  MCP Servers:");
+    for (const name of serverNames) {
+      const config = mcpServers[name];
+      const isProvisioned = registeredServers.includes(name);
+
+      if (isProvisioned) {
+        print(`    ✅ ${name} — provisioned`);
+      } else {
+        // Check if it needs secrets
+        const envEntries = config.env || {};
+        const needsSecrets = Object.values(envEntries).some(
+          (val) => typeof val === "string" && val.startsWith("${") && val.endsWith("}")
+        );
+        if (needsSecrets) {
+          print(`    🔑 ${name} — needs secrets (run \`npx sticky-note bootstrap\`)`);
+        } else {
+          print(`    ❌ ${name} — not provisioned`);
+        }
+      }
+    }
+  }
+
+  // Skills, Agents, Commands counts
+  const skillsDir = path.join(envDir, "skills");
+  const agentsDir = path.join(envDir, "agents");
+  const commandsDir = path.join(envDir, "commands");
+
+  function countMdFiles(dir) {
+    try {
+      return fs.readdirSync(dir).filter((f) => f.endsWith(".md")).length;
+    } catch {
+      return 0;
+    }
+  }
+
+  const skillsCount = countMdFiles(skillsDir);
+  const agentsCount = countMdFiles(agentsDir);
+  const commandsCount = countMdFiles(commandsDir);
+
+  print("");
+  print("  Resources:");
+  print(`    Skills:   ${skillsCount}`);
+  print(`    Agents:   ${agentsCount}`);
+  print(`    Commands: ${commandsCount}`);
+
+  // Env vars status
+  const envVars = manifest.env_vars || {};
+  const envVarNames = Object.keys(envVars);
+
+  if (envVarNames.length > 0) {
+    print("");
+    print("  Environment Variables:");
+
+    // Parse .env file for checking
+    const dotEnvPath = path.join(cwd, ".env");
+    const dotEnvVars = {};
+    try {
+      const content = fs.readFileSync(dotEnvPath, "utf-8");
+      for (const line of content.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const eqIdx = trimmed.indexOf("=");
+        if (eqIdx === -1) continue;
+        dotEnvVars[trimmed.slice(0, eqIdx).trim()] = true;
+      }
+    } catch {
+      // no .env
+    }
+
+    for (const varName of envVarNames) {
+      const meta = envVars[varName];
+      const inEnv = !!process.env[varName];
+      const inDotEnv = !!dotEnvVars[varName];
+      const reqLabel = meta.required === false ? " (optional)" : "";
+
+      if (inEnv) {
+        print(`    ✅ ${varName} — set in environment${reqLabel}`);
+      } else if (inDotEnv) {
+        print(`    ✅ ${varName} — set in .env${reqLabel}`);
+      } else {
+        print(`    ❌ ${varName} — not found${reqLabel}`);
+      }
+    }
+  }
+
+  print("");
+}
+
+async function cmdEnvAddServer() {
+  const cwd = process.cwd();
+  const manifestPath = path.join(cwd, ".sticky-note", "environment", "manifest.json");
+
+  printBanner();
+  print("  ➕ Add MCP Server to Manifest\n");
+
+  if (!fs.existsSync(manifestPath)) {
+    print("  No environment manifest found. Run `npx sticky-note init` first.");
+    return;
+  }
+
+  const manifest = readJsonSafe(manifestPath, null);
+  if (!manifest) {
+    print("  [ERR] Failed to parse manifest.json");
+    return;
+  }
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const name = await ask(rl, "Server name (e.g. github, context7)", "");
+  if (!name) {
+    print("  [ERR] Server name is required.");
+    rl.close();
+    return;
+  }
+
+  const command = await ask(rl, "Command (e.g. npx, node)", "npx");
+  const argsRaw = await ask(rl, "Args (comma-separated)", "");
+  const description = await ask(rl, "Description", "");
+  const requiredRaw = await ask(rl, "Required?", "yes");
+  const required = requiredRaw.toLowerCase() === "yes" || requiredRaw.toLowerCase() === "y";
+
+  const args = argsRaw
+    ? argsRaw.split(",").map((a) => a.trim()).filter(Boolean)
+    : [];
+
+  const serverConfig = {
+    type: "stdio",
+    command,
+    args,
+    description,
+    required,
+  };
+
+  // Ask about env vars
+  const needsEnv = await ask(rl, "Does this server need environment variables?", "no");
+  if (needsEnv.toLowerCase() === "yes" || needsEnv.toLowerCase() === "y") {
+    serverConfig.env = {};
+    let addMore = true;
+    while (addMore) {
+      const envName = await ask(rl, "  Env var name (e.g. GITHUB_TOKEN)", "");
+      if (!envName) break;
+
+      const envDesc = await ask(rl, "  Description", "");
+      const envDocs = await ask(rl, "  Docs URL (optional)", "");
+      const envReqRaw = await ask(rl, "  Required?", "yes");
+      const envRequired = envReqRaw.toLowerCase() === "yes" || envReqRaw.toLowerCase() === "y";
+
+      // Add placeholder to server env
+      serverConfig.env[envName] = `\${${envName}}`;
+
+      // Add to env_vars metadata
+      manifest.env_vars = manifest.env_vars || {};
+      manifest.env_vars[envName] = {
+        description: envDesc || envName,
+        required: envRequired,
+      };
+      if (envDocs) manifest.env_vars[envName].docs_url = envDocs;
+
+      const moreRaw = await ask(rl, "  Add another env var?", "no");
+      addMore = moreRaw.toLowerCase() === "yes" || moreRaw.toLowerCase() === "y";
+    }
+  }
+
+  rl.close();
+
+  // Write to manifest
+  manifest.mcp_servers = manifest.mcp_servers || {};
+  manifest.mcp_servers[name] = serverConfig;
+
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+
+  print("");
+  print(`  ✅ Added server "${name}" to manifest.json`);
+  print(`  Run \`npx sticky-note bootstrap\` to provision it.`);
+  print("");
+}
+
+// ──────────────────────────────────────────────
 // Main
 // ──────────────────────────────────────────────
 
@@ -2506,6 +2972,12 @@ async function main() {
     case "sync":
       cmdSync();
       break;
+    case "bootstrap":
+      await cmdBootstrap();
+      break;
+    case "env":
+      await cmdEnv();
+      break;
     case "mcp-server":
       cmdMcpServer();
       break;
@@ -2535,6 +3007,8 @@ async function main() {
       print("    overlap            Detect file overlaps with open/stuck threads");
       print("    claim              Claim ownership of files you're working on (--list, --clear)");
       print("    sync               Commit .sticky-note/ changes to git (--push to also push)");
+    print("    bootstrap          Provision MCP servers with secrets from manifest");
+    print("    env                Environment management (status, add-server)");
     print("    mcp-server         Launch the sticky-note MCP server (stdio JSON-RPC)");
       print("");
       print("  Options:");

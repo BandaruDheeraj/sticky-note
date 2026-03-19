@@ -439,6 +439,62 @@ function formatOverlapWarnings(threads, currentUser, memory) {
 
 // ── MCP Server Auto-Registration ──────────────────────────
 
+// ── Backward compatibility migration ─────────────────────
+// Migrates old sticky-note-config.json arrays (mcp_servers, skills)
+// to the new .sticky-note/environment/ manifest format.
+function migrateOldEnvironmentConfig() {
+  const fs = require("fs");
+  const cwd = process.cwd();
+  const configPath = getConfigPath();
+  const config = loadJson(configPath, null);
+  if (!config) return;
+
+  // Only run once — skip if already migrated
+  if (config.environment_version) return;
+
+  const envDir = path.join(cwd, ".sticky-note", "environment");
+  const manifestPath = path.join(envDir, "manifest.json");
+
+  let changed = false;
+
+  // Migrate mcp_servers array to manifest.json keyed format
+  if (Array.isArray(config.mcp_servers) && config.mcp_servers.length > 0) {
+    fs.mkdirSync(envDir, { recursive: true });
+    const manifest = loadJson(manifestPath, { version: "1", mcp_servers: {} });
+    if (!manifest.mcp_servers) manifest.mcp_servers = {};
+    for (const entry of config.mcp_servers) {
+      if (!entry || !entry.name) continue;
+      if (manifest.mcp_servers[entry.name]) continue; // already present
+      const def = {};
+      if (entry.type) def.type = entry.type;
+      if (entry.command) def.command = entry.command;
+      if (entry.args) def.args = entry.args;
+      if (entry.env) def.env = entry.env;
+      manifest.mcp_servers[entry.name] = def;
+    }
+    saveJson(manifestPath, manifest);
+    changed = true;
+  }
+
+  // Migrate skills array to placeholder .md files
+  if (Array.isArray(config.skills) && config.skills.length > 0) {
+    const skillsDir = path.join(envDir, "skills");
+    fs.mkdirSync(skillsDir, { recursive: true });
+    for (const skill of config.skills) {
+      if (!skill || typeof skill !== "string") continue;
+      const skillFile = path.join(skillsDir, skill + ".md");
+      if (fs.existsSync(skillFile)) continue;
+      fs.writeFileSync(skillFile, `# ${skill}\n\nTODO: Add skill instructions here.\n`, "utf-8");
+    }
+    changed = true;
+  }
+
+  if (changed) {
+    config.environment_version = "1";
+    saveJson(configPath, config);
+  }
+}
+
 function ensureMcpServerRegistered() {
   try {
     const fs = require("fs");
@@ -671,6 +727,9 @@ function main() {
 
   // Migrate legacy single-file audit/presence to per-user dirs
   migrateAuditAndPresence();
+
+  // Migrate old config arrays to environment directory format
+  try { migrateOldEnvironmentConfig(); } catch (_) { /* migration must not break session */ }
 
   // Auto-provision team environment from .sticky-note/environment/
   try { ensureEnvironmentProvisioned(); } catch (_) { /* provisioning must not break session */ }

@@ -286,6 +286,54 @@ try {
     assert.ok(typeof utils.syncStickyNote === "function", "syncStickyNote should be exported");
   });
 
+  run("bootstrap runs without error (no manifest)", () => {
+    const out = cli(["bootstrap"]);
+    assert.ok(out.length > 0, "Should produce output");
+  });
+
+  run("env status runs without error", () => {
+    const out = cli(["env", "status"]);
+    assert.ok(out.length > 0, "Should produce output");
+  });
+
+  run("environment directory template exists", () => {
+    const manifestPath = path.join(TEMPLATES, "environment", "manifest.json");
+    assert.ok(fs.existsSync(manifestPath), "templates/environment/manifest.json should exist");
+    const data = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+    assert.ok(data.version, "Manifest should have version field");
+  });
+
+  run("provisioning creates .env-provision-hash", () => {
+    // Set up a minimal environment dir for provisioning
+    const envDir = path.join(tmpDir, ".sticky-note", "environment");
+    fs.mkdirSync(envDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(envDir, "manifest.json"),
+      JSON.stringify({ version: "1", mcp_servers: {} }, null, 2) + "\n"
+    );
+
+    // Run session-start hook (it calls ensureEnvironmentProvisioned internally)
+    const hookPath = path.join(TEMPLATES, "hooks", "session-start.js");
+    try {
+      execFileSync("node", [hookPath, "--copilot-cli"], {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+        cwd: tmpDir,
+        timeout: 15000,
+        env: { ...process.env, STICKY_CWD: tmpDir },
+      });
+    } catch (_) { /* hook may exit non-zero, that's ok */ }
+
+    const hashFile = path.join(tmpDir, ".sticky-note", ".env-provision-hash");
+    assert.ok(fs.existsSync(hashFile), ".env-provision-hash should be created after provisioning");
+  });
+
+  run("help text includes bootstrap and env commands", () => {
+    const out = cli(["--help"]);
+    assert.ok(out.includes("bootstrap"), "Help should mention bootstrap command");
+    assert.ok(out.includes("env"), "Help should mention env command");
+  });
+
 } finally {
   cleanup();
 }
