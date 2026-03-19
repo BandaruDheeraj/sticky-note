@@ -1,5 +1,30 @@
 # Changelog
 
+## V2.6.16
+
+### Fix: MCP server connection (npx command)
+- `npx -y sticky-note-cli mcp-server` failed with "could not determine
+  executable to run" because the package name doesn't match the bin entry.
+  Fixed to `npx -y -p sticky-note-cli sticky-note mcp-server`.
+- Updated `.mcp.json`, session-start hook auto-registration, README, and
+  plan docs with the corrected command.
+
+### New: Styled overlap banners
+- AI-rendered banner uses `━` bar borders, structured layout with
+  `🔴 STUCK` / `🟡 OPEN` status indicators, user, branch, files,
+  narrative, and resume command.
+- stderr banner uses ANSI colors: yellow borders, red/green status,
+  cyan branch names, dim narrative, pipe (`┃`) left border.
+- Consistent format across all channels: pre-tool-use deny,
+  inject-context, session-start, and instruction templates.
+
+### Fix: Copilot CLI not calling MCP tools
+- `.github/copilot-instructions.md` was missing the MCP Server section
+  entirely — the AI never knew the tools existed.
+- Restructured instructions so MCP tools are the **first section** with
+  mandatory language. Manual file reads demoted to fallback.
+- Updated both the active copy and the template.
+
 ## V2.6.13
 
 ### Fix: Teammate hook sharing (zero-config onboarding)

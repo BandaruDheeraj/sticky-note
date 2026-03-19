@@ -30,8 +30,12 @@
 
 ## The Problem
 
-I have seen many agent-to-agent to orchestration systems and frameworks, but I still like working with other people.
-Other people that ALSO use agents to develop. I couldn't get my agent to understand what my friends agents were doing.
+When multiple developers on a team use AI coding assistants, each assistant operates in its own bubble. Your agent doesn't know that your teammate's agent just spent 45 minutes debugging token rotation in the same file you're about to refactor. It doesn't know what they tried and abandoned. It doesn't know they're stuck.
+
+The result: duplicated effort, conflicting changes, and context that evaporates the moment a session ends.
+
+There are plenty of agent-to-agent orchestration frameworks out there, but that's not how most teams actually work. We work with other people — people who also happen to use agents. We needed a way for those agents to share context without changing how anyone works.
+
 So we built Sticky Note.
 
 ## The Solution
@@ -44,7 +48,9 @@ their next session by relevance.
 
 ## What's New in V2.6
 
-- **Overlap detection**: Warns when you're working on files another teammate has open/stuck threads on. Three delivery channels: injected context, stderr banner, and preToolUse deny (Copilot CLI)
+- **MCP server**: 8-tool MCP server for reliable AI-to-sticky-note communication. Auto-registers in `.mcp.json` on first session. Works with Claude Code, Copilot CLI, and any MCP-compatible client
+- **Styled overlap banners**: Overlap warnings now use structured box-drawing format with 🔴/🟡 status indicators, ANSI-colored stderr output
+- **Overlap detection**: Warns when you're working on files another teammate has open/stuck threads on. Three delivery channels: MCP tool, injected context, and preToolUse deny
 - **File claiming**: `npx sticky-note-cli claim src/auth.ts "refactoring auth flow"` — declare intent to work on files
 - **Auto-close Copilot CLI threads**: Threads from Copilot CLI sessions auto-close after configurable inactivity (default 24h), since Copilot CLI has no session-end signal
 - **PID-keyed session isolation**: Concurrent Copilot CLI sessions get independent overlap dedup via `COPILOT_LOADER_PID`
