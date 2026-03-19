@@ -10,6 +10,16 @@
         "sticky-note",
         "mcp-server"
       ]
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
+      "description": "Fetch up-to-date docs for any library",
+      "required": true
     }
   }
 }

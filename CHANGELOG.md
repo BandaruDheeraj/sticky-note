@@ -1,5 +1,32 @@
 # Changelog
 
+## V2.7.0
+
+### New: Team Environment Sync ("Vibe Coding Container")
+- **Auto-provisioning engine** in session-start hook: copies skills, agents,
+  commands to tool-specific directories; writes secret-free MCP servers to
+  `.mcp.json`; merges permissions into `.claude/settings.local.json`
+- **Hash-based change detection**: provisioning only runs when environment
+  directory contents change (SHA-256 hash stored in `.env-provision-hash`)
+- **`.sticky-note/environment/` directory**: manifest.json for MCP servers
+  and permissions; `skills/`, `agents/`, `commands/` for .md files
+- **`npx sticky-note bootstrap`**: interactive secrets provisioning for MCP
+  servers with `${ENV_VAR}` placeholders. Resolves via shell env → .env →
+  interactive prompt. Generates `.env.example`.
+- **`npx sticky-note env status`**: shows provisioned/missing/needs-secrets
+  per MCP server, resource counts, env var resolution status
+- **`npx sticky-note env add-server`**: interactive command to add MCP
+  servers to the team environment manifest
+- **Dual-target provisioning**: skills copied to both
+  `.claude/plugins/sticky-note-team/` (Claude Code) and
+  `.github/extensions/sticky-note-team/` (Copilot CLI)
+- **Auto-generated plugin.json**: Claude Code plugin metadata created
+  automatically from provisioned skills
+- **Backward compatibility**: old `mcp_servers[]`/`skills[]` in
+  `sticky-note-config.json` auto-migrated to new environment format
+- **MCP `get_environment_status()` tool**: reads manifest and reports
+  what's provisioned vs missing vs needs-secrets to the AI
+
 ## V2.6.16
 
 ### Fix: MCP server connection (npx command)

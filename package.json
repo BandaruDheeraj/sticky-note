@@ -1,6 +1,6 @@
 {
   "name": "sticky-note-cli",
-  "version": "2.6.16",
+  "version": "2.7.0",
   "description": "Human-to-human handoff for AI coding assistants. Git-backed shared memory for Claude Code and Copilot CLI.",
   "license": "MIT",
   "bin": {

@@ -46,7 +46,14 @@ their next session by relevance.
 
 ---
 
-## What's New in V2.6
+## What's New in V2.7
+
+- **Team Environment Sync**: Share your complete AI dev environment through git. Skills, agents, commands, MCP servers, and permissions auto-provision when teammates start a session — zero manual setup
+- **`bootstrap` command**: Interactive secrets provisioning for MCP servers that need credentials. Generates `.env.example` for the team
+- **`env` commands**: `env status` shows provisioning state, `env add-server` adds MCP servers interactively
+- **Dual-target provisioning**: Skills deployed to both Claude Code plugins and Copilot CLI extensions automatically
+
+### What's New in V2.6
 
 - **MCP server**: 8-tool MCP server for reliable AI-to-sticky-note communication. Auto-registers in `.mcp.json` on first session. Works with Claude Code, Copilot CLI, and any MCP-compatible client
 - **Styled overlap banners**: Overlap warnings now use structured box-drawing format with 🔴/🟡 status indicators, ANSI-colored stderr output
@@ -342,6 +349,9 @@ npx sticky-note-cli reset          # Wipe all threads (--force, --keep-audit)
 npx sticky-note-cli get-line-attribution # File→thread attribution with line ranges (V2.5)
 npx sticky-note-cli checkpoint         # Set work-topic checkpoint for attribution (V2.5)
 npx sticky-note-cli sync               # Commit .sticky-note/ changes (--push to also push)
+npx sticky-note-cli bootstrap         # Provision MCP servers that need secrets
+npx sticky-note-cli env status         # Show environment provisioning status
+npx sticky-note-cli env add-server     # Add MCP server to team environment
 npx sticky-note mcp-server             # Launch MCP server (stdio JSON-RPC)
 npx sticky-note-cli --version      # Show version
 npx sticky-note-cli --help         # Show help
@@ -456,6 +466,50 @@ Hook output goes to the AI model's context window — the AI decides whether
 to surface it. MCP tool responses are part of the AI's active reasoning,
 so the data always gets processed. This makes the MCP server the most
 reliable channel for overlap warnings and environment notifications.
+
+---
+
+## Team Environment Sync
+
+Share your complete AI development environment with the team — MCP servers,
+skills, agents, commands, and permissions — through git, with zero manual setup.
+
+### How it works
+
+```
+Team lead: npx sticky-note init     → commits hooks + environment/
+Teammate:  git pull && start session → hook auto-provisions everything
+```
+
+The session-start hook is the provisioning engine. It copies skills to
+plugin directories, writes MCP servers to `.mcp.json`, and merges
+permissions — all automatically when a teammate starts their AI session.
+
+### Directory structure
+
+```
+.sticky-note/environment/
+├── manifest.json         # MCP servers, permissions, env vars
+├── skills/               # Team skill definitions (.md files)
+├── agents/               # Team agent definitions (.md files)
+└── commands/             # Team command definitions (.md files)
+```
+
+### Adding team resources
+
+**Skills/agents/commands:** Drop a `.md` file into the appropriate directory.
+It auto-provisions on next session and auto-commits with your next commit.
+
+**MCP servers:** `npx sticky-note env add-server` or edit `manifest.json`.
+
+### Secrets handling
+
+MCP servers that need secrets (e.g., `${GITHUB_TOKEN}`) are skipped by
+auto-provisioning. Run `npx sticky-note bootstrap` to provide credentials
+interactively — they're saved to `.env` (gitignored), never committed.
+
+The MCP server's `get_environment_status()` tool tells the AI what's missing
+so it can prompt the user.
 
 ---
 
