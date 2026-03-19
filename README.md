@@ -336,7 +336,7 @@ npx sticky-note-cli reset          # Wipe all threads (--force, --keep-audit)
 npx sticky-note-cli get-line-attribution # File→thread attribution with line ranges (V2.5)
 npx sticky-note-cli checkpoint         # Set work-topic checkpoint for attribution (V2.5)
 npx sticky-note-cli sync               # Commit .sticky-note/ changes (--push to also push)
-npx sticky-note-cli mcp-server         # Launch MCP server (stdio JSON-RPC)
+npx sticky-note mcp-server             # Launch MCP server (stdio JSON-RPC)
 npx sticky-note-cli --version      # Show version
 npx sticky-note-cli --help         # Show help
 ```
@@ -425,7 +425,7 @@ Add to `.mcp.json` at your project root:
     "sticky-note": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "sticky-note-cli", "mcp-server"]
+      "args": ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"]
     }
   }
 }

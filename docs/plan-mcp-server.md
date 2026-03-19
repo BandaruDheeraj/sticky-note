@@ -172,7 +172,7 @@ function ensureMcpServerRegistered() {
     mcp.mcpServers['sticky-note'] = {
       type: 'stdio',
       command: 'npx',
-      args: ['-y', 'sticky-note-cli', 'mcp-server']
+      args: ['-y', '-p', 'sticky-note-cli', 'sticky-note', 'mcp-server']
     };
     fs.writeFileSync(mcpPath, JSON.stringify(mcp, null, 2) + '\n');
   }
@@ -205,7 +205,7 @@ In `.mcp.json`:
     "sticky-note": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "sticky-note-cli", "mcp-server"]
+      "args": ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"]
     }
   }
 }

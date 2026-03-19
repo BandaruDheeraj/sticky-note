@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "sticky-note": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "-p",
+        "sticky-note-cli",
+        "sticky-note",
+        "mcp-server"
+      ]
+    }
+  }
+}
