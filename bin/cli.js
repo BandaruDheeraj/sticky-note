@@ -116,6 +116,7 @@ function installPreCommitHook() {
       '  [ -f "$_sn_root/.sticky-note/merge-driver.js" ] && git add "$_sn_root/.sticky-note/merge-driver.js" 2>/dev/null || true',
       '  [ -d "$_sn_root/.sticky-note/audit" ] && git add "$_sn_root/.sticky-note/audit/" 2>/dev/null || true',
       '  [ -d "$_sn_root/.sticky-note/presence" ] && git add "$_sn_root/.sticky-note/presence/" 2>/dev/null || true',
+      '  [ -d "$_sn_root/.sticky-note/environment" ] && git add "$_sn_root/.sticky-note/environment/" 2>/dev/null || true',
       'fi',
       STICKY_PRE_COMMIT_END,
     ].join("\n");
@@ -763,16 +764,46 @@ async function cmdInit() {
 
   // Create environment directory structure
   const envDir = path.join(stickyNoteDir, "environment");
-  const envManifestSrc = path.join(TEMPLATES_DIR, "environment", "manifest.json");
   const envManifestDest = path.join(envDir, "manifest.json");
   mkdirSafe(path.join(envDir, "skills"));
   mkdirSafe(path.join(envDir, "agents"));
   mkdirSafe(path.join(envDir, "commands"));
   if (!fs.existsSync(envManifestDest)) {
-    if (fs.existsSync(envManifestSrc)) {
-      copyFile(envManifestSrc, envManifestDest);
-    } else {
-      fs.writeFileSync(envManifestDest, JSON.stringify({ version: "1", mcp_servers: {} }, null, 2) + "\n");
+    // Build manifest from detected MCP servers and skills
+    const manifestData = { version: "1", mcp_servers: {}, permissions: [], env_vars: {} };
+    for (const server of mcpServers) {
+      const entry = { type: server.type || "stdio", description: server.name, required: false };
+      if (server.command) entry.command = server.command;
+      if (server.args) entry.args = server.args;
+      if (server.env) {
+        entry.env = {};
+        for (const [k, v] of Object.entries(server.env)) {
+          entry.env[k] = `\${${k}}`;
+          manifestData.env_vars[k] = { description: k, required: true };
+        }
+      }
+      manifestData.mcp_servers[server.name] = entry;
+    }
+    fs.writeFileSync(envManifestDest, JSON.stringify(manifestData, null, 2) + "\n");
+    if (mcpServers.length > 0) {
+      print(`  [OK] Manifest populated with ${mcpServers.length} detected MCP server(s)`);
+    }
+    // Copy detected skills into environment/skills/
+    for (const skillName of skills) {
+      const claudeSkillPath = path.join(process.cwd(), ".claude", "plugins");
+      const possibleSkillPaths = [
+        path.join(claudeSkillPath, skillName, "SKILL.md"),
+        path.join(claudeSkillPath, skillName, "skills", skillName, "SKILL.md"),
+      ];
+      for (const sp of possibleSkillPaths) {
+        if (fs.existsSync(sp)) {
+          fs.copyFileSync(sp, path.join(envDir, "skills", skillName + ".md"));
+          break;
+        }
+      }
+    }
+    if (skills.length > 0) {
+      print(`  [OK] Copied ${skills.length} detected skill(s) to environment/skills/`);
     }
   }
   print("  [OK] Created environment directory (.sticky-note/environment/)");
@@ -2698,12 +2729,16 @@ async function cmdEnv() {
     case "add-server":
       await cmdEnvAddServer();
       break;
+    case "add-plugin":
+      await cmdEnvAddPlugin();
+      break;
     default:
       printBanner();
       print("  Usage: npx sticky-note env <subcommand>\n");
       print("  Subcommands:");
       print("    status       Show what's provisioned vs missing vs needs-secrets");
       print("    add-server   Interactively add an MCP server to the manifest");
+      print("    add-plugin   Interactively add a plugin to the manifest");
       print("");
       break;
   }
@@ -2915,6 +2950,63 @@ async function cmdEnvAddServer() {
   print("");
 }
 
+async function cmdEnvAddPlugin() {
+  const cwd = process.cwd();
+  const manifestPath = path.join(cwd, ".sticky-note", "environment", "manifest.json");
+
+  printBanner();
+  print("  ➕ Add Plugin to Manifest\n");
+
+  if (!fs.existsSync(manifestPath)) {
+    print("  No environment manifest found. Run `npx sticky-note init` first.");
+    return;
+  }
+
+  const manifest = readJsonSafe(manifestPath, null);
+  if (!manifest) {
+    print("  [ERR] Failed to parse manifest.json");
+    return;
+  }
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const name = await ask(rl, "Plugin name (e.g. docker, eslint-helper)", "");
+  if (!name) {
+    print("  [ERR] Plugin name is required.");
+    rl.close();
+    return;
+  }
+
+  const source = await ask(rl, "Source (e.g. registry:docker-copilot-ext, github:user/repo)", "");
+  if (!source) {
+    print("  [ERR] Plugin source is required.");
+    rl.close();
+    return;
+  }
+
+  const description = await ask(rl, "Description", "");
+  const requiredRaw = await ask(rl, "Required?", "no");
+  const required = requiredRaw.toLowerCase() === "yes" || requiredRaw.toLowerCase() === "y";
+
+  rl.close();
+
+  manifest.plugins = manifest.plugins || {};
+  manifest.plugins[name] = {
+    source,
+    description,
+    required,
+  };
+
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+
+  print("");
+  print(`  ✅ Added plugin "${name}" to manifest.json`);
+  print("");
+}
+
 // ──────────────────────────────────────────────
 // Main
 // ──────────────────────────────────────────────
@@ -3008,7 +3100,7 @@ async function main() {
       print("    claim              Claim ownership of files you're working on (--list, --clear)");
       print("    sync               Commit .sticky-note/ changes to git (--push to also push)");
     print("    bootstrap          Provision MCP servers with secrets from manifest");
-    print("    env                Environment management (status, add-server)");
+    print("    env                Environment management (status, add-server, add-plugin)");
     print("    mcp-server         Launch the sticky-note MCP server (stdio JSON-RPC)");
       print("");
       print("  Options:");

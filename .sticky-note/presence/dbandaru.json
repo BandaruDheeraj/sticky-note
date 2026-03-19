@@ -1,15 +1,15 @@
 {
   "active_files": [
-    ".gitignore",
-    "templates\\gitignore-additions.txt",
-    "templates\\hooks\\sticky-utils.js",
+    ".sticky-note\\environment\\skills\\react-doctor.md",
+    "README.md",
+    "CHANGELOG.md",
     "package.json",
-    "..\\..\\..\\..\\.copilot\\session-state\\c6545bf9-06f2-4972-9209-a0d429fce043\\plan.md",
-    "templates\\sticky-note-config.json",
-    "templates\\hooks\\post-commit",
-    "templates\\hooks\\session-end.js",
     "test\\smoke.test.js",
-    "bin\\cli.js"
+    "docs",
+    "docs\\plan-environment-sync.md",
+    "templates\\hooks\\session-start.js",
+    "bin\\cli.js",
+    "templates\\copilot-instructions.md"
   ],
-  "last_seen": "2026-03-16T22:41:45.494Z"
+  "last_seen": "2026-03-19T20:16:44.292Z"
 }

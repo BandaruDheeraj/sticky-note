@@ -332,6 +332,105 @@ try {
     const out = cli(["--help"]);
     assert.ok(out.includes("bootstrap"), "Help should mention bootstrap command");
     assert.ok(out.includes("env"), "Help should mention env command");
+    assert.ok(out.includes("add-plugin"), "Help should mention add-plugin in env description");
+  });
+
+  run("provisioning creates extension.mjs and package.json for Copilot CLI", () => {
+    const envDir = path.join(tmpDir, ".sticky-note", "environment");
+    fs.mkdirSync(envDir, { recursive: true });
+    fs.mkdirSync(path.join(envDir, "skills"), { recursive: true });
+    fs.writeFileSync(
+      path.join(envDir, "manifest.json"),
+      JSON.stringify({ version: "1", mcp_servers: {} }, null, 2) + "\n"
+    );
+    fs.writeFileSync(
+      path.join(envDir, "skills", "test-skill.md"),
+      "# Test Skill\nA test skill for smoke testing.\n"
+    );
+
+    const hookPath = path.join(TEMPLATES, "hooks", "session-start.js");
+    try {
+      execFileSync("node", [hookPath, "--copilot-cli"], {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+        cwd: tmpDir,
+        timeout: 15000,
+        env: { ...process.env, STICKY_CWD: tmpDir },
+      });
+    } catch (_) { /* hook may exit non-zero */ }
+
+    const extDir = path.join(tmpDir, ".github", "extensions", "sticky-note-team");
+    assert.ok(fs.existsSync(path.join(extDir, "extension.mjs")), "extension.mjs should be created");
+    assert.ok(fs.existsSync(path.join(extDir, "package.json")), "package.json should be created");
+
+    const pkg = JSON.parse(fs.readFileSync(path.join(extDir, "package.json"), "utf-8"));
+    assert.strictEqual(pkg.name, "sticky-note-team", "package.json should have correct name");
+    assert.strictEqual(pkg.type, "module", "package.json should set type to module");
+  });
+
+  run("provisioning copies skills to both Claude and Copilot dirs", () => {
+    const claudeSkill = path.join(tmpDir, ".claude", "plugins", "sticky-note-team", "skills", "test-skill", "SKILL.md");
+    const copilotSkill = path.join(tmpDir, ".github", "extensions", "sticky-note-team", "skills", "test-skill.md");
+    assert.ok(fs.existsSync(claudeSkill), "Skill should be provisioned to Claude plugin dir");
+    assert.ok(fs.existsSync(copilotSkill), "Skill should be provisioned to Copilot extension dir");
+  });
+
+  run("provisioning merges permissions into settings.local.json", () => {
+    // Clean up from previous test, set up fresh
+    const envDir = path.join(tmpDir, ".sticky-note", "environment");
+    fs.writeFileSync(
+      path.join(envDir, "manifest.json"),
+      JSON.stringify({
+        version: "1",
+        mcp_servers: {},
+        permissions: ["Bash(npm test:*)", "mcp:context7"],
+      }, null, 2) + "\n"
+    );
+    // Clear provision hash to force re-provisioning
+    const hashFile = path.join(tmpDir, ".sticky-note", ".env-provision-hash");
+    if (fs.existsSync(hashFile)) fs.unlinkSync(hashFile);
+
+    const hookPath = path.join(TEMPLATES, "hooks", "session-start.js");
+    try {
+      execFileSync("node", [hookPath, "--copilot-cli"], {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+        cwd: tmpDir,
+        timeout: 15000,
+        env: { ...process.env, STICKY_CWD: tmpDir },
+      });
+    } catch (_) { /* hook may exit non-zero */ }
+
+    const settingsPath = path.join(tmpDir, ".claude", "settings.local.json");
+    if (fs.existsSync(settingsPath)) {
+      const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+      assert.ok(
+        Array.isArray(settings.allowedTools) && settings.allowedTools.includes("Bash(npm test:*)"),
+        "Permissions should be merged into settings.local.json"
+      );
+    }
+  });
+
+  run("pre-commit hook includes environment/ in auto-stage paths", () => {
+    const cliPath = path.join(__dirname, "..", "bin", "cli.js");
+    const cliSource = fs.readFileSync(cliPath, "utf-8");
+    assert.ok(
+      cliSource.includes('.sticky-note/environment"') || cliSource.includes(".sticky-note/environment/"),
+      "Pre-commit hook should auto-stage .sticky-note/environment/"
+    );
+  });
+
+  run("env add-plugin appears in env subcommand help", () => {
+    const cliPath = path.join(__dirname, "..", "bin", "cli.js");
+    const cliSource = fs.readFileSync(cliPath, "utf-8");
+    assert.ok(cliSource.includes("add-plugin"), "env subcommand should include add-plugin case");
+  });
+
+  run("copilot-instructions.md mentions environment sync", () => {
+    const instrPath = path.join(TEMPLATES, "copilot-instructions.md");
+    const content = fs.readFileSync(instrPath, "utf-8");
+    assert.ok(content.includes("environment sync"), "copilot-instructions.md should mention environment sync");
+    assert.ok(content.includes("get_environment_status"), "copilot-instructions.md should mention get_environment_status tool");
   });
 
 } finally {

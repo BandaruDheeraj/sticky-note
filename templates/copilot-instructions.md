@@ -237,4 +237,19 @@ when sticky-note is acting on their behalf.
 ### Team config
 
 Check `.sticky-note/sticky-note-config.json` for team conventions and settings.
+
+### Team environment sync
+
+The team's vibe coding environment is defined in `.sticky-note/environment/`.
+Skills, agents, commands, MCP servers, and permissions are auto-provisioned
+by the session-start hook — no manual setup needed.
+
+- **Skills:** `.sticky-note/environment/skills/*.md` → auto-copied to plugin dirs
+- **Agents:** `.sticky-note/environment/agents/*.md` → auto-copied to plugin dirs
+- **Commands:** `.sticky-note/environment/commands/*.md` → auto-copied to plugin dirs
+- **MCP servers:** Defined in `manifest.json` → secret-free servers auto-provisioned
+- **Permissions:** Defined in `manifest.json` → merged into settings
+
+Use `get_environment_status()` MCP tool to check what's provisioned vs missing.
+If MCP servers need secrets, tell the user to run `npx sticky-note bootstrap`.
 <!-- sticky-note:end -->
