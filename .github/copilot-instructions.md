@@ -2,7 +2,34 @@
 # Sticky Note — Copilot CLI Instructions
 
 This repository uses **Sticky Note** for team handoff context.
-All session threads are stored in `.sticky-note/sticky-note.json`.
+
+## ⚠️ MANDATORY: Sticky Note MCP Tools (DO THIS FIRST)
+
+You have a `sticky-note` MCP server connected. You MUST call these tools:
+
+### On EVERY session — before doing any work:
+```
+get_stuck_threads()          → surface stuck threads to user
+get_environment_status()     → check for missing MCP servers/secrets
+```
+
+### Before EVERY file edit:
+```
+check_overlaps(files)        → detect if teammates are working on same files
+```
+If overlaps are found, display the overlap banner BEFORE proceeding.
+
+### When you need context:
+```
+get_thread_context_for_files(files)  → who worked on these files, what happened
+search_threads(query)                → keyword search across all threads
+get_session_context(id)              → full thread payload by ID
+get_audit_trail(file, user, since)   → query per-user audit logs
+get_presence()                       → who is currently active
+```
+
+These MCP tools are the PRIMARY way sticky-note communicates with you.
+Do NOT skip them. Do NOT substitute with manual file reads.
 
 ## When asked about threads, sessions, or teammate activity
 
@@ -17,20 +44,18 @@ git history, your own session memory, or any other source.
 - [CLOSED] `closed` — completed
 - [EXPIRED] `expired` — tombstoned, minimal data remains
 
-### Proactive context injection (V2.5)
+### Fallback: Manual context injection (if MCP is unavailable)
 
-Copilot CLI does not have lifecycle hooks, so **you must self-serve context**.
-Follow these two rules every session:
+If the sticky-note MCP server is not connected, fall back to self-serve:
 
-#### 1. Eager: At session start, check for stuck/open threads
+#### 1. At session start, check for stuck/open threads
 
-Before doing any work, read `.sticky-note/sticky-note.json` and check for
-threads with status `stuck` or `open`. If any exist, briefly summarize them
-to the user (what's blocked, what files are involved).
+Read `.sticky-note/sticky-note.json` and check for threads with status
+`stuck` or `open`. If any exist, briefly summarize them to the user.
 
-#### 2. Lazy: Before editing a file, check for prior thread context
+#### 2. Before editing a file, check for prior thread context
 
-**The first time you edit or read a file in a session**, run:
+**The first time you edit a file in a session**, run:
 ```bash
 npx sticky-note get-line-attribution --file <path>
 ```
@@ -214,25 +239,6 @@ Rules:
 
 This pattern exists to prevent two teammates from wasting hours on the
 same problem. Treat it like a system alert, not optional context.
-
-## Sticky Note MCP Server
-
-You have access to a `sticky-note` MCP server. Use it:
-
-1. **At session start**: Call `get_stuck_threads()` and `get_environment_status()`
-   to check for team blockers and environment changes. Surface any warnings.
-
-2. **Before editing files**: Call `check_overlaps(files)` with the files you
-   plan to edit. If overlaps exist, warn the user before proceeding.
-
-3. **For prior work context**: Call `get_thread_context_for_files(files)` or
-   `search_threads(query)` to find relevant thread history.
-
-4. **For audit history**: Call `get_audit_trail(file)` to understand who
-   changed a file and when.
-
-These tools are the primary way sticky-note communicates with you.
-Hook-injected context supplements but does not replace MCP tool calls.
 
 ### `[STICKY-NOTE]` tags
 
