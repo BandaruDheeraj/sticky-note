@@ -469,6 +469,176 @@ function ensureMcpServerRegistered() {
   }
 }
 
+// ── Environment provisioning ──────────────────────────────
+
+function hasEnvPlaceholders(obj) {
+  if (obj == null) return false;
+  if (typeof obj === "string") return obj.includes("${");
+  if (Array.isArray(obj)) return obj.some(hasEnvPlaceholders);
+  if (typeof obj === "object") {
+    return Object.values(obj).some(hasEnvPlaceholders);
+  }
+  return false;
+}
+
+function ensureEnvironmentProvisioned() {
+  const fs = require("fs");
+  const cwd = process.cwd();
+  const envDir = path.join(cwd, ".sticky-note", "environment");
+  const hashFile = path.join(cwd, ".sticky-note", ".env-provision-hash");
+  const debug = !!process.env.STICKY_DEBUG;
+
+  if (!fs.existsSync(envDir)) return;
+
+  // Hash all files in .sticky-note/environment/ recursively
+  function hashDir(dir) {
+    const hash = crypto.createHash("sha256");
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return hash; }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const ent of entries) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        hash.update("d:" + ent.name + "\n");
+        hash.update(hashDir(full).digest());
+      } else if (ent.isFile()) {
+        hash.update("f:" + ent.name + "\n");
+        try { hash.update(fs.readFileSync(full)); } catch (_) { /* skip */ }
+      }
+    }
+    return hash;
+  }
+
+  const currentHash = hashDir(envDir).digest("hex");
+
+  // Skip if hash matches (idempotent)
+  try {
+    const stored = fs.readFileSync(hashFile, "utf-8").trim();
+    if (stored === currentHash) {
+      if (debug) process.stderr.write("[sticky-note] environment unchanged, skipping provisioning\n");
+      return;
+    }
+  } catch (_) { /* no hash file yet */ }
+
+  if (debug) process.stderr.write("[sticky-note] provisioning team environment...\n");
+
+  const manifest = loadJson(path.join(envDir, "manifest.json"), {});
+
+  // ── MCP server provisioning (secret-free only) ──
+  const mcpServers = manifest.mcp_servers || {};
+  if (Object.keys(mcpServers).length > 0) {
+    const mcpPath = path.join(cwd, ".mcp.json");
+    const mcpConfig = loadJson(mcpPath, { mcpServers: {} });
+    if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
+    let mcpChanged = false;
+    for (const [name, serverDef] of Object.entries(mcpServers)) {
+      if (mcpConfig.mcpServers[name]) continue; // already present
+      if (hasEnvPlaceholders(serverDef)) {
+        if (debug) process.stderr.write(`[sticky-note] skipping MCP server "${name}" (has placeholders)\n`);
+        continue;
+      }
+      mcpConfig.mcpServers[name] = serverDef;
+      mcpChanged = true;
+      if (debug) process.stderr.write(`[sticky-note] added MCP server "${name}"\n`);
+    }
+    if (mcpChanged) saveJson(mcpPath, mcpConfig);
+  }
+
+  // ── Skill provisioning ──
+  const skillsDir = path.join(envDir, "skills");
+  if (fs.existsSync(skillsDir)) {
+    let skillFiles;
+    try { skillFiles = fs.readdirSync(skillsDir).filter((f) => f.endsWith(".md")); } catch (_) { skillFiles = []; }
+    for (const file of skillFiles) {
+      const name = path.basename(file, ".md");
+      const content = fs.readFileSync(path.join(skillsDir, file), "utf-8");
+
+      // Claude Code format
+      const claudeSkillDir = path.join(cwd, ".claude", "plugins", "sticky-note-team", "skills", name);
+      fs.mkdirSync(claudeSkillDir, { recursive: true });
+      fs.writeFileSync(path.join(claudeSkillDir, "SKILL.md"), content, "utf-8");
+
+      // Copilot CLI format
+      const copilotSkillDir = path.join(cwd, ".github", "extensions", "sticky-note-team", "skills");
+      fs.mkdirSync(copilotSkillDir, { recursive: true });
+      fs.writeFileSync(path.join(copilotSkillDir, name + ".md"), content, "utf-8");
+    }
+  }
+
+  // Auto-generate plugin.json for Claude Code
+  const pluginJsonDir = path.join(cwd, ".claude", "plugins", "sticky-note-team", ".claude-plugin");
+  fs.mkdirSync(pluginJsonDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(pluginJsonDir, "plugin.json"),
+    JSON.stringify({
+      name: "sticky-note-team",
+      version: "1.0.0",
+      description: "Team skills, agents, and commands provisioned by sticky-note",
+    }, null, 2) + "\n",
+    "utf-8"
+  );
+
+  // ── Agent provisioning ──
+  const agentsDir = path.join(envDir, "agents");
+  if (fs.existsSync(agentsDir)) {
+    let agentFiles;
+    try { agentFiles = fs.readdirSync(agentsDir).filter((f) => f.endsWith(".md")); } catch (_) { agentFiles = []; }
+    for (const file of agentFiles) {
+      const name = path.basename(file, ".md");
+      const content = fs.readFileSync(path.join(agentsDir, file), "utf-8");
+
+      const claudeAgentDir = path.join(cwd, ".claude", "plugins", "sticky-note-team", "agents");
+      fs.mkdirSync(claudeAgentDir, { recursive: true });
+      fs.writeFileSync(path.join(claudeAgentDir, name + ".md"), content, "utf-8");
+
+      const copilotAgentDir = path.join(cwd, ".github", "extensions", "sticky-note-team", "agents");
+      fs.mkdirSync(copilotAgentDir, { recursive: true });
+      fs.writeFileSync(path.join(copilotAgentDir, name + ".md"), content, "utf-8");
+    }
+  }
+
+  // ── Command provisioning ──
+  const commandsDir = path.join(envDir, "commands");
+  if (fs.existsSync(commandsDir)) {
+    let commandFiles;
+    try { commandFiles = fs.readdirSync(commandsDir).filter((f) => f.endsWith(".md")); } catch (_) { commandFiles = []; }
+    for (const file of commandFiles) {
+      const name = path.basename(file, ".md");
+      const content = fs.readFileSync(path.join(commandsDir, file), "utf-8");
+
+      const claudeCmdDir = path.join(cwd, ".claude", "plugins", "sticky-note-team", "commands");
+      fs.mkdirSync(claudeCmdDir, { recursive: true });
+      fs.writeFileSync(path.join(claudeCmdDir, name + ".md"), content, "utf-8");
+
+      const copilotCmdDir = path.join(cwd, ".github", "extensions", "sticky-note-team", "commands");
+      fs.mkdirSync(copilotCmdDir, { recursive: true });
+      fs.writeFileSync(path.join(copilotCmdDir, name + ".md"), content, "utf-8");
+    }
+  }
+
+  // ── Permission merging ──
+  const permissions = manifest.permissions;
+  if (Array.isArray(permissions) && permissions.length > 0) {
+    const settingsPath = path.join(cwd, ".claude", "settings.local.json");
+    const settings = loadJson(settingsPath, {});
+    if (!Array.isArray(settings.allowedTools)) settings.allowedTools = [];
+    let permChanged = false;
+    for (const perm of permissions) {
+      if (!settings.allowedTools.includes(perm)) {
+        settings.allowedTools.push(perm);
+        permChanged = true;
+      }
+    }
+    if (permChanged) saveJson(settingsPath, settings);
+  }
+
+  // Write provision hash after all provisioning succeeds
+  fs.mkdirSync(path.dirname(hashFile), { recursive: true });
+  fs.writeFileSync(hashFile, currentHash + "\n", "utf-8");
+
+  if (debug) process.stderr.write("[sticky-note] environment provisioning complete\n");
+}
+
 // ── Main ──────────────────────────────────────────────────
 
 function main() {
@@ -501,6 +671,9 @@ function main() {
 
   // Migrate legacy single-file audit/presence to per-user dirs
   migrateAuditAndPresence();
+
+  // Auto-provision team environment from .sticky-note/environment/
+  try { ensureEnvironmentProvisioned(); } catch (_) { /* provisioning must not break session */ }
 
   // Auto-register sticky-note MCP server in .mcp.json
   ensureMcpServerRegistered();
