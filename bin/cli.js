@@ -689,7 +689,7 @@ async function cmdInit() {
 
   // Install merge driver script and git config
   const mergeDriverSrc = path.join(TEMPLATES_DIR, "merge-driver.js");
-  const mergeDriverDest = path.join(stickyDir, "merge-driver.js");
+  const mergeDriverDest = path.join(stickyNoteDir, "merge-driver.js");
   copyFile(mergeDriverSrc, mergeDriverDest);
   print("  [OK] .sticky-note/merge-driver.js installed");
   try {
