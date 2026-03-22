@@ -66,6 +66,7 @@ const {
   getMemoryPath,
   loadJson,
   normalizeSep,
+  syncStickyNote,
 } = utils;
 
 // ── File path extraction from tool input ──────────────────
@@ -188,6 +189,17 @@ function main() {
   }
 
   const sessionId = getSessionId(hookInput);
+
+  // ── Auto-sync before git pull/merge/rebase ──
+  // Prevents "local changes would be overwritten" errors for .sticky-note/ files
+  const toolName = (hookInput.tool_name || hookInput.toolName || "").toLowerCase();
+  if (toolName === "bash" || toolName === "shell" || toolName === "command") {
+    const toolInput = hookInput.tool_input || hookInput.input || hookInput.toolArgs || {};
+    const cmd = typeof toolInput === "string" ? toolInput : (toolInput.command || "");
+    if (/\bgit\s+(pull|merge|rebase|fetch)\b/.test(cmd)) {
+      try { syncStickyNote({}); } catch (_) {}
+    }
+  }
 
   // ── Overlap deny gate (Copilot CLI only) ──
   // Detect overlaps and deny on first tool call, keyed by COPILOT_LOADER_PID.

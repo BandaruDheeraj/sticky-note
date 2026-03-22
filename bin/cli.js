@@ -716,6 +716,18 @@ async function cmdInit() {
     print("  ⏭️  Could not set git alias (non-fatal)");
   }
 
+  // Add git alias for safe pull with auto-sync
+  try {
+    const spullAlias = '!f() { npx sticky-note pull "$@"; }; f';
+    execFileSync("git", ["config", "alias.spull", spullAlias], {
+      cwd: process.cwd(),
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    print("  [OK] git alias: git spull (auto-sync + pull)");
+  } catch (_) {
+    print("  ⏭️  Could not set git spull alias (non-fatal)");
+  }
+
   // Deploy AI instruction files (CLAUDE.md + .github/copilot-instructions.md)
   const claudeMdDest = path.join(process.cwd(), "CLAUDE.md");
   if (!fs.existsSync(claudeMdDest)) {
@@ -2477,6 +2489,50 @@ function cmdSync() {
   print("");
 }
 
+// ──────────────────────────────────────────────
+// PULL command — auto-sync + git pull
+// ──────────────────────────────────────────────
+
+function cmdPull() {
+  const args = process.argv.slice(3);
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+
+  // Step 1: Sync .sticky-note/ changes if any
+  if (fs.existsSync(stickyDir)) {
+    try {
+      const status = execSync(
+        'git status --porcelain -- ".sticky-note/sticky-note.json" ".sticky-note/audit/" ".sticky-note/presence/"',
+        { encoding: "utf-8", cwd: process.cwd() }
+      ).trim();
+      if (status) {
+        const guardPath = path.join(stickyDir, ".sticky-syncing");
+        fs.writeFileSync(guardPath, process.pid.toString(), "utf-8");
+        try {
+          execFileSync("git", [
+            "add", "--", ".sticky-note/sticky-note.json",
+            ".sticky-note/audit/", ".sticky-note/presence/"
+          ], { cwd: process.cwd(), timeout: 10000, stdio: ["pipe", "pipe", "pipe"] });
+          execFileSync("git", [
+            "commit", "--no-verify", "-m", "chore(sticky-note): sync thread data"
+          ], { cwd: process.cwd(), timeout: 15000, stdio: ["pipe", "pipe", "pipe"] });
+          print("  ✅ Auto-synced .sticky-note/ before pull");
+        } finally {
+          try { fs.unlinkSync(guardPath); } catch (_) {}
+        }
+      }
+    } catch (_) {
+      // Non-fatal — proceed with pull even if sync fails
+    }
+  }
+
+  // Step 2: Run git pull with any extra args
+  try {
+    execFileSync("git", ["pull", ...args], { stdio: "inherit", cwd: process.cwd() });
+  } catch (err) {
+    process.exit(err.status || 1);
+  }
+}
+
 // MCP-SERVER command — launch the stdio MCP server
 function cmdMcpServer() {
   const mcpServerPath = path.join(__dirname, "mcp-server.js");
@@ -3064,6 +3120,9 @@ async function main() {
     case "sync":
       cmdSync();
       break;
+    case "pull":
+      cmdPull();
+      break;
     case "bootstrap":
       await cmdBootstrap();
       break;
@@ -3099,6 +3158,7 @@ async function main() {
       print("    overlap            Detect file overlaps with open/stuck threads");
       print("    claim              Claim ownership of files you're working on (--list, --clear)");
       print("    sync               Commit .sticky-note/ changes to git (--push to also push)");
+    print("    pull               Auto-sync .sticky-note/ then git pull (alias: git spull)");
     print("    bootstrap          Provision MCP servers with secrets from manifest");
     print("    env                Environment management (status, add-server, add-plugin)");
     print("    mcp-server         Launch the sticky-note MCP server (stdio JSON-RPC)");
