@@ -696,7 +696,7 @@ async function cmdInit() {
     execFileSync("git", ["config", "merge.sticky-note.name", "Sticky Note thread merge"], {
       cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
     });
-    execFileSync("git", ["config", "merge.sticky-note.driver", "node .sticky-note/merge-driver.js %O %A %B"], {
+    execFileSync("git", ["config", "merge.sticky-note.driver", "node \"$(git rev-parse --show-toplevel)/.sticky-note/merge-driver.js\" %O %A %B"], {
       cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
     });
     print("  [OK] git merge driver configured (merge.sticky-note)");
@@ -955,7 +955,7 @@ function cmdUpdate() {
     execFileSync("git", ["config", "merge.sticky-note.name", "Sticky Note thread merge"], {
       cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
     });
-    execFileSync("git", ["config", "merge.sticky-note.driver", "node .sticky-note/merge-driver.js %O %A %B"], {
+    execFileSync("git", ["config", "merge.sticky-note.driver", "node \"$(git rev-parse --show-toplevel)/.sticky-note/merge-driver.js\" %O %A %B"], {
       cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
     });
     print("  [OK] git merge driver configured (merge.sticky-note)");
