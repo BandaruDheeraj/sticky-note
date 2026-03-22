@@ -83,6 +83,28 @@ function readTemplate(name) {
   return fs.readFileSync(path.join(TEMPLATES_DIR, name), "utf-8");
 }
 
+// Replace $(git rev-parse --show-toplevel) with absolute root path
+// so hook commands work from any CWD without shell expansion.
+function resolveHookPaths(obj, rootDir) {
+  const root = rootDir.replace(/\\/g, "/");
+  const resolve = (s) =>
+    s.replace(/"\$\(git rev-parse --show-toplevel\)\//g, `"${root}/`);
+  const hooks = obj.hooks || {};
+  for (const entries of Object.values(hooks)) {
+    for (const entry of Array.isArray(entries) ? entries : []) {
+      if (entry.hooks) {
+        for (const h of entry.hooks) {
+          if (h.command) h.command = resolve(h.command);
+        }
+      }
+      if (entry.bash) entry.bash = resolve(entry.bash);
+      if (entry.powershell) entry.powershell = resolve(entry.powershell);
+      if (entry.command) entry.command = resolve(entry.command);
+    }
+  }
+  return obj;
+}
+
 function makeExecutable(filePath) {
   try {
     fs.chmodSync(filePath, 0o755);
@@ -551,12 +573,14 @@ async function cmdInit() {
 
   // Create settings.json (Claude Code)
   const settingsTemplate = JSON.parse(readTemplate("settings.json"));
+  resolveHookPaths(settingsTemplate, process.cwd());
   const settingsDest = path.join(process.cwd(), ".claude", "settings.json");
   fs.writeFileSync(settingsDest, JSON.stringify(settingsTemplate, null, 2) + "\n");
   print("  [OK] .claude/settings.json");
 
   // Create hooks.json (Copilot CLI)
   const hooksTemplate = JSON.parse(readTemplate("hooks.json"));
+  resolveHookPaths(hooksTemplate, process.cwd());
   const hooksDest = path.join(githubHooksDir, "hooks.json");
   fs.writeFileSync(hooksDest, JSON.stringify(hooksTemplate, null, 2) + "\n");
   print("  [OK] .github/hooks/hooks.json");
@@ -693,10 +717,11 @@ async function cmdInit() {
   copyFile(mergeDriverSrc, mergeDriverDest);
   print("  [OK] .sticky-note/merge-driver.js installed");
   try {
+    const mergeRoot = process.cwd().replace(/\\/g, "/");
     execFileSync("git", ["config", "merge.sticky-note.name", "Sticky Note thread merge"], {
       cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
     });
-    execFileSync("git", ["config", "merge.sticky-note.driver", "node \"$(git rev-parse --show-toplevel)/.sticky-note/merge-driver.js\" %O %A %B"], {
+    execFileSync("git", ["config", "merge.sticky-note.driver", `node "${mergeRoot}/.sticky-note/merge-driver.js" %O %A %B`], {
       cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
     });
     print("  [OK] git merge driver configured (merge.sticky-note)");
@@ -872,6 +897,7 @@ function cmdUpdate() {
   const settingsPath = path.join(process.cwd(), ".claude", "settings.json");
   if (fs.existsSync(settingsPath)) {
     const settingsTemplate = JSON.parse(readTemplate("settings.json"));
+    resolveHookPaths(settingsTemplate, process.cwd());
     const existing = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
     existing.hooks = settingsTemplate.hooks;
     fs.writeFileSync(settingsPath, JSON.stringify(existing, null, 2) + "\n");
@@ -882,6 +908,7 @@ function cmdUpdate() {
   const hooksPath = path.join(process.cwd(), ".github", "hooks", "hooks.json");
   if (fs.existsSync(hooksPath)) {
     const hooksTemplate = JSON.parse(readTemplate("hooks.json"));
+    resolveHookPaths(hooksTemplate, process.cwd());
     fs.writeFileSync(hooksPath, JSON.stringify(hooksTemplate, null, 2) + "\n");
     print("  [OK] .github/hooks/hooks.json (updated)");
   }
@@ -964,10 +991,11 @@ function cmdUpdate() {
 
   // Ensure git merge driver config is set
   try {
+    const mergeRoot = process.cwd().replace(/\\/g, "/");
     execFileSync("git", ["config", "merge.sticky-note.name", "Sticky Note thread merge"], {
       cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
     });
-    execFileSync("git", ["config", "merge.sticky-note.driver", "node \"$(git rev-parse --show-toplevel)/.sticky-note/merge-driver.js\" %O %A %B"], {
+    execFileSync("git", ["config", "merge.sticky-note.driver", `node "${mergeRoot}/.sticky-note/merge-driver.js" %O %A %B`], {
       cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
     });
     print("  [OK] git merge driver configured (merge.sticky-note)");

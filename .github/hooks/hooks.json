@@ -4,43 +4,43 @@
     "sessionStart": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 node \"$(git rev-parse --show-toplevel)/.claude/hooks/session-start.js\" --copilot-cli",
-        "powershell": "$env:COPILOT_CLI='1'; node \"$(git rev-parse --show-toplevel)/.claude/hooks/session-start.js\" --copilot-cli"
+        "bash": "COPILOT_CLI=1 node \"C:/Users/dbandaru/OneDrive - Microsoft/Desktop/Projects/sticky-note/.claude/hooks/session-start.js\" --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; node \"C:/Users/dbandaru/OneDrive - Microsoft/Desktop/Projects/sticky-note/.claude/hooks/session-start.js\" --copilot-cli"
       }
     ],
     "sessionEnd": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 node \"$(git rev-parse --show-toplevel)/.claude/hooks/session-end.js\" --copilot-cli",
-        "powershell": "$env:COPILOT_CLI='1'; node \"$(git rev-parse --show-toplevel)/.claude/hooks/session-end.js\" --copilot-cli"
+        "bash": "COPILOT_CLI=1 node \"C:/Users/dbandaru/OneDrive - Microsoft/Desktop/Projects/sticky-note/.claude/hooks/session-end.js\" --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; node \"C:/Users/dbandaru/OneDrive - Microsoft/Desktop/Projects/sticky-note/.claude/hooks/session-end.js\" --copilot-cli"
       }
     ],
     "userPromptSubmitted": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 node \"$(git rev-parse --show-toplevel)/.claude/hooks/inject-context.js\" --copilot-cli",
-        "powershell": "$env:COPILOT_CLI='1'; node \"$(git rev-parse --show-toplevel)/.claude/hooks/inject-context.js\" --copilot-cli"
+        "bash": "COPILOT_CLI=1 node \"C:/Users/dbandaru/OneDrive - Microsoft/Desktop/Projects/sticky-note/.claude/hooks/inject-context.js\" --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; node \"C:/Users/dbandaru/OneDrive - Microsoft/Desktop/Projects/sticky-note/.claude/hooks/inject-context.js\" --copilot-cli"
       }
     ],
     "preToolUse": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 node \"$(git rev-parse --show-toplevel)/.claude/hooks/pre-tool-use.js\" --copilot-cli",
-        "powershell": "$env:COPILOT_CLI='1'; node \"$(git rev-parse --show-toplevel)/.claude/hooks/pre-tool-use.js\" --copilot-cli"
+        "bash": "COPILOT_CLI=1 node \"C:/Users/dbandaru/OneDrive - Microsoft/Desktop/Projects/sticky-note/.claude/hooks/pre-tool-use.js\" --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; node \"C:/Users/dbandaru/OneDrive - Microsoft/Desktop/Projects/sticky-note/.claude/hooks/pre-tool-use.js\" --copilot-cli"
       }
     ],
     "postToolUse": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 node \"$(git rev-parse --show-toplevel)/.claude/hooks/track-work.js\" --copilot-cli",
-        "powershell": "$env:COPILOT_CLI='1'; node \"$(git rev-parse --show-toplevel)/.claude/hooks/track-work.js\" --copilot-cli"
+        "bash": "COPILOT_CLI=1 node \"C:/Users/dbandaru/OneDrive - Microsoft/Desktop/Projects/sticky-note/.claude/hooks/track-work.js\" --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; node \"C:/Users/dbandaru/OneDrive - Microsoft/Desktop/Projects/sticky-note/.claude/hooks/track-work.js\" --copilot-cli"
       }
     ],
     "errorOccurred": [
       {
         "type": "command",
-        "bash": "COPILOT_CLI=1 node \"$(git rev-parse --show-toplevel)/.claude/hooks/on-error.js\" --copilot-cli",
-        "powershell": "$env:COPILOT_CLI='1'; node \"$(git rev-parse --show-toplevel)/.claude/hooks/on-error.js\" --copilot-cli"
+        "bash": "COPILOT_CLI=1 node \"C:/Users/dbandaru/OneDrive - Microsoft/Desktop/Projects/sticky-note/.claude/hooks/on-error.js\" --copilot-cli",
+        "powershell": "$env:COPILOT_CLI='1'; node \"C:/Users/dbandaru/OneDrive - Microsoft/Desktop/Projects/sticky-note/.claude/hooks/on-error.js\" --copilot-cli"
       }
     ]
   }
