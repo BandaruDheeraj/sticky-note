@@ -189,6 +189,18 @@ after. A raw `git checkout` or `git switch` will fail if sticky-note
 files have uncommitted changes. The alias `git sw <branch>` also works
 if set up by `npx sticky-note init`.
 
+### Pulling changes
+
+**IMPORTANT:** Before pulling remote changes, always use:
+```bash
+npx sticky-note pull
+```
+This auto-commits `.sticky-note/` tracking data before pulling, preventing
+"local changes would be overwritten" errors. The alias `git spull` also
+works if set up by `npx sticky-note init`. The PreToolUse hook handles
+this automatically for AI tool calls, but prefer `git spull` when running
+git commands directly.
+
 ### ⚠️ Overlap warnings
 
 Sticky-note detects when your files overlap with other teammates'
