@@ -327,6 +327,62 @@ function countJsonlLines(filePath) {
 }
 
 // ──────────────────────────────────────────────
+// Copilot CLI MCP config helpers
+// ──────────────────────────────────────────────
+
+function getCopilotCliConfigDir() {
+  if (process.env.COPILOT_HOME) return process.env.COPILOT_HOME;
+  const home = process.env.HOME || process.env.USERPROFILE;
+  if (!home) return null;
+  return path.join(home, ".copilot");
+}
+
+function getCopilotCliMcpConfigPath() {
+  const dir = getCopilotCliConfigDir();
+  return dir ? path.join(dir, "mcp-config.json") : null;
+}
+
+/**
+ * Register an MCP server in Copilot CLI's ~/.copilot/mcp-config.json.
+ * Only writes if the ~/.copilot/ directory exists (Copilot CLI is installed).
+ */
+function ensureMcpInCopilotCliConfig(serverName, serverConfig) {
+  try {
+    const configDir = getCopilotCliConfigDir();
+    if (!configDir || !fs.existsSync(configDir)) return false;
+
+    const configPath = path.join(configDir, "mcp-config.json");
+    let config = {};
+    if (fs.existsSync(configPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      } catch (_) {
+        config = {};
+      }
+    }
+
+    config.mcpServers = config.mcpServers || {};
+    const existing = config.mcpServers[serverName];
+    // Copilot CLI requires "tools" field — fix entries missing it
+    if (existing) {
+      if (!existing.tools) {
+        existing.tools = ["*"];
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+        return true;
+      }
+      return false;
+    }
+
+    if (!serverConfig.tools) serverConfig.tools = ["*"];
+    config.mcpServers[serverName] = serverConfig;
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+// ──────────────────────────────────────────────
 // Auto-detection
 // ──────────────────────────────────────────────
 
@@ -351,6 +407,28 @@ function detectMcpServers() {
         servers.set(name, entry);
       }
     } catch (err) { debugLog("detectMcpServers settings.json: " + (err.message || err)); }
+  }
+
+  // Also detect from Copilot CLI's ~/.copilot/mcp-config.json
+  const copilotMcpPath = getCopilotCliMcpConfigPath();
+  if (copilotMcpPath && fs.existsSync(copilotMcpPath)) {
+    try {
+      const copilotMcp = JSON.parse(fs.readFileSync(copilotMcpPath, "utf-8"));
+      const mcpServers = copilotMcp.mcpServers || {};
+      for (const [name, config] of Object.entries(mcpServers)) {
+        if (servers.has(name)) continue; // repo-level takes precedence
+        const entry = {
+          name,
+          type: config.type || config.transport || "unknown",
+          source: "~/.copilot/mcp-config.json",
+        };
+        if (config.command) entry.command = config.command;
+        if (config.args) entry.args = config.args;
+        if (config.env) entry.env = config.env;
+        if (config.url) entry.url = config.url;
+        servers.set(name, entry);
+      }
+    } catch (err) { debugLog("detectMcpServers copilot mcp-config: " + (err.message || err)); }
   }
 
   const localSettingsPath = path.join(process.cwd(), ".claude", "settings.local.json");
@@ -456,13 +534,18 @@ async function syncMcpFromStickyNote(rl) {
   }
 
   for (const s of missing) {
-    const config = { type: s.type || "stdio" };
-    if (s.command) config.command = s.command;
-    if (s.args) config.args = s.args;
-    if (s.env) config.env = s.env;
-    if (s.url) config.url = s.url;
-    mcpJson.mcpServers[s.name] = config;
+    const serverEntry = { type: s.type || "stdio" };
+    if (s.command) serverEntry.command = s.command;
+    if (s.args) serverEntry.args = s.args;
+    if (s.env) serverEntry.env = s.env;
+    if (s.url) serverEntry.url = s.url;
+    mcpJson.mcpServers[s.name] = serverEntry;
     print(`  [OK] Added ${s.name} to .mcp.json`);
+
+    // Also register in Copilot CLI config
+    if (ensureMcpInCopilotCliConfig(s.name, serverEntry)) {
+      print(`  [OK] Added ${s.name} to ~/.copilot/mcp-config.json`);
+    }
   }
 
   fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2) + "\n");
@@ -854,6 +937,24 @@ async function cmdInit() {
     print("  [OK] .claude/hooks/ and .claude/settings.json staged for git");
   } catch (err) {
     debugLog("git add --force .claude/ failed: " + (err.message || err));
+  }
+
+  // Register sticky-note MCP server in Copilot CLI's ~/.copilot/mcp-config.json
+  const stickyMcpEntry = {
+    type: "stdio",
+    command: "npx",
+    args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
+    tools: ["*"],
+  };
+  if (ensureMcpInCopilotCliConfig("sticky-note", stickyMcpEntry)) {
+    print("  [OK] Registered sticky-note MCP server in ~/.copilot/mcp-config.json (Copilot CLI)");
+  } else {
+    const copilotDir = getCopilotCliConfigDir();
+    if (!copilotDir || !fs.existsSync(copilotDir)) {
+      print("  ⏭️  Copilot CLI not detected (~/.copilot/ not found) — skipped mcp-config.json");
+    } else {
+      print("  ⏭️  sticky-note already registered in ~/.copilot/mcp-config.json");
+    }
   }
 
   // Done!
@@ -2738,26 +2839,14 @@ async function cmdBootstrap() {
     };
 
     if (config.env) {
-      const resolvedEnv = {};
-      let hasUnresolved = false;
+      // Keep ${VAR} placeholders in .mcp.json — never write resolved secrets
+      // to committed files. Both Claude Code and Copilot CLI resolve env vars
+      // from the process environment at MCP server spawn time.
+      const safeEnv = {};
       for (const [envKey, envVal] of Object.entries(config.env)) {
-        if (typeof envVal === "string" && envVal.startsWith("${") && envVal.endsWith("}")) {
-          const varName = envVal.slice(2, -1);
-          if (resolved[varName]) {
-            resolvedEnv[envKey] = resolved[varName];
-          } else {
-            hasUnresolved = true;
-          }
-        } else {
-          resolvedEnv[envKey] = envVal;
-        }
+        safeEnv[envKey] = envVal; // preserves "${GITHUB_TOKEN}" as-is
       }
-      if (hasUnresolved) {
-        print(`  ⚠️  ${name}: skipped (unresolved secrets)`);
-        skipped++;
-        continue;
-      }
-      serverEntry.env = resolvedEnv;
+      serverEntry.env = safeEnv;
     }
 
     mcpJson.mcpServers[name] = serverEntry;
@@ -2765,6 +2854,31 @@ async function cmdBootstrap() {
   }
 
   fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2) + "\n");
+
+  // 6b. Also provision to Copilot CLI's ~/.copilot/mcp-config.json
+  // This file is local-only (not committed), so resolved secrets are safe here.
+  let copilotProvisioned = 0;
+  for (const [name, config] of serverEntries) {
+    if (mcpJson.mcpServers[name]) {
+      const copilotEntry = { ...mcpJson.mcpServers[name] };
+      // Resolve ${VAR} placeholders for local-only config
+      if (copilotEntry.env) {
+        const resolvedEnv = {};
+        for (const [envKey, envVal] of Object.entries(copilotEntry.env)) {
+          if (typeof envVal === "string" && envVal.startsWith("${") && envVal.endsWith("}")) {
+            const varName = envVal.slice(2, -1);
+            resolvedEnv[envKey] = resolved[varName] || envVal;
+          } else {
+            resolvedEnv[envKey] = envVal;
+          }
+        }
+        copilotEntry.env = resolvedEnv;
+      }
+      if (ensureMcpInCopilotCliConfig(name, copilotEntry)) {
+        copilotProvisioned++;
+      }
+    }
+  }
 
   // 7. Generate .env.example from manifest env_vars
   if (Object.keys(envVarsMeta).length > 0) {
@@ -2793,6 +2907,7 @@ async function cmdBootstrap() {
   print("");
   print("  ── Summary ──");
   print(`  Provisioned: ${provisioned} server(s)`);
+  if (copilotProvisioned > 0) print(`  Copilot CLI: ${copilotProvisioned} server(s) added to ~/.copilot/mcp-config.json`);
   if (skipped > 0) print(`  Skipped:     ${skipped} server(s) (missing secrets)`);
   print(`  Config:      ${mcpJsonPath}`);
   print("");
@@ -2851,6 +2966,13 @@ function cmdEnvStatus() {
   const mcpServers = manifest.mcp_servers || {};
   const serverNames = Object.keys(mcpServers);
 
+  // Also check Copilot CLI config
+  const copilotMcpPath = getCopilotCliMcpConfigPath();
+  let copilotServers = {};
+  if (copilotMcpPath && fs.existsSync(copilotMcpPath)) {
+    copilotServers = readJsonSafe(copilotMcpPath, { mcpServers: {} }).mcpServers || {};
+  }
+
   if (serverNames.length === 0) {
     print("  MCP Servers: (none defined)");
   } else {
@@ -2858,9 +2980,14 @@ function cmdEnvStatus() {
     for (const name of serverNames) {
       const config = mcpServers[name];
       const isProvisioned = registeredServers.includes(name);
+      const inCopilotCli = !!copilotServers[name];
 
-      if (isProvisioned) {
-        print(`    ✅ ${name} — provisioned`);
+      if (isProvisioned && inCopilotCli) {
+        print(`    ✅ ${name} — provisioned (Claude Code + Copilot CLI)`);
+      } else if (isProvisioned) {
+        print(`    ✅ ${name} — provisioned (.mcp.json only)`);
+      } else if (inCopilotCli) {
+        print(`    ✅ ${name} — provisioned (Copilot CLI only)`);
       } else {
         // Check if it needs secrets
         const envEntries = config.env || {};

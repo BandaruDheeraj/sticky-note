@@ -1,4 +1,7 @@
 
+# Secrets — never commit
+.env
+
 # Sticky Note - local overrides
 .claude/settings.local.json
 
@@ -9,6 +12,11 @@ __pycache__/
 # Sticky Note - debug log
 .sticky-note/hook-debug.log
 .sticky-note/.sticky-debug.jsonl
+
+# Sticky Note - lock and backup files
+.sticky-note/.sticky-backups/
+.sticky-note/sticky-note.json.lock
+.sticky-note/sticky-note.json.tmp.*
 
 # Sticky Note - transient session/resume signals
 .sticky-note/.sticky-resume

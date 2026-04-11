@@ -17,9 +17,18 @@
       "args": [
         "-y",
         "@upstash/context7-mcp@latest"
+      ]
+    },
+    "github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
       ],
-      "description": "Fetch up-to-date docs for any library",
-      "required": true
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
     }
   }
 }

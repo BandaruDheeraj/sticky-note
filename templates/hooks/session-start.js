@@ -62,6 +62,7 @@ const {
   clearActiveResumeThreadId,
   getActiveResumeThreadId,
   normalizeSep,
+  detectLostThreads,
 } = utils;
 
 // ── Stale-thread ageing ───────────────────────────────────
@@ -511,15 +512,43 @@ function ensureMcpServerRegistered() {
     }
 
     mcp.mcpServers = mcp.mcpServers || {};
-    if (mcp.mcpServers["sticky-note"]) return; // already registered
+    if (!mcp.mcpServers["sticky-note"]) {
+      mcp.mcpServers["sticky-note"] = {
+        type: "stdio",
+        command: "npx",
+        args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
+      };
+      fs.writeFileSync(mcpPath, JSON.stringify(mcp, null, 2) + "\n");
+    }
 
-    mcp.mcpServers["sticky-note"] = {
-      type: "stdio",
-      command: "npx",
-      args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
-    };
-
-    fs.writeFileSync(mcpPath, JSON.stringify(mcp, null, 2) + "\n");
+    // Also register in Copilot CLI's ~/.copilot/mcp-config.json
+    try {
+      const utils = require("./sticky-utils");
+      utils.ensureMcpInCopilotCliConfig("sticky-note", {
+        type: "stdio",
+        command: "npx",
+        args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
+        tools: ["*"],
+      });
+    } catch (_) {
+      // sticky-utils not available — inline fallback
+      const home = process.env.COPILOT_HOME || path.join(process.env.HOME || process.env.USERPROFILE || "", ".copilot");
+      if (home && fs.existsSync(home)) {
+        const copilotMcpPath = path.join(home, "mcp-config.json");
+        let copilotMcp = {};
+        try { copilotMcp = JSON.parse(fs.readFileSync(copilotMcpPath, "utf-8")); } catch (_) {}
+        copilotMcp.mcpServers = copilotMcp.mcpServers || {};
+        if (!copilotMcp.mcpServers["sticky-note"]) {
+          copilotMcp.mcpServers["sticky-note"] = {
+            type: "stdio",
+            command: "npx",
+            args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
+            tools: ["*"],
+          };
+          fs.writeFileSync(copilotMcpPath, JSON.stringify(copilotMcp, null, 2) + "\n");
+        }
+      }
+    }
   } catch (_) {
     // Non-fatal — MCP server registration is best-effort
   }
@@ -598,6 +627,15 @@ function ensureEnvironmentProvisioned() {
       if (debug) process.stderr.write(`[sticky-note] added MCP server "${name}"\n`);
     }
     if (mcpChanged) saveJson(mcpPath, mcpConfig);
+
+    // Also provision secret-free MCP servers to Copilot CLI's config
+    try {
+      const utils = require("./sticky-utils");
+      for (const [name, serverDef] of Object.entries(mcpServers)) {
+        if (hasEnvPlaceholders(serverDef)) continue;
+        utils.ensureMcpInCopilotCliConfig(name, serverDef);
+      }
+    } catch (_) { /* sticky-utils not available — skip Copilot CLI provisioning */ }
   }
 
   // ── Skill provisioning ──
@@ -771,6 +809,20 @@ function main() {
     project: "",
     threads: [],
   });
+
+  // Rollback detection: warn if threads went missing (e.g., after git reset)
+  try {
+    const lost = detectLostThreads(memoryPath);
+    if (lost.length > 0) {
+      const ids = lost.slice(0, 5).map((t) => t.id).join(", ");
+      const extra = lost.length > 5 ? ` (+${lost.length - 5} more)` : "";
+      process.stderr.write(
+        `[sticky-note] ⚠️  ${lost.length} thread(s) missing since last backup: ${ids}${extra}\n` +
+        `[sticky-note] This may indicate a git rollback. Run 'npx sticky-note status' to inspect.\n`
+      );
+    }
+  } catch (_) { /* rollback detection must not break session */ }
+
   const config = loadJson(getConfigPath(), { stale_days: 14 });
   const staleDays = config.stale_days != null ? config.stale_days : 14;
   const autoCloseHours =

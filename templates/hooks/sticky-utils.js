@@ -284,32 +284,169 @@ function loadJson(filePath, defaultVal) {
 
 function saveJson(filePath, data) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n", "utf-8");
+  // Atomic write: write to temp file then rename to prevent partial/truncated JSON
+  const tmpPath = filePath + ".tmp." + process.pid;
+  try {
+    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2) + "\n", "utf-8");
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    // Rename can fail on some Windows configs; fall back to direct write
+    try { fs.unlinkSync(tmpPath); } catch (_) {}
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n", "utf-8");
+  }
+}
+
+// ── File locking ─────────────────────────────────────────
+
+const LOCK_STALE_MS = 10000; // 10 seconds
+const LOCK_RETRY_MS = 50;
+const LOCK_MAX_RETRIES = 60; // 3 seconds max wait
+
+function acquireLock(memoryPath) {
+  const lockPath = memoryPath + ".lock";
+  for (let i = 0; i < LOCK_MAX_RETRIES; i++) {
+    try {
+      // Exclusive create — fails if lock already exists
+      fs.writeFileSync(lockPath, JSON.stringify({ pid: process.pid, ts: Date.now() }), { flag: "wx" });
+      return lockPath;
+    } catch (_) {
+      // Lock exists — check if stale
+      try {
+        const lock = JSON.parse(fs.readFileSync(lockPath, "utf-8"));
+        if (Date.now() - lock.ts > LOCK_STALE_MS) {
+          // Stale lock — remove and retry
+          try { fs.unlinkSync(lockPath); } catch (_) {}
+          continue;
+        }
+      } catch (_) {
+        // Can't read lock — remove and retry
+        try { fs.unlinkSync(lockPath); } catch (_) {}
+        continue;
+      }
+      // Lock is fresh — wait and retry
+      const waitUntil = Date.now() + LOCK_RETRY_MS;
+      while (Date.now() < waitUntil) { /* busy wait */ }
+    }
+  }
+  // Couldn't acquire after retries — proceed without lock (best effort)
+  return null;
+}
+
+function releaseLock(lockPath) {
+  if (!lockPath) return;
+  try { fs.unlinkSync(lockPath); } catch (_) {}
+}
+
+// ── Backup rotation ──────────────────────────────────────
+
+const MAX_BACKUPS = 3;
+
+function rotateBackup(memoryPath) {
+  const dir = path.dirname(memoryPath);
+  const backupDir = path.join(dir, ".sticky-backups");
+  try {
+    fs.mkdirSync(backupDir, { recursive: true });
+    // Read current file
+    const current = fs.readFileSync(memoryPath, "utf-8");
+    // Rotate: remove oldest, shift names
+    for (let i = MAX_BACKUPS; i > 1; i--) {
+      const older = path.join(backupDir, `sticky-note.${i - 1}.json`);
+      const newer = path.join(backupDir, `sticky-note.${i}.json`);
+      try {
+        if (fs.existsSync(older)) fs.renameSync(older, newer);
+      } catch (_) {}
+    }
+    // Write newest backup
+    fs.writeFileSync(path.join(backupDir, "sticky-note.1.json"), current, "utf-8");
+  } catch (_) {
+    // Backup failure is non-fatal
+  }
+}
+
+function loadLatestBackup(memoryPath) {
+  const backupDir = path.join(path.dirname(memoryPath), ".sticky-backups");
+  for (let i = 1; i <= MAX_BACKUPS; i++) {
+    try {
+      const bp = path.join(backupDir, `sticky-note.${i}.json`);
+      return JSON.parse(fs.readFileSync(bp, "utf-8"));
+    } catch (_) {
+      continue;
+    }
+  }
+  return null;
+}
+
+/**
+ * Detect threads lost since last backup (e.g., after git reset/rollback).
+ * Returns array of thread IDs that are in backup but not in current.
+ */
+function detectLostThreads(memoryPath) {
+  try {
+    const current = loadJson(memoryPath, { threads: [] });
+    const backup = loadLatestBackup(memoryPath);
+    if (!backup || !Array.isArray(backup.threads)) return [];
+    const currentIds = new Set(
+      (current.threads || []).filter(Boolean).map((t) => t.id)
+    );
+    return (backup.threads || []).filter(
+      (t) => t && t.id && !currentIds.has(t.id) && t.status !== "expired"
+    );
+  } catch (_) {
+    return [];
+  }
 }
 
 /**
  * Merge-on-write for the memory file. Re-reads the file from disk before
  * writing and preserves any threads (by ID) that exist on disk but not in
- * the in-memory copy. This prevents concurrent sessions or un-pulled commits
- * from silently dropping other users' threads.
+ * the in-memory copy. For same-ID threads, performs field-level 2-way merge
+ * to prevent concurrent sessions from clobbering each other's changes.
+ *
+ * Uses file locking, atomic writes, and rolling backups.
  */
 function saveMemoryMerged(memoryPath, memory) {
+  const lockPath = acquireLock(memoryPath);
   try {
-    const onDisk = loadJson(memoryPath, { threads: [] });
-    const onDiskThreads = Array.isArray(onDisk.threads) ? onDisk.threads.filter(Boolean) : [];
-    const inMemoryThreads = Array.isArray(memory.threads) ? memory.threads.filter(Boolean) : [];
-    const inMemoryIds = new Set(inMemoryThreads.map((t) => t.id));
-
-    for (const diskThread of onDiskThreads) {
-      if (diskThread.id && !inMemoryIds.has(diskThread.id)) {
-        memory.threads.push(diskThread);
-      }
+    // Create backup before writing
+    if (fs.existsSync(memoryPath)) {
+      rotateBackup(memoryPath);
     }
-  } catch (_) {
-    // If re-read fails, proceed with what we have
-  }
 
-  saveJson(memoryPath, memory);
+    // Load merge helpers (field-level thread merge)
+    let mergeOneThread2Way = null;
+    try {
+      const md = require(path.join(path.dirname(memoryPath), "merge-driver.js"));
+      mergeOneThread2Way = md.mergeOneThread2Way;
+    } catch (_) {}
+
+    try {
+      const onDisk = loadJson(memoryPath, { threads: [] });
+      const onDiskThreads = Array.isArray(onDisk.threads) ? onDisk.threads.filter(Boolean) : [];
+      const inMemoryThreads = Array.isArray(memory.threads) ? memory.threads.filter(Boolean) : [];
+      const inMemoryMap = new Map(inMemoryThreads.map((t) => [t.id, t]));
+
+      for (const diskThread of onDiskThreads) {
+        if (!diskThread.id) continue;
+        if (!inMemoryMap.has(diskThread.id)) {
+          // Thread only on disk — preserve it
+          memory.threads.push(diskThread);
+        } else if (mergeOneThread2Way) {
+          // Thread on both — field-level merge
+          const inMemThread = inMemoryMap.get(diskThread.id);
+          const merged = mergeOneThread2Way(inMemThread, diskThread);
+          // Replace in-memory version with merged version
+          const idx = memory.threads.findIndex((t) => t && t.id === diskThread.id);
+          if (idx >= 0) memory.threads[idx] = merged;
+        }
+      }
+    } catch (_) {
+      // If re-read/merge fails, proceed with what we have
+    }
+
+    saveJson(memoryPath, memory);
+  } finally {
+    releaseLock(lockPath);
+  }
 }
 
 function appendAuditLine(entry) {
@@ -747,6 +884,62 @@ function clearActiveResumeThreadId() {
   }
 }
 
+// ── Copilot CLI MCP config helpers ────────────────────────
+
+function getCopilotCliConfigDir() {
+  if (process.env.COPILOT_HOME) return process.env.COPILOT_HOME;
+  const home = process.env.HOME || process.env.USERPROFILE;
+  if (!home) return null;
+  return path.join(home, ".copilot");
+}
+
+function getCopilotCliMcpConfigPath() {
+  const dir = getCopilotCliConfigDir();
+  return dir ? path.join(dir, "mcp-config.json") : null;
+}
+
+/**
+ * Register an MCP server in Copilot CLI's ~/.copilot/mcp-config.json.
+ * Only writes if the ~/.copilot/ directory already exists (Copilot CLI installed).
+ * Returns true if written, false if skipped.
+ */
+function ensureMcpInCopilotCliConfig(serverName, serverConfig) {
+  try {
+    const configDir = getCopilotCliConfigDir();
+    if (!configDir || !fs.existsSync(configDir)) return false;
+
+    const configPath = path.join(configDir, "mcp-config.json");
+    let config = {};
+    if (fs.existsSync(configPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      } catch (_) {
+        config = {};
+      }
+    }
+
+    config.mcpServers = config.mcpServers || {};
+    const existing = config.mcpServers[serverName];
+    // Copilot CLI requires "tools" field — fix entries missing it
+    if (existing) {
+      if (!existing.tools) {
+        existing.tools = ["*"];
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+        return true;
+      }
+      return false; // already registered with tools
+    }
+
+    // Ensure tools field is present for Copilot CLI compatibility
+    if (!serverConfig.tools) serverConfig.tools = ["*"];
+    config.mcpServers[serverName] = serverConfig;
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 // ── Exports ───────────────────────────────────────────────
 
 module.exports = {
@@ -816,5 +1009,14 @@ module.exports = {
   normalizeSep,
   // V2.7: auto-sync
   syncStickyNote,
+  // V2.9: Copilot CLI MCP config
+  getCopilotCliMcpConfigPath,
+  ensureMcpInCopilotCliConfig,
+  // V2.10: rollback detection + backups
+  detectLostThreads,
+  loadLatestBackup,
+  rotateBackup,
+  acquireLock,
+  releaseLock,
 };
 // tier1 test
