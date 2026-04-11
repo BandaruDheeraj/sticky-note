@@ -1,6 +1,7 @@
 {
-  "last_seen": "2026-04-11T00:32:23.780Z",
+  "last_seen": "2026-04-11T00:36:08.837Z",
   "active_files": [
-    ".sticky-note\\sticky-note.json"
+    ".sticky-note\\sticky-note.json",
+    "package.json"
   ]
 }

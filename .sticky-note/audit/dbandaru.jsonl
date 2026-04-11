@@ -3676,3 +3676,28 @@
 {"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:32:06.919Z","tool":"edit","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","file":".sticky-note\\sticky-note.json","lines_changed":["32-122"],"checkpoint_topic":"ok great setup the demo now like creating a second thread or simulating an overlap scenario?"}
 {"type":"overlap_deny","user":"dbandaru","ts":"2026-04-11T00:32:14.813Z","copilot_pid":"22140"}
 {"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:32:23.775Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:32:36.802Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-04-11T00:32:49.548Z","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","prompt":"push to github and and make sure the npm package is updated"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-04-11T00:32:50.251Z","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","prompt":"push to github and and make sure the npm package is updated","result":"injected","threads_scored":2,"threads_injected":2,"top_scores":[{"id":"demo-gra","score":6.9},{"id":"demo-ali","score":2}]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:33:00.820Z","tool":"report_intent","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:33:01.742Z","tool":"view","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","file":"package.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:33:02.921Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:33:14.395Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:33:26.986Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"session_start","user":"dbandaru","ts":"2026-04-11T00:33:43.085Z","session_id":"25f34572-e3a0-4983-b475-a49e9ea3ba5b"}
+{"type":"session_start","user":"dbandaru","ts":"2026-04-11T00:33:43.920Z","session_id":"25f34572-e3a0-4983-b475-a49e9ea3ba5b"}
+{"type":"session_start","user":"dbandaru","ts":"2026-04-11T00:33:44.698Z","session_id":"25f34572-e3a0-4983-b475-a49e9ea3ba5b"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:33:46.385Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:33:58.731Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:34:11.006Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-04-11T00:35:12.343Z","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","prompt":"PS C:\\Users\\dbandaru\\OneDrive - Microsoft\\Desktop\\Projects\\Personal-Projects\\MOBA> npx sticky-note-cli@latest init\nnpm ERR! could not determine executable to run\n\nnpm ERR! A complete log of this run can be found in: C:\\Users\\dbandaru\\AppData\\Local\\npm-cache\\_logs\\2026-04-11T00_34_59_895Z-debug-0.log"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-04-11T00:35:13.018Z","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","prompt":"PS C:\\Users\\dbandaru\\OneDrive - Microsoft\\Desktop\\Projects\\Personal-Projects\\MOBA> npx sticky-note-cli@latest init\nnpm E","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:35:23.783Z","tool":"report_intent","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:35:24.585Z","tool":"view","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","file":"package.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:35:25.681Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:35:35.261Z","tool":"edit","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","file":"package.json","lines_changed":["8-8"],"checkpoint_topic":"PS C:\\Users\\dbandaru\\OneDrive - Microsoft\\Desktop\\Projects\\Personal-Projects\\MOBA> npx sticky-note-cli@latest init\nnpm ERR! could not determine executable to run\n\nnpm ERR! A complete log of this run c"}
+{"type":"session_start","user":"dbandaru","ts":"2026-04-11T00:35:53.805Z","session_id":"25f34572-e3a0-4983-b475-a49e9ea3ba5b"}
+{"type":"session_start","user":"dbandaru","ts":"2026-04-11T00:35:54.891Z","session_id":"25f34572-e3a0-4983-b475-a49e9ea3ba5b"}
+{"type":"session_start","user":"dbandaru","ts":"2026-04-11T00:35:55.645Z","session_id":"25f34572-e3a0-4983-b475-a49e9ea3ba5b"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:35:56.585Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:36:08.830Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
