@@ -2,5 +2,33 @@
   "version": "2",
   "project": "",
   "claims": [],
-  "threads": []
+  "threads": [
+    {
+      "id": "6869e313-b4fa-4f20-b894-c72da6265c8e",
+      "user": "dbandaru",
+      "project": "",
+      "status": "open",
+      "branch": "master",
+      "created_at": "2026-04-10T23:14:20.995Z",
+      "closed_at": null,
+      "last_activity_at": "2026-04-10T23:14:20.997Z",
+      "files_touched": [],
+      "last_note": "",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "25f34572-e3a0-4983-b475-a49e9ea3ba5b",
+      "work_type": "",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": [],
+      "contributors": [
+        "dbandaru"
+      ],
+      "resume_history": []
+    }
+  ]
 }
