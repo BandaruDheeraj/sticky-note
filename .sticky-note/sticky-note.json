@@ -29,6 +29,97 @@
         "dbandaru"
       ],
       "resume_history": []
+    },
+    {
+      "id": "demo-grant-search-perf",
+      "user": "grantharris",
+      "project": "",
+      "status": "stuck",
+      "branch": "feature/search-optimization",
+      "created_at": "2026-04-09T10:00:00.000Z",
+      "closed_at": null,
+      "last_activity_at": "2026-04-10T16:30:00.000Z",
+      "files_touched": [
+        "bin/mcp-server.js",
+        "bin/cli.js"
+      ],
+      "last_note": "Stuck — the search_threads regex is O(n*m) on large thread stores. 50+ threads causes visible lag on every MCP call.",
+      "narrative": "Optimizing the search_threads tool in the MCP server. With 50+ threads the regex-based keyword matching in handleSearchThreads() takes 800ms+, which blocks the JSON-RPC event loop. Profiled and confirmed the bottleneck is the nested loop over threads × search terms. Tried pre-indexing but hit issues with stale index after merges.",
+      "failed_approaches": [
+        "Built an in-memory inverted index on session start — worked for search but the index went stale after saveMemoryMerged() writes. Would need cache invalidation on every write path.",
+        "Tried switching to a single combined regex with alternation (term1|term2|term3) — faster but broke phrase matching and returned false positives on partial word matches."
+      ],
+      "handoff_summary": "The search bottleneck is in bin/mcp-server.js handleSearchThreads() around line 180. The current approach lowercases every field of every thread on each search call. A pre-computed search text per thread (built once on load, updated on write) would fix it without needing a full inverted index. The CLI search in bin/cli.js cmdThreads() has the same pattern and should get the same fix.",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "claude-code",
+      "session_id": "demo-session-grant-search",
+      "work_type": "performance",
+      "activities": [
+        "edited 2 file(s)",
+        "profiled MCP server response times",
+        "12 prompt(s)"
+      ],
+      "tool_calls": {
+        "bash": 15,
+        "Read": 22,
+        "Edit": 5,
+        "grep": 8
+      },
+      "prompts": [
+        "the search_threads MCP tool is really slow with lots of threads",
+        "can you profile where the time is spent in handleSearchThreads",
+        "try building an inverted index at startup",
+        "that goes stale after writes, try a simpler approach"
+      ],
+      "contributors": [
+        "grantharris"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "demo-alice-docs-update",
+      "user": "alice",
+      "project": "",
+      "status": "open",
+      "branch": "feature/docs-refresh",
+      "created_at": "2026-04-10T14:00:00.000Z",
+      "closed_at": null,
+      "last_activity_at": "2026-04-10T22:15:00.000Z",
+      "files_touched": [
+        "README.md",
+        "CONTRIBUTING.md",
+        "docs/branch-switching.md"
+      ],
+      "last_note": "Updating docs to reflect v2.5 merge driver and bootstrap changes. README done, CONTRIBUTING in progress.",
+      "narrative": "Refreshing all documentation to cover the new merge driver, bootstrap secret handling, and rollback detection features. README has been updated with the new setup flow. CONTRIBUTING.md needs the section on how the merge driver works for contributors. Also updating branch-switching docs.",
+      "failed_approaches": [],
+      "handoff_summary": "README.md is updated. CONTRIBUTING.md still needs a 'How the merge driver works' section. docs/branch-switching.md needs review — may be outdated after the v2 branch was deleted.",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "demo-session-alice-docs",
+      "work_type": "documentation",
+      "activities": [
+        "edited 2 file(s)",
+        "touched 3 file(s)",
+        "6 prompt(s)"
+      ],
+      "tool_calls": {
+        "powershell": 4,
+        "view": 10,
+        "edit": 6,
+        "grep": 2
+      },
+      "prompts": [
+        "update the README to cover the new bootstrap flow",
+        "add merge driver docs to CONTRIBUTING.md",
+        "check if branch-switching.md is still accurate"
+      ],
+      "contributors": [
+        "alice"
+      ],
+      "resume_history": []
     }
   ]
 }

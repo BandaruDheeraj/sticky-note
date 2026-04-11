@@ -3660,3 +3660,19 @@
 {"type":"tool_use","user":"dbandaru","ts":"2026-03-19T20:16:44.286Z","tool":"sql","session_id":"8c04a0ac-5b5b-4d0a-b0be-6b0e248fa0a8"}
 {"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:29:09.095Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
 {"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:29:20.785Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:29:33.009Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-04-11T00:30:02.342Z","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","prompt":"great did also restore my threads?"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-04-11T00:30:03.014Z","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","prompt":"great did also restore my threads?","result":"injected","threads_scored":1,"threads_injected":1,"top_scores":[{"id":"6869e313","score":3}]}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:30:12.725Z","tool":"report_intent","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:30:14.603Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:30:23.362Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:30:34.111Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:30:45.560Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-04-11T00:31:15.193Z","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","prompt":"ok great setup the demo now like creating a second thread or simulating an overlap scenario?"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-04-11T00:31:15.913Z","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","prompt":"ok great setup the demo now like creating a second thread or simulating an overlap scenario?","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:31:32.662Z","tool":"report_intent","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:31:33.452Z","tool":"view","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","file":".sticky-note\\sticky-note.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:31:34.150Z","tool":"view","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:32:06.919Z","tool":"edit","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4","file":".sticky-note\\sticky-note.json","lines_changed":["32-122"],"checkpoint_topic":"ok great setup the demo now like creating a second thread or simulating an overlap scenario?"}
+{"type":"overlap_deny","user":"dbandaru","ts":"2026-04-11T00:32:14.813Z","copilot_pid":"22140"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-11T00:32:23.775Z","tool":"powershell","session_id":"3e69cfd5-a69e-42f2-967b-39942d4354e4"}
