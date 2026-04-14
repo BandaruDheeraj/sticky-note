@@ -162,6 +162,7 @@ Example format:
 - `.sticky-note/.sticky-head` — transient HEAD snapshot
 - `.sticky-note/.sticky-injected` — transient injection tracking (V2.5)
 - `.sticky-note/.sticky-active-resume` — transient active resume marker (V2.5)
+- `.sticky-note/.sticky-banner-shown` — transient startup banner dedup
 
 When a session ends or the user asks to commit, **always include
 `sticky-note.json` and the `audit/` and `presence/` directories**

@@ -8,6 +8,7 @@
 .sticky-note/.sticky-injected
 .sticky-note/.sticky-active-resume
 .sticky-note/.sticky-checkpoint
+.sticky-note/.sticky-banner-shown
 
 # Sticky Note - debug log
 .sticky-note/hook-debug.log

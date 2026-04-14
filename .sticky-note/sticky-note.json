@@ -7,10 +7,10 @@
       "id": "6869e313-b4fa-4f20-b894-c72da6265c8e",
       "user": "dbandaru",
       "project": "",
-      "status": "open",
+      "status": "closed",
       "branch": "master",
       "created_at": "2026-04-10T23:14:20.995Z",
-      "closed_at": null,
+      "closed_at": "2026-04-13T21:25:13.814Z",
       "last_activity_at": "2026-04-10T23:14:20.997Z",
       "files_touched": [],
       "last_note": "",
@@ -34,11 +34,11 @@
       "id": "demo-grant-search-perf",
       "user": "grantharris",
       "project": "",
-      "status": "stuck",
+      "status": "open",
       "branch": "feature/search-optimization",
       "created_at": "2026-04-09T10:00:00.000Z",
       "closed_at": null,
-      "last_activity_at": "2026-04-10T16:30:00.000Z",
+      "last_activity_at": "2026-04-14T00:36:05.729Z",
       "files_touched": [
         "bin/mcp-server.js",
         "bin/cli.js"
@@ -50,8 +50,26 @@
         "Tried switching to a single combined regex with alternation (term1|term2|term3) — faster but broke phrase matching and returned false positives on partial word matches."
       ],
       "handoff_summary": "The search bottleneck is in bin/mcp-server.js handleSearchThreads() around line 180. The current approach lowercases every field of every thread on each search call. A pre-computed search text per thread (built once on load, updated on write) would fix it without needing a full inverted index. The CLI search in bin/cli.js cmdThreads() has the same pattern and should get the same fix.",
-      "related_session_ids": [],
-      "resume_chain": [],
+      "related_session_ids": [
+        "a9156cdf-f117-426f-8563-7fa8d18da62e",
+        "a9156cdf-f117-426f-8563-7fa8d18da62e"
+      ],
+      "resume_chain": [
+        {
+          "session_id": "a9156cdf-f117-426f-8563-7fa8d18da62e",
+          "tool": "copilot-cli",
+          "started_at": "2026-04-14T00:35:59.527Z",
+          "ended_at": null,
+          "resumed_from": "demo-session-grant-search"
+        },
+        {
+          "session_id": "a9156cdf-f117-426f-8563-7fa8d18da62e",
+          "tool": "copilot-cli",
+          "started_at": "2026-04-14T00:36:05.729Z",
+          "ended_at": null,
+          "resumed_from": "a9156cdf-f117-426f-8563-7fa8d18da62e"
+        }
+      ],
       "tool": "claude-code",
       "session_id": "demo-session-grant-search",
       "work_type": "performance",
@@ -81,10 +99,10 @@
       "id": "demo-alice-docs-update",
       "user": "alice",
       "project": "",
-      "status": "open",
+      "status": "closed",
       "branch": "feature/docs-refresh",
       "created_at": "2026-04-10T14:00:00.000Z",
-      "closed_at": null,
+      "closed_at": "2026-04-14T00:36:05.724Z",
       "last_activity_at": "2026-04-10T22:15:00.000Z",
       "files_touched": [
         "README.md",
@@ -118,6 +136,228 @@
       ],
       "contributors": [
         "alice"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "c171b8a2-a202-4f3c-80c3-1c2457ceb6d1",
+      "user": "dbandaru",
+      "project": "",
+      "status": "open",
+      "branch": "main",
+      "created_at": "2026-04-13T21:25:13.990Z",
+      "closed_at": null,
+      "last_activity_at": "2026-04-13T21:59:27.948Z",
+      "files_touched": [
+        "templates/hooks/session-start.js",
+        "templates/hooks.json",
+        "templates",
+        "templates/gitignore-additions.txt",
+        ".claude/hooks/session-start.js",
+        ".gitignore",
+        "templates/CLAUDE.md",
+        "templates/copilot-instructions.md",
+        "CLAUDE.md",
+        ".github/copilot-instructions.md"
+      ],
+      "last_note": "",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "b3123fd5-188b-43d4-aedc-4c9a8d7ae9a9",
+      "work_type": "",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": [],
+      "contributors": [
+        "dbandaru"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "6a4963ee-1486-4c20-b34e-d2b337c9662c",
+      "user": "dbandaru",
+      "project": "",
+      "status": "open",
+      "branch": "main",
+      "created_at": "2026-04-13T22:20:18.241Z",
+      "closed_at": null,
+      "last_activity_at": "2026-04-14T00:08:08.728Z",
+      "files_touched": [
+        "bin",
+        "bin/mcp-server.js",
+        "bin/cli.js",
+        "templates/hooks/session-start.js",
+        "templates/hooks/inject-context.js",
+        ".github/hooks/hooks.json",
+        "templates/hooks.json",
+        "README.md",
+        "templates/hooks/sticky-attribution.js",
+        "templates/hooks/sticky-git-notes.js",
+        "../../../../.copilot/session-state/31a5e3fb-4597-44c5-8054-97be525bbca3/files/demo-script.md"
+      ],
+      "last_note": "",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "31a5e3fb-4597-44c5-8054-97be525bbca3",
+      "work_type": "",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": [],
+      "contributors": [
+        "dbandaru"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "demo-bob-merge-driver",
+      "user": "bobsmith",
+      "project": "",
+      "status": "stuck",
+      "branch": "fix/merge-driver-conflicts",
+      "created_at": "2026-04-11T09:30:00.000Z",
+      "closed_at": null,
+      "last_activity_at": "2026-04-13T16:45:00.000Z",
+      "files_touched": [
+        "bin/cli.js",
+        "bin/merge-driver.js",
+        "test/merge-driver.test.js"
+      ],
+      "last_note": "Stuck — three-way merge loses threads when both sides add new threads at the same array index. JSON merge is not array-aware.",
+      "narrative": "Fixing the sticky-note merge driver to handle concurrent thread additions. When two branches each add a new thread, the merge driver treats the threads array as a text blob and produces a conflict or silently drops one thread. Need array-aware JSON merging that deduplicates by thread ID.",
+      "failed_approaches": [
+        "Tried using JSON.parse on each side and concatenating arrays — works for additions but doesn't handle edits to the same thread (e.g., both sides update last_note on the same thread ID). Produces duplicate threads.",
+        "Attempted a deep-merge with lodash mergeWith — corrupts nested arrays like files_touched and failed_approaches by interleaving elements instead of replacing."
+      ],
+      "handoff_summary": "The merge driver in bin/merge-driver.js needs a thread-ID-aware merge strategy: deduplicate by thread.id, prefer the version with the later last_activity_at, and concatenate files_touched with dedup. The test file has 3 passing cases and 2 failing cases that cover the concurrent-add scenario.",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "claude-code",
+      "session_id": "demo-session-bob-merge",
+      "work_type": "bug-fix",
+      "activities": [
+        "edited 3 file(s)",
+        "ran test suite 6 times",
+        "9 prompt(s)"
+      ],
+      "tool_calls": {
+        "bash": 18,
+        "Read": 14,
+        "Edit": 9,
+        "grep": 3
+      },
+      "prompts": [
+        "the merge driver drops threads when two people add threads at the same time",
+        "try concatenating the thread arrays and deduplicating",
+        "lodash mergeWith is corrupting the nested arrays",
+        "can you write tests for the concurrent-add scenario"
+      ],
+      "contributors": [
+        "bobsmith"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "demo-carol-hooks-windows",
+      "user": "carolchen",
+      "project": "",
+      "status": "stuck",
+      "branch": "fix/windows-hooks",
+      "created_at": "2026-04-12T11:00:00.000Z",
+      "closed_at": null,
+      "last_activity_at": "2026-04-13T19:30:00.000Z",
+      "files_touched": [
+        "templates/hooks/session-start.js",
+        "templates/hooks/pre-tool-use.js",
+        "templates/hooks/inject-context.js",
+        "bin/cli.js"
+      ],
+      "last_note": "Stuck — hooks crash on Windows due to path separator issues and missing shebang handling. process.argv differs between cmd.exe and PowerShell.",
+      "narrative": "Claude Code hooks fail silently on Windows. The session-start hook uses unix paths with forward slashes to resolve .sticky-note/ paths, which breaks on Windows. Additionally, the inject-context hook spawns `git blame` with a shell command that doesn't work in cmd.exe. Tried normalizing paths but broke Linux in the process.",
+      "failed_approaches": [
+        "Replaced all path.join with forward-slash concatenation — fixed Windows but broke the git blame call on Linux where the path must match the repo-relative format exactly.",
+        "Tried using cross-spawn npm package to normalize shell execution — the hooks run in a constrained environment where node_modules from the project aren't available, only built-in Node modules."
+      ],
+      "handoff_summary": "The fix needs to use path.resolve() and path.sep consistently in all three hook files. The git blame call in inject-context.js line 45 needs to convert Windows backslashes to forward slashes ONLY for the git argument, not for the fs.readFile path. bin/cli.js init command should detect Windows and adjust the hooks.json command format (no shebang needed on Windows).",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "demo-session-carol-win",
+      "work_type": "bug-fix",
+      "activities": [
+        "edited 4 file(s)",
+        "tested on Windows and WSL",
+        "8 prompt(s)"
+      ],
+      "tool_calls": {
+        "powershell": 12,
+        "view": 16,
+        "edit": 8,
+        "grep": 5
+      },
+      "prompts": [
+        "the hooks don't work on Windows at all",
+        "try normalizing all paths with path.join",
+        "that broke Linux — we need platform-aware path handling",
+        "can cross-spawn help with the shell differences"
+      ],
+      "contributors": [
+        "carolchen"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "demo-dave-audit-perf",
+      "user": "davejones",
+      "project": "",
+      "status": "stuck",
+      "branch": "fix/audit-file-growth",
+      "created_at": "2026-04-10T08:00:00.000Z",
+      "closed_at": null,
+      "last_activity_at": "2026-04-12T14:20:00.000Z",
+      "files_touched": [
+        "bin/cli.js",
+        "bin/mcp-server.js",
+        ".sticky-note/audit/dbandaru.jsonl"
+      ],
+      "last_note": "Stuck — audit JSONL files grow unbounded and slow down git operations. A 2MB audit file adds 3+ seconds to every git status.",
+      "narrative": "The per-user audit JSONL files grow without limit. After a few weeks of active use, dbandaru.jsonl hit 2MB and git operations (status, diff, add) became noticeably slower because the file is tracked. Tried rotation but the pre-commit hook auto-stages all audit files, so rotated-out files still get committed.",
+      "failed_approaches": [
+        "Implemented log rotation (keep last 500 lines, archive the rest) — but the pre-commit hook stages .sticky-note/audit/*.jsonl which picks up the archive files too. Moving archives outside .sticky-note/ breaks the audit trail query.",
+        "Tried adding a max-lines config to sticky-note-config.json and truncating on write — this loses audit history silently, and the truncation races with concurrent writes from multiple hooks firing in the same session."
+      ],
+      "handoff_summary": "Best approach is probably: (1) add a configurable max_audit_lines to sticky-note-config.json, (2) on session close only, trim the JSONL to the last N entries, (3) update the pre-commit hook glob to exclude archive files (.sticky-note/audit/*.archive.jsonl). The trim should happen in the session-end hook, not on every write, to avoid the race condition.",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "claude-code",
+      "session_id": "demo-session-dave-audit",
+      "work_type": "performance",
+      "activities": [
+        "edited 3 file(s)",
+        "profiled git operations",
+        "7 prompt(s)"
+      ],
+      "tool_calls": {
+        "bash": 20,
+        "Read": 12,
+        "Edit": 6,
+        "grep": 4
+      },
+      "prompts": [
+        "git status is really slow in repos with sticky-note",
+        "profile where the time is going",
+        "the audit jsonl files are huge — try rotating them",
+        "rotation doesn't help because the pre-commit hook stages everything"
+      ],
+      "contributors": [
+        "davejones"
       ],
       "resume_history": []
     }

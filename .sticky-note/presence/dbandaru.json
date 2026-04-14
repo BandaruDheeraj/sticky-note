@@ -1,7 +1,15 @@
 {
-  "last_seen": "2026-04-11T00:36:08.837Z",
+  "last_seen": "2026-04-14T01:03:14.456Z",
   "active_files": [
+    "README.md",
+    "templates\\hooks\\sticky-attribution.js",
+    "templates\\hooks\\sticky-git-notes.js",
+    "..\\..\\..\\..\\.copilot\\session-state\\31a5e3fb-4597-44c5-8054-97be525bbca3\\files\\demo-script.md",
     ".sticky-note\\sticky-note.json",
-    "package.json"
+    "bin\\mcp-server.js",
+    "bin\\cli.js",
+    ".claude\\hooks\\session-start.js",
+    "templates\\hooks\\session-start.js",
+    "docs\\plan-mcp-server.md"
   ]
 }
