@@ -154,7 +154,7 @@ threads only — non-stuck threads are held for lazy injection.
 - **Stuck threads** — All stuck threads are injected eagerly (V2.5).
 - **Team config** — Conventions, MCP servers, and skills from
   `sticky-note-config.json`.
-- **Active presence** — Developers seen in the last 15 minutes and the
+- **Active presence** — Developers seen in the last hour and the
   files they're working on.
 
 The hook also clears the injected-this-session tracking set, snapshots

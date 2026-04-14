@@ -73,7 +73,7 @@ Registered in `.mcp.json` or `settings.local.json` as a local MCP server.
 | `get_stuck_threads()` | All threads with status `stuck` | Session start, checking team blockers |
 | `search_threads(query)` | Keyword search across non-expired threads | Finding related prior work |
 | `get_audit_trail(file, user, since, tool, session, limit)` | Query JSONL audit log with filters | Understanding file history |
-| `get_presence()` | Active developers seen in last 15 minutes | Checking who's online |
+| `get_presence()` | Active developers seen in last hour | Checking who's online |
 
 ### New Tools (notification channel + environment)
 

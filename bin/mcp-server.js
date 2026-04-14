@@ -234,7 +234,7 @@ function toolGetPresence() {
   const active = entries
     .filter(([_user, data]) => {
       const lastSeen = new Date(data.last_seen || 0);
-      return now - lastSeen < 15 * 60 * 1000;
+      return now - lastSeen < 60 * 60 * 1000;
     })
     .map(([user, data]) => ({
       user,
@@ -298,7 +298,7 @@ function toolCheckOverlaps(params) {
   for (const [user, data] of Object.entries(presence)) {
     if (user === currentUser) continue;
     const lastSeen = new Date(data.last_seen || 0);
-    if (now - lastSeen > 15 * 60 * 1000) continue;
+    if (now - lastSeen > 60 * 60 * 1000) continue;
 
     const presenceFiles = (data.active_files || []).map((f) =>
       f.replace(/\\/g, "/")
@@ -576,7 +576,7 @@ const TOOLS = {
   },
   get_presence: {
     description:
-      "Get current developer presence — who is actively working and on which files. Only shows users seen in the last 15 minutes.",
+      "Get current developer presence — who is actively working and on which files. Only shows users seen in the last hour.",
     inputSchema: {
       type: "object",
       properties: {},

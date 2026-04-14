@@ -121,6 +121,59 @@ function autoCloseCopilotCliThreads(memory, autoCloseHours) {
 
 // ── Formatting helpers ────────────────────────────────────
 
+function formatStuckBanner(threads) {
+  const stuck = (threads || []).filter((t) => t && t.status === "stuck");
+  if (stuck.length === 0) return "";
+
+  const R = "\x1b[0m";
+  const Y = "\x1b[33m";
+  const BY = "\x1b[1;33m";
+  const BR = "\x1b[1;31m";
+  const B = "\x1b[1m";
+  const C = "\x1b[36m";
+  const D = "\x1b[2m";
+  const bar = "━".repeat(52);
+
+  const lines = [
+    "",
+    `${Y}${bar}${R}`,
+    `${BY}  ⚠️  STUCK THREADS${R}`,
+    `${Y}${bar}${R}`,
+  ];
+
+  for (const t of stuck.slice(0, 5)) {
+    const user = t.user || t.author || "unknown";
+    const branch = t.branch ? ` ${D}·${R} ${C}${t.branch}${R}` : "";
+    const files = (t.files_touched || []).slice(0, 3).join(", ");
+    const narrative = t.narrative || t.last_note || "";
+    const snip =
+      narrative.length > 80 ? narrative.substring(0, 80) + "…" : narrative;
+    const threadId = (t.id || "").substring(0, 8);
+    const failed = t.failed_approaches || [];
+
+    lines.push(
+      `${Y}  ┃${R}  ${BR}[STUCK]${R} ${B}${user}${R}${branch}`
+    );
+    if (files) lines.push(`${Y}  ┃${R}    Files: ${files}`);
+    if (snip) lines.push(`${Y}  ┃${R}    ${D}"${snip}"${R}`);
+    if (failed.length > 0) {
+      lines.push(
+        `${Y}  ┃${R}    ${BR}⚠️ ${failed.length} failed approach(es)${R}`
+      );
+    }
+    lines.push(
+      `${Y}  ┃${R}    → Resume: ${C}npx sticky-note resume ${threadId}${R}`
+    );
+  }
+
+  if (stuck.length > 5) {
+    lines.push(`${Y}  ┃${R}  ... and ${stuck.length - 5} more`);
+  }
+
+  lines.push(`${Y}${bar}${R}`, "");
+  return lines.join("\n") + "\n";
+}
+
 function formatThreadsForInjection(threads, maxThreads, maxTokens) {
   maxThreads = maxThreads || 10;
   maxTokens = maxTokens || 500;
@@ -251,7 +304,7 @@ function formatPresence(presenceData, threads) {
     try {
       const ts = new Date(lastSeen).getTime();
       if (isNaN(ts)) continue;
-      if (now - ts < 15 * 60 * 1000) {
+      if (now - ts < 60 * 60 * 1000) {
         const files = (info.active_files || []).slice(0, 3).join(", ");
         const thread = userThreads[user];
         let line = `- **${user}**`;
@@ -929,6 +982,41 @@ function main() {
   });
 
   saveMemoryMerged(memoryPath, memory);
+
+  // ── Stuck threads startup banner ────────────────────────
+  // Write a visible banner to stderr so the user sees stuck threads
+  // immediately when the session starts, before any AI interaction.
+  const stuckThreads = (memory.threads || [])
+    .filter((t) => t && t.status === "stuck");
+  if (stuckThreads.length > 0) {
+    const fs = require("fs");
+    const bannerShownPath = path.join(
+      path.dirname(memoryPath),
+      ".sticky-banner-shown"
+    );
+    let showBanner = true;
+
+    // Copilot CLI fires sessionStart per-turn — only show once per session.
+    if (isCopilotCli) {
+      try {
+        const shown = fs.readFileSync(bannerShownPath, "utf-8").trim();
+        if (shown === sessionId) showBanner = false;
+      } catch (_) {
+        /* file doesn't exist yet */
+      }
+    }
+
+    if (showBanner) {
+      process.stderr.write(formatStuckBanner(stuckThreads));
+      if (isCopilotCli) {
+        try {
+          fs.writeFileSync(bannerShownPath, sessionId, "utf-8");
+        } catch (_) {
+          /* non-fatal */
+        }
+      }
+    }
+  }
 
   // ── Assemble output ───────────────────────────────────
   const parts = [];

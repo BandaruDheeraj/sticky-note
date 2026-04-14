@@ -1243,7 +1243,7 @@ function cmdStatus() {
       const lastSeen = info.last_seen || "";
       if (lastSeen) {
         const ts = new Date(lastSeen).getTime();
-        if (!isNaN(ts) && now - ts < 15 * 60 * 1000) {
+        if (!isNaN(ts) && now - ts < 60 * 60 * 1000) {
           activeUsers.push(path.basename(f, ".json"));
         }
       }
@@ -1687,7 +1687,7 @@ function cmdWho() {
       for (const [user, info] of Object.entries(data)) {
         const lastSeen = info.last_seen || "";
         const ts = lastSeen ? new Date(lastSeen).getTime() : 0;
-        const active = !isNaN(ts) && now - ts < 15 * 60 * 1000;
+        const active = !isNaN(ts) && now - ts < 60 * 60 * 1000;
         const ago = lastSeen ? _relativeTime(lastSeen) : "unknown";
         const files = (info.active_files || []).slice(0, 5).join(", ");
         const marker = active ? "[ACTIVE]" : "[IDLE]";
@@ -1713,7 +1713,7 @@ function cmdWho() {
     const info = readJsonSafe(path.join(presenceDir, f), {});
     const lastSeen = info.last_seen || "";
     const ts = lastSeen ? new Date(lastSeen).getTime() : 0;
-    const active = !isNaN(ts) && now - ts < 15 * 60 * 1000;
+    const active = !isNaN(ts) && now - ts < 60 * 60 * 1000;
     users.push({ user, info, lastSeen, active });
   }
 
