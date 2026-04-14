@@ -38,7 +38,7 @@
       "branch": "feature/search-optimization",
       "created_at": "2026-04-09T10:00:00.000Z",
       "closed_at": null,
-      "last_activity_at": "2026-04-14T00:36:05.729Z",
+      "last_activity_at": "2026-04-14T04:36:03.259Z",
       "files_touched": [
         "bin/mcp-server.js",
         "bin/cli.js"
@@ -52,7 +52,9 @@
       "handoff_summary": "The search bottleneck is in bin/mcp-server.js handleSearchThreads() around line 180. The current approach lowercases every field of every thread on each search call. A pre-computed search text per thread (built once on load, updated on write) would fix it without needing a full inverted index. The CLI search in bin/cli.js cmdThreads() has the same pattern and should get the same fix.",
       "related_session_ids": [
         "a9156cdf-f117-426f-8563-7fa8d18da62e",
-        "a9156cdf-f117-426f-8563-7fa8d18da62e"
+        "a9156cdf-f117-426f-8563-7fa8d18da62e",
+        "75c44351-f1a9-475a-8bea-622812eb5a46",
+        "59f244b6-0be4-415a-87e4-98fb01572f85"
       ],
       "resume_chain": [
         {
@@ -68,6 +70,20 @@
           "started_at": "2026-04-14T00:36:05.729Z",
           "ended_at": null,
           "resumed_from": "a9156cdf-f117-426f-8563-7fa8d18da62e"
+        },
+        {
+          "session_id": "75c44351-f1a9-475a-8bea-622812eb5a46",
+          "tool": "copilot-cli",
+          "started_at": "2026-04-14T01:18:20.335Z",
+          "ended_at": null,
+          "resumed_from": "a9156cdf-f117-426f-8563-7fa8d18da62e"
+        },
+        {
+          "session_id": "59f244b6-0be4-415a-87e4-98fb01572f85",
+          "tool": "copilot-cli",
+          "started_at": "2026-04-14T04:36:03.261Z",
+          "ended_at": null,
+          "resumed_from": "75c44351-f1a9-475a-8bea-622812eb5a46"
         }
       ],
       "tool": "claude-code",
@@ -220,11 +236,11 @@
       "id": "demo-bob-merge-driver",
       "user": "bobsmith",
       "project": "",
-      "status": "stuck",
+      "status": "open",
       "branch": "fix/merge-driver-conflicts",
       "created_at": "2026-04-11T09:30:00.000Z",
       "closed_at": null,
-      "last_activity_at": "2026-04-13T16:45:00.000Z",
+      "last_activity_at": "2026-04-14T04:38:50.402Z",
       "files_touched": [
         "bin/cli.js",
         "bin/merge-driver.js",
@@ -237,8 +253,18 @@
         "Attempted a deep-merge with lodash mergeWith — corrupts nested arrays like files_touched and failed_approaches by interleaving elements instead of replacing."
       ],
       "handoff_summary": "The merge driver in bin/merge-driver.js needs a thread-ID-aware merge strategy: deduplicate by thread.id, prefer the version with the later last_activity_at, and concatenate files_touched with dedup. The test file has 3 passing cases and 2 failing cases that cover the concurrent-add scenario.",
-      "related_session_ids": [],
-      "resume_chain": [],
+      "related_session_ids": [
+        "59f244b6-0be4-415a-87e4-98fb01572f85"
+      ],
+      "resume_chain": [
+        {
+          "session_id": "59f244b6-0be4-415a-87e4-98fb01572f85",
+          "tool": "copilot-cli",
+          "started_at": "2026-04-14T04:38:50.402Z",
+          "ended_at": null,
+          "resumed_from": "demo-session-bob-merge"
+        }
+      ],
       "tool": "claude-code",
       "session_id": "demo-session-bob-merge",
       "work_type": "bug-fix",

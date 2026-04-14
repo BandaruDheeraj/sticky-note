@@ -18,6 +18,10 @@
 <br/>
 
 <p align="center">
+  <img src="docs/images/demo.gif" alt="Sticky Note demo" width="600" />
+</p>
+
+<p align="center">
   <img src="https://raw.githubusercontent.com/BandaruDheeraj/sticky-note/main/docs/images/architecture.svg" alt="Architecture diagram" width="800" />
 </p>
 
