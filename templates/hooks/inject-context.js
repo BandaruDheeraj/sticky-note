@@ -376,10 +376,11 @@ function main() {
 
   const sessionId = getSessionId(hookInput);
 
-  function _auditInject(result, threadsScored, threadsInjected, topScores, error) {
+  function _auditInject(result, threadsScored, threadsInjected, topScores, error, emitted) {
     threadsScored = threadsScored || 0;
     threadsInjected = threadsInjected || 0;
     try {
+      const out = typeof emitted === "string" ? emitted : "";
       const entry = {
         type: "inject_result",
         user: getUser(),
@@ -389,6 +390,8 @@ function main() {
         result: result,
         threads_scored: threadsScored,
         threads_injected: threadsInjected,
+        chars: out.length,
+        est_tokens: Math.floor(out.length / 4),
       };
       if (topScores) entry.top_scores = topScores;
       if (error) entry.error = String(error).substring(0, 200);
@@ -433,7 +436,7 @@ function main() {
     (t) => t.status === "open" || t.status === "stuck" || t.status === "closed"
   );
   if (live.length === 0) {
-    _auditInject("no_live_threads");
+    _auditInject("no_live_threads", 0, 0, null, null, "");
     _emit("");
     return;
   }
@@ -548,11 +551,11 @@ function main() {
     // Even with no scored threads, check for overlaps
     const overlapWarning = detectAndFormatOverlaps(threads, currentUser);
     if (overlapWarning) {
-      _auditInject("no_scored_threads", 0);
+      _auditInject("no_scored_threads", 0, 0, null, null, overlapWarning);
       _emit(overlapWarning);
       return;
     }
-    _auditInject("no_scored_threads", 0);
+    _auditInject("no_scored_threads", 0, 0, null, null, "");
     _emit("");
     return;
   }
@@ -615,7 +618,9 @@ function main() {
     scored.slice(0, 5).map(([s, t]) => ({
       id: (t.id || "").substring(0, 8),
       score: Math.round(s * 10) / 10,
-    }))
+    })),
+    null,
+    output
   );
   _emit(output);
 }

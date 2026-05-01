@@ -26,6 +26,7 @@ search_threads(query)                → keyword search across all threads
 get_session_context(id)              → full thread payload by ID
 get_audit_trail(file, user, since)   → query per-user audit logs
 get_presence()                       → who is currently active
+get_token_footprint()                → how many tokens sticky-note adds per prompt
 ```
 
 These MCP tools are the PRIMARY way sticky-note communicates with you.

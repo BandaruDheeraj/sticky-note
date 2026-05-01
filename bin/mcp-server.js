@@ -13,6 +13,7 @@
  *   check_overlaps(files)               — overlap detection for edit gating
  *   get_environment_status()            — environment sync status
  *   get_thread_context_for_files(files) — thread attribution for files
+ *   get_token_footprint()               — how many tokens sticky-note adds
  *
  * Zero external dependencies. Node >= 16.
  *
@@ -246,6 +247,141 @@ function toolGetPresence() {
     active_count: active.length,
     users: active,
     stale_count: entries.length - active.length,
+  };
+}
+
+function toolGetTokenFootprint(params) {
+  const opts = params || {};
+  const days = typeof opts.days === "number" && opts.days > 0 ? opts.days : 7;
+  const userFilter = opts.user || null;
+  const allUsers = !!opts.all_users;
+
+  const TOK_MARK_START = "<!-- sticky-note:start";
+  const TOK_MARK_END = "<!-- sticky-note:end";
+  const estTokens = (s) => Math.floor((s || "").length / 4);
+
+  function measureMarkedSection(filePath) {
+    if (!fs.existsSync(filePath)) return null;
+    let text;
+    try { text = fs.readFileSync(filePath, "utf-8"); } catch (_) { return null; }
+    const start = text.indexOf(TOK_MARK_START);
+    const end = text.indexOf(TOK_MARK_END);
+    if (start < 0 || end < 0 || end <= start) {
+      return { chars: text.length, est_tokens: estTokens(text), full_file: true };
+    }
+    const endLineEnd = text.indexOf("\n", end);
+    const slice = text.substring(start, endLineEnd > 0 ? endLineEnd + 1 : text.length);
+    return { chars: slice.length, est_tokens: estTokens(slice), full_file: false };
+  }
+
+  // Static (per-prompt instruction overhead) — measure installed files first
+  const claudeInstalled = path.join(PROJECT_ROOT, "CLAUDE.md");
+  const copilotInstalled = path.join(PROJECT_ROOT, ".github", "copilot-instructions.md");
+  const claudeMeasure = measureMarkedSection(claudeInstalled);
+  const copilotMeasure = measureMarkedSection(copilotInstalled);
+
+  const config = getConfig();
+  const injectBudget = config.inject_token_budget || 1000;
+
+  // Measured (audit log)
+  const auditDir = path.join(stickyDir(), "audit");
+  const sinceCutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const me = userFilter || process.env.USER || process.env.USERNAME || "unknown";
+
+  const stats = {
+    inject_result: { count: 0, with_tokens: 0, est_tokens: 0 },
+    lazy_inject: { count: 0, with_tokens: 0, est_tokens: 0 },
+  };
+  const sessions = new Set();
+  let oldestTs = null;
+  let newestTs = null;
+
+  if (fs.existsSync(auditDir)) {
+    const files = fs.readdirSync(auditDir).filter((f) => f.endsWith(".jsonl"));
+    const targets = allUsers ? files : files.filter((f) => f === `${me}.jsonl`);
+    for (const f of targets) {
+      let text;
+      try { text = fs.readFileSync(path.join(auditDir, f), "utf-8"); } catch (_) { continue; }
+      for (const line of text.split(/\r?\n/)) {
+        if (!line.trim()) continue;
+        let entry;
+        try { entry = JSON.parse(line); } catch (_) { continue; }
+        if (entry.type !== "inject_result" && entry.type !== "lazy_inject") continue;
+        const ts = entry.ts ? new Date(entry.ts) : null;
+        if (!ts || isNaN(ts.getTime())) continue;
+        if (ts < sinceCutoff) continue;
+        if (!oldestTs || ts < oldestTs) oldestTs = ts;
+        if (!newestTs || ts > newestTs) newestTs = ts;
+        const bucket = stats[entry.type];
+        bucket.count++;
+        if (typeof entry.est_tokens === "number") {
+          bucket.with_tokens++;
+          bucket.est_tokens += entry.est_tokens;
+        }
+        if (entry.session_id) sessions.add(entry.session_id);
+      }
+    }
+  }
+
+  const eagerAvg = stats.inject_result.with_tokens > 0
+    ? Math.round(stats.inject_result.est_tokens / stats.inject_result.with_tokens)
+    : null;
+  const lazyAvg = stats.lazy_inject.with_tokens > 0
+    ? Math.round(stats.lazy_inject.est_tokens / stats.lazy_inject.with_tokens)
+    : null;
+  const totalTokens = stats.inject_result.est_tokens + stats.lazy_inject.est_tokens;
+  const dailyAvg = days > 0 ? Math.round(totalTokens / days) : 0;
+
+  const perPromptBaseline =
+    (claudeMeasure ? claudeMeasure.est_tokens : 0) +
+    (copilotMeasure ? copilotMeasure.est_tokens : 0);
+  const perPromptWithEager = perPromptBaseline + (eagerAvg !== null ? eagerAvg : 0);
+
+  // Build a one-line summary string the AI can quote directly
+  const summaryParts = [];
+  summaryParts.push(`recurring per prompt: ~${perPromptBaseline.toLocaleString("en-US")} tok (instructions)`);
+  if (eagerAvg !== null) {
+    summaryParts.push(`+ ~${eagerAvg} tok eager injection avg = ~${perPromptWithEager.toLocaleString("en-US")} tok/prompt`);
+  } else {
+    summaryParts.push(`eager injection: no measured data yet (cap ${injectBudget} tok)`);
+  }
+  if (lazyAvg !== null) {
+    summaryParts.push(`occasional lazy injection avg ~${lazyAvg} tok per first-touch tool call`);
+  }
+
+  return {
+    estimator: "chars/4 (±20% vs real tokenizers)",
+    window_days: days,
+    summary: summaryParts.join("; "),
+    static: {
+      claude_md: claudeMeasure,
+      copilot_instructions: copilotMeasure,
+      inject_token_budget: injectBudget,
+      per_prompt_baseline_est_tokens: perPromptBaseline,
+    },
+    measured: {
+      users_included: allUsers ? "all" : me,
+      window_days: days,
+      oldest_ts: oldestTs ? oldestTs.toISOString() : null,
+      newest_ts: newestTs ? newestTs.toISOString() : null,
+      sessions: sessions.size,
+      total_est_tokens: totalTokens,
+      daily_avg_est_tokens: dailyAvg,
+      eager_avg_est_tokens: eagerAvg,
+      lazy_avg_est_tokens: lazyAvg,
+      by_type: stats,
+    },
+    per_prompt_overhead_est_tokens: eagerAvg !== null ? perPromptWithEager : perPromptBaseline,
+    not_measured: [
+      "MCP tool responses (this tool included)",
+      "Manual CLI command output piped into prompts",
+      "Audit data unsynced from teammates' branches",
+    ],
+    tips: [
+      `Lower 'inject_token_budget' in .sticky-note/sticky-note-config.json (currently ${injectBudget})`,
+      "Run 'npx sticky-note gc' to expire stale closed threads",
+      "Trim unused sections from CLAUDE.md (between sticky-note markers)",
+    ],
   };
 }
 
@@ -625,6 +761,28 @@ const TOOLS = {
       required: ["files"],
     },
     handler: toolGetThreadContextForFiles,
+  },
+  get_token_footprint: {
+    description:
+      "Report how many tokens sticky-note adds to the AI workflow. Returns static instruction overhead (per-prompt) measured from CLAUDE.md and copilot-instructions.md sticky-note sections, plus measured eager and lazy injection averages from the audit log. Use when the user asks 'how much does sticky-note cost in tokens?' or about token consumption.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        days: {
+          type: "number",
+          description: "Window in days for measured stats (default: 7)",
+        },
+        user: {
+          type: "string",
+          description: "Restrict measured stats to this user (default: current user)",
+        },
+        all_users: {
+          type: "boolean",
+          description: "If true, aggregate measured stats across all users in audit/",
+        },
+      },
+    },
+    handler: toolGetTokenFootprint,
   },
 };
 

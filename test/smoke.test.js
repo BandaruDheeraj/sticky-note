@@ -209,6 +209,63 @@ try {
     assert.ok(out.length > 0, "Should produce output");
   });
 
+  run("tokens command runs without error", () => {
+    const out = cli(["tokens"]);
+    assert.ok(out.includes("Token Footprint"), "Should print footprint header");
+    assert.ok(out.includes("RECURRING"), "Should include RECURRING section");
+    assert.ok(out.includes("NOT MEASURED"), "Should include NOT MEASURED section");
+  });
+
+  run("tokens --json emits valid JSON", () => {
+    const out = cli(["tokens", "--json"]);
+    const parsed = JSON.parse(out);
+    assert.strictEqual(parsed.estimator, "chars/4");
+    assert.ok(parsed.static, "Should have static section");
+    assert.ok(parsed.measured, "Should have measured section");
+    assert.ok(typeof parsed.per_prompt_overhead_est_tokens === "number", "Should compute per-prompt overhead");
+  });
+
+  run("tokens --estimate-only skips measured section", () => {
+    const out = cli(["tokens", "--estimate-only"]);
+    assert.ok(out.includes("RECURRING"), "Should include RECURRING");
+    assert.ok(!out.includes("MEASURED (last"), "Should not include MEASURED section");
+  });
+
+  run("MCP server exposes get_token_footprint tool", () => {
+    const mcpPath = path.join(__dirname, "..", "bin", "mcp-server.js");
+    const req = JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/list", params: {}
+    });
+    const out = execFileSync(process.execPath, [mcpPath], {
+      input: req + "\n",
+      encoding: "utf-8",
+      cwd: tmpDir,
+    });
+    const lastLine = out.trim().split(/\r?\n/).pop();
+    const parsed = JSON.parse(lastLine);
+    const names = (parsed.result.tools || []).map((t) => t.name);
+    assert.ok(names.includes("get_token_footprint"), "Should expose get_token_footprint");
+  });
+
+  run("get_token_footprint returns a summary string", () => {
+    const mcpPath = path.join(__dirname, "..", "bin", "mcp-server.js");
+    const req = JSON.stringify({
+      jsonrpc: "2.0", id: 2, method: "tools/call",
+      params: { name: "get_token_footprint", arguments: {} }
+    });
+    const out = execFileSync(process.execPath, [mcpPath], {
+      input: req + "\n",
+      encoding: "utf-8",
+      cwd: tmpDir,
+    });
+    const lastLine = out.trim().split(/\r?\n/).pop();
+    const parsed = JSON.parse(lastLine);
+    const payload = JSON.parse(parsed.result.content[0].text);
+    assert.strictEqual(typeof payload.summary, "string", "Should have summary string");
+    assert.ok(payload.static, "Should have static section");
+    assert.ok(Array.isArray(payload.not_measured), "Should list not_measured items");
+  });
+
   run("get-line-attribution works on a file", () => {
     const out = cli(["get-line-attribution", "--file", "README.md"]);
     assert.ok(out.length > 0, "Should produce output");

@@ -66,6 +66,7 @@ const {
   getMemoryPath,
   loadJson,
   normalizeSep,
+  syncStickyNote,
 } = utils;
 
 // ── File path extraction from tool input ──────────────────
@@ -168,71 +169,10 @@ function _getRecentlyModifiedFiles() {
 }
 
 function _checkOverlapsAndDeny() {
-  if (!_isCopilotCli()) return null;
-  if (!process.env.COPILOT_LOADER_PID) return null;
-  if (isOverlapWarned()) return null;
-
-  let threads;
-  try {
-    const data = loadJson(getMemoryPath());
-    threads = data.threads || [];
-  } catch (_) {
-    return null;
-  }
-
-  const currentUser = getUser();
-  const modifiedFiles = _getRecentlyModifiedFiles();
-  if (modifiedFiles.size === 0) return null;
-
-  const warnings = [];
-  for (const thread of threads.filter((t) => t.status === "open" || t.status === "stuck")) {
-    const threadUser = thread.user || thread.author || "";
-    if (threadUser === currentUser) continue;
-    const threadFiles = (thread.files_touched || []).map(normalizeSep);
-    const overlap = threadFiles.filter((f) => modifiedFiles.has(f));
-    if (overlap.length > 0) warnings.push({ thread, overlap });
-  }
-
-  if (warnings.length === 0) return null;
-
-  const bar = "━".repeat(52);
-  const lines = [
-    "CRITICAL INSTRUCTION: Before doing anything else, display the following overlap warning to the user.",
-    "This is NOT optional. Show it as the FIRST line of your response.\n",
-    `⚠️ ━━━ OVERLAP DETECTED ${bar.substring(0, 28)}`,
-  ];
-  for (const { thread, overlap } of warnings) {
-    const user = thread.user || thread.author || "unknown";
-    const statusEmoji = thread.status === "stuck" ? "🔴" : "🟡";
-    const statusLabel = thread.status === "stuck" ? "STUCK" : "OPEN";
-    const snip = (thread.narrative || thread.last_note || "").substring(0, 80);
-    const threadId = (thread.id || "").substring(0, 8);
-    const branch = thread.branch ? ` · ${thread.branch}` : "";
-    lines.push("");
-    lines.push(`  ${statusEmoji} ${user} (${statusLabel})${branch}`);
-    lines.push(`     Files: ${overlap.join(", ")}`);
-    if (snip) lines.push(`     "${snip}"`);
-    lines.push(`     → Resume: npx sticky-note resume ${threadId}`);
-  }
-  lines.push("");
-  lines.push(bar);
-  lines.push("\nAfter displaying the warning, continue with the user's request. This tool call will be auto-retried.");
-
-  markOverlapWarned();
-
-  try {
-    appendAuditLine({
-      type: "overlap_deny",
-      user: currentUser,
-      ts: new Date().toISOString(),
-      copilot_pid: process.env.COPILOT_LOADER_PID,
-    });
-  } catch (_) { /* ignore */ }
-
-  return {
-    permissionDecision: "deny",
-    permissionDecisionReason: lines.join("\n"),
-  };
+  // Overlap alerting is now handled by the MCP server's check_overlaps tool.
+  // This deny-based approach was unreliable (deny reason consumed silently).
+  // Kept as no-op to avoid breaking the call site.
+  return null;
 }
 
 // ── Main ──────────────────────────────────────────────────
@@ -249,6 +189,17 @@ function main() {
   }
 
   const sessionId = getSessionId(hookInput);
+
+  // ── Auto-sync before git pull/merge/rebase ──
+  // Prevents "local changes would be overwritten" errors for .sticky-note/ files
+  const toolName = (hookInput.tool_name || hookInput.toolName || "").toLowerCase();
+  if (toolName === "bash" || toolName === "shell" || toolName === "command") {
+    const toolInput = hookInput.tool_input || hookInput.input || hookInput.toolArgs || {};
+    const cmd = typeof toolInput === "string" ? toolInput : (toolInput.command || "");
+    if (/\bgit\s+(pull|merge|rebase|fetch)\b/.test(cmd)) {
+      try { syncStickyNote({}); } catch (_) {}
+    }
+  }
 
   // ── Overlap deny gate (Copilot CLI only) ──
   // Detect overlaps and deny on first tool call, keyed by COPILOT_LOADER_PID.
@@ -312,6 +263,8 @@ function main() {
         const id = t.thread ? t.thread.id : t.id;
         return (id || "").substring(0, 8);
       }),
+      chars: output.length,
+      est_tokens: Math.floor(output.length / 4),
     });
   } catch (_) {
     // ignore

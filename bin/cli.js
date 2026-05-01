@@ -2507,6 +2507,434 @@ function cmdCheckpoint() {
 }
 
 // ──────────────────────────────────────────────
+// tokens — report sticky-note token footprint
+// ──────────────────────────────────────────────
+
+const TOK_MARK_START = "<!-- sticky-note:start";
+const TOK_MARK_END = "<!-- sticky-note:end";
+
+function _estTokens(s) {
+  return Math.floor((s || "").length / 4);
+}
+
+function _measureMarkedSection(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+  let text;
+  try {
+    text = fs.readFileSync(filePath, "utf-8");
+  } catch (_) {
+    return null;
+  }
+  const start = text.indexOf(TOK_MARK_START);
+  const end = text.indexOf(TOK_MARK_END);
+  if (start < 0 || end < 0 || end <= start) {
+    // No markers — file may be entirely sticky-note (rare) or unmanaged.
+    return { chars: text.length, est_tokens: _estTokens(text), full_file: true };
+  }
+  // Include the closing marker line for accuracy
+  const endLineEnd = text.indexOf("\n", end);
+  const slice = text.substring(start, endLineEnd > 0 ? endLineEnd + 1 : text.length);
+  return { chars: slice.length, est_tokens: _estTokens(slice), full_file: false };
+}
+
+function _readJsonl(filePath) {
+  const out = [];
+  if (!fs.existsSync(filePath)) return out;
+  let text;
+  try {
+    text = fs.readFileSync(filePath, "utf-8");
+  } catch (_) {
+    return out;
+  }
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      out.push(JSON.parse(trimmed));
+    } catch (_) {
+      // skip bad lines
+    }
+  }
+  return out;
+}
+
+function _formatNumber(n) {
+  return Number(n).toLocaleString("en-US");
+}
+
+function _pad(s, n) {
+  s = String(s);
+  return s.length >= n ? s : s + " ".repeat(n - s.length);
+}
+
+function _padNum(n, w) {
+  const s = _formatNumber(Math.round(n));
+  return s.length >= w ? s : " ".repeat(w - s.length) + s;
+}
+
+function _tokensWatch({ allUsers, userFilter }) {
+  const cwd = process.cwd();
+  const auditDir = path.join(cwd, ".sticky-note", "audit");
+  const me = userFilter || (process.env.USER || process.env.USERNAME || "unknown");
+
+  function pickFiles() {
+    if (!fs.existsSync(auditDir)) return [];
+    const all = fs.readdirSync(auditDir).filter((f) => f.endsWith(".jsonl"));
+    return (allUsers ? all : all.filter((f) => f === `${me}.jsonl`))
+      .map((f) => ({ user: f.replace(/\.jsonl$/, ""), path: path.join(auditDir, f) }));
+  }
+
+  // Track byte offset per file so we only emit new lines
+  const offsets = new Map();
+  let totals = { inject_result: 0, lazy_inject: 0, events: 0 };
+  const startedAt = new Date();
+
+  function fmtRow(user, entry) {
+    const t = entry.type;
+    const ts = entry.ts ? entry.ts.substring(11, 19) : "--:--:--";
+    const tok = typeof entry.est_tokens === "number" ? entry.est_tokens : null;
+    const tokStr = tok === null ? "    -- " : `${String(tok).padStart(6)} tok`;
+    const label = t === "inject_result" ? "eager " : "lazy  ";
+    const result = entry.result ? entry.result : (entry.file ? path.basename(entry.file) : "");
+    const detail = entry.threads_injected != null ? `threads=${entry.threads_injected}` : "";
+    const extras = [result, detail].filter(Boolean).join("  ");
+    return `  ${ts}  ${label}  ${tokStr}  ${user.padEnd(12)}  ${extras}`;
+  }
+
+  function tailFile(user, filePath) {
+    let stat;
+    try { stat = fs.statSync(filePath); } catch (_) { return; }
+    const prev = offsets.get(filePath) ?? stat.size;
+    if (stat.size < prev) {
+      // File was truncated/rotated — reset to 0
+      offsets.set(filePath, 0);
+      return tailFile(user, filePath);
+    }
+    if (stat.size === prev) return;
+    let chunk = "";
+    try {
+      const fd = fs.openSync(filePath, "r");
+      const buf = Buffer.alloc(stat.size - prev);
+      fs.readSync(fd, buf, 0, buf.length, prev);
+      fs.closeSync(fd);
+      chunk = buf.toString("utf-8");
+    } catch (_) {
+      offsets.set(filePath, stat.size);
+      return;
+    }
+    offsets.set(filePath, stat.size);
+
+    for (const line of chunk.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      let entry;
+      try { entry = JSON.parse(trimmed); } catch (_) { continue; }
+      if (entry.type !== "inject_result" && entry.type !== "lazy_inject") continue;
+      const tok = typeof entry.est_tokens === "number" ? entry.est_tokens : 0;
+      totals[entry.type] += tok;
+      totals.events += 1;
+      print(fmtRow(user, entry));
+    }
+  }
+
+  // Initial seek to end-of-file so we only show NEW events
+  for (const { path: p } of pickFiles()) {
+    try { offsets.set(p, fs.statSync(p).size); } catch (_) { offsets.set(p, 0); }
+  }
+
+  printBanner();
+  print("  ━━━ Sticky-Note Token Watch ━━━━━━━━━━━━━━━━━━━━━━━");
+  print(`  Watching: ${allUsers ? "all users" : me}     Audit dir: .sticky-note/audit/`);
+  print(`  Started:  ${startedAt.toISOString()}`);
+  print("  Press Ctrl+C to exit. Streaming new injection events:");
+  print("");
+  print("  TIME      TYPE     TOKENS       USER          DETAIL");
+  print("  ────────  ───────  ───────────  ────────────  ─────────────────────");
+
+  // Poll-based tail (cross-platform reliable; fs.watch is flaky on Windows for appends)
+  const interval = setInterval(() => {
+    for (const { user, path: p } of pickFiles()) {
+      tailFile(user, p);
+    }
+  }, 1000);
+
+  function shutdown() {
+    clearInterval(interval);
+    print("");
+    print(`  ━━━ Session totals ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    print(`  Events:        ${totals.events}`);
+    print(`  Eager tokens:  ${_formatNumber(totals.inject_result)}`);
+    print(`  Lazy tokens:   ${_formatNumber(totals.lazy_inject)}`);
+    print(`  Total:         ${_formatNumber(totals.inject_result + totals.lazy_inject)} est. tokens`);
+    print("");
+    process.exit(0);
+  }
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
+
+function cmdTokens() {
+  const args = process.argv.slice(3);
+  let days = 7;
+  let userFilter = null;
+  let allUsers = false;
+  let asJson = false;
+  let estimateOnly = false;
+  let watch = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    switch (a) {
+      case "--days":
+      case "-d":
+        days = parseInt(args[++i], 10) || 7;
+        break;
+      case "--user":
+      case "-u":
+        userFilter = args[++i];
+        break;
+      case "--all-users":
+        allUsers = true;
+        break;
+      case "--json":
+        asJson = true;
+        break;
+      case "--estimate-only":
+      case "--estimate":
+        estimateOnly = true;
+        break;
+      case "--watch":
+      case "-w":
+        watch = true;
+        break;
+      case "--help":
+      case "-h":
+        print("");
+        print("  Usage: npx sticky-note tokens [options]");
+        print("");
+        print("  Reports the token footprint sticky-note adds to your AI workflow.");
+        print("");
+        print("  Options:");
+        print("    --days N           Window for measured stats (default: 7)");
+        print("    --user <name>      Show only this user (default: current user)");
+        print("    --all-users        Aggregate across all users in audit/");
+        print("    --estimate-only    Skip historical data, show static estimates");
+        print("    --json             Machine-readable output");
+        print("    --watch            Live-tail injection events as they happen");
+        print("");
+        return;
+    }
+  }
+
+  if (watch) {
+    return _tokensWatch({ allUsers, userFilter });
+  }
+
+  const cwd = process.cwd();
+  const stickyDir = path.join(cwd, ".sticky-note");
+
+  // ─── Static (recurring per prompt) ───
+  // Prefer installed files, fall back to templates
+  const claudeInstalled = path.join(cwd, "CLAUDE.md");
+  const copilotInstalled = path.join(cwd, ".github", "copilot-instructions.md");
+  const claudeTemplate = path.join(TEMPLATES_DIR, "CLAUDE.md");
+  const copilotTemplate = path.join(TEMPLATES_DIR, "copilot-instructions.md");
+
+  const claudeMeasure = _measureMarkedSection(claudeInstalled) || _measureMarkedSection(claudeTemplate);
+  const claudeSource = fs.existsSync(claudeInstalled) ? "installed" : (fs.existsSync(claudeTemplate) ? "template" : "missing");
+
+  const copilotMeasure = _measureMarkedSection(copilotInstalled) || _measureMarkedSection(copilotTemplate);
+  const copilotSource = fs.existsSync(copilotInstalled) ? "installed" : (fs.existsSync(copilotTemplate) ? "template" : "missing");
+
+  // Inject token budget cap (config)
+  const configPath = path.join(stickyDir, "sticky-note-config.json");
+  const config = readJsonSafe(configPath, {});
+  const injectBudget = config.inject_token_budget || 1000;
+
+  // ─── Measured (audit log) ───
+  const auditDir = path.join(stickyDir, "audit");
+  const sinceCutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  let auditFiles = [];
+  if (fs.existsSync(auditDir)) {
+    auditFiles = fs.readdirSync(auditDir)
+      .filter((f) => f.endsWith(".jsonl"))
+      .map((f) => ({ user: f.replace(/\.jsonl$/, ""), path: path.join(auditDir, f) }));
+  }
+
+  let targetFiles = auditFiles;
+  if (!allUsers) {
+    const me = userFilter || (process.env.USER || process.env.USERNAME || "unknown");
+    targetFiles = auditFiles.filter((f) => f.user === me);
+  }
+
+  const stats = {
+    inject_result: { count: 0, with_tokens: 0, est_tokens: 0, chars: 0 },
+    lazy_inject: { count: 0, with_tokens: 0, est_tokens: 0, chars: 0 },
+  };
+  const sessions = new Set();
+  let oldestTs = null;
+  let newestTs = null;
+  let entriesScanned = 0;
+  let entriesInWindow = 0;
+
+  for (const { path: p } of targetFiles) {
+    for (const entry of _readJsonl(p)) {
+      entriesScanned++;
+      const t = entry.type;
+      if (t !== "inject_result" && t !== "lazy_inject") continue;
+      const ts = entry.ts ? new Date(entry.ts) : null;
+      if (!ts || isNaN(ts.getTime())) continue;
+      if (ts < sinceCutoff) continue;
+      entriesInWindow++;
+      if (!oldestTs || ts < oldestTs) oldestTs = ts;
+      if (!newestTs || ts > newestTs) newestTs = ts;
+      const bucket = stats[t];
+      bucket.count++;
+      if (typeof entry.est_tokens === "number") {
+        bucket.with_tokens++;
+        bucket.est_tokens += entry.est_tokens;
+        bucket.chars += entry.chars || 0;
+      }
+      if (entry.session_id) sessions.add(entry.session_id);
+    }
+  }
+
+  const totalTokens = stats.inject_result.est_tokens + stats.lazy_inject.est_tokens;
+  const dailyAvg = days > 0 ? totalTokens / days : 0;
+  const eagerAvg = stats.inject_result.with_tokens > 0
+    ? stats.inject_result.est_tokens / stats.inject_result.with_tokens
+    : null;
+  const lazyAvg = stats.lazy_inject.with_tokens > 0
+    ? stats.lazy_inject.est_tokens / stats.lazy_inject.with_tokens
+    : null;
+
+  const perPromptOverhead =
+    (claudeMeasure ? claudeMeasure.est_tokens : 0) +
+    (copilotMeasure ? copilotMeasure.est_tokens : 0) +
+    (eagerAvg !== null ? Math.round(eagerAvg) : 0);
+
+  // ─── JSON output ───
+  if (asJson) {
+    print(JSON.stringify({
+      version: VERSION,
+      estimator: "chars/4",
+      window_days: days,
+      static: {
+        claude_md: claudeMeasure ? { ...claudeMeasure, source: claudeSource, path: claudeSource === "installed" ? claudeInstalled : claudeTemplate } : null,
+        copilot_instructions: copilotMeasure ? { ...copilotMeasure, source: copilotSource, path: copilotSource === "installed" ? copilotInstalled : copilotTemplate } : null,
+        inject_token_budget: injectBudget,
+      },
+      measured: {
+        users_included: allUsers ? "all" : (userFilter || (process.env.USER || process.env.USERNAME || "unknown")),
+        audit_files: targetFiles.map((f) => f.user),
+        entries_scanned: entriesScanned,
+        entries_in_window: entriesInWindow,
+        oldest_ts: oldestTs ? oldestTs.toISOString() : null,
+        newest_ts: newestTs ? newestTs.toISOString() : null,
+        sessions: sessions.size,
+        total_est_tokens: totalTokens,
+        daily_avg_est_tokens: Math.round(dailyAvg),
+        by_type: stats,
+        eager_avg_est_tokens: eagerAvg !== null ? Math.round(eagerAvg) : null,
+        lazy_avg_est_tokens: lazyAvg !== null ? Math.round(lazyAvg) : null,
+      },
+      per_prompt_overhead_est_tokens: perPromptOverhead,
+      not_measured: [
+        "MCP tool responses (get_stuck_threads, check_overlaps, etc.)",
+        "Manual CLI command output piped into prompts",
+      ],
+    }, null, 2));
+    return;
+  }
+
+  // ─── Text output ───
+  printBanner();
+  print("  ━━━ Sticky-Note Token Footprint ━━━━━━━━━━━━━━━━━━━━━");
+  print("");
+  print("  Estimator: chars/4 heuristic (±20% vs real tokenizers)");
+  print("");
+
+  // RECURRING (every prompt)
+  print("  RECURRING (every prompt)");
+  if (claudeMeasure) {
+    print(`    CLAUDE.md sticky-note section          ${_padNum(claudeMeasure.est_tokens, 8)} tok  [${claudeSource}]`);
+  } else {
+    print(`    CLAUDE.md sticky-note section          ${_pad("(not found)", 18)}`);
+  }
+  if (copilotMeasure) {
+    print(`    copilot-instructions.md section        ${_padNum(copilotMeasure.est_tokens, 8)} tok  [${copilotSource}]`);
+  } else {
+    print(`    copilot-instructions.md section        ${_pad("(not found)", 18)}`);
+  }
+  if (!estimateOnly && eagerAvg !== null) {
+    print(`    Eager context injection (avg, ${days}d)     ${_padNum(eagerAvg, 8)} tok  [measured, n=${stats.inject_result.with_tokens}]`);
+  } else {
+    print(`    Eager context injection                ${_pad("unavailable", 8)} tok  [no history yet — re-run after some prompts]`);
+    print(`      max budget cap                       ${_padNum(injectBudget, 8)} tok  [config: inject_token_budget]`);
+  }
+  print(`    ──────────────────────────────────────────────────────`);
+  if (eagerAvg !== null) {
+    print(`    Per-prompt overhead (with eager avg)   ${_padNum(perPromptOverhead, 8)} tok`);
+  } else {
+    const baseline = (claudeMeasure ? claudeMeasure.est_tokens : 0) + (copilotMeasure ? copilotMeasure.est_tokens : 0);
+    print(`    Per-prompt baseline (instructions only)${_padNum(baseline, 8)} tok`);
+  }
+  print("");
+
+  // OCCASIONAL (per tool call, when triggered)
+  print("  OCCASIONAL (only when triggered)");
+  if (!estimateOnly && lazyAvg !== null) {
+    print(`    Lazy file→thread injection (avg, ${days}d)  ${_padNum(lazyAvg, 8)} tok  [measured, n=${stats.lazy_inject.with_tokens}]`);
+  } else {
+    print(`    Lazy file→thread injection             ${_pad("unavailable", 8)} tok  [no history yet]`);
+  }
+  print(`    Triggered: first tool call per file with prior thread attribution`);
+  print("");
+
+  // MEASURED
+  if (!estimateOnly) {
+    const userLabel = allUsers ? "all users" : (userFilter || (process.env.USER || process.env.USERNAME || "unknown"));
+    print(`  MEASURED (last ${days} day${days === 1 ? "" : "s"} · ${userLabel})`);
+    print(`    Total est. tokens injected:    ${_padNum(totalTokens, 10)}`);
+    print(`    Sessions counted:              ${_padNum(sessions.size, 10)}`);
+    print(`    Daily average:                 ${_padNum(dailyAvg, 10)} tok/day`);
+    print(`    By type:`);
+    print(`      inject_result   ${_padNum(stats.inject_result.est_tokens, 10)} tok   (${stats.inject_result.count} events, ${stats.inject_result.with_tokens} with token data)`);
+    print(`      lazy_inject     ${_padNum(stats.lazy_inject.est_tokens, 10)} tok   (${stats.lazy_inject.count} events, ${stats.lazy_inject.with_tokens} with token data)`);
+    if (entriesInWindow === 0) {
+      print(`    [!] No injection events found in window.`);
+      print(`        Audit files scanned: ${targetFiles.length}  Entries: ${entriesScanned}`);
+    } else if (oldestTs && newestTs) {
+      print(`    Window: ${oldestTs.toISOString().substring(0, 10)} → ${newestTs.toISOString().substring(0, 10)}`);
+    }
+    if (stats.inject_result.count > stats.inject_result.with_tokens || stats.lazy_inject.count > stats.lazy_inject.with_tokens) {
+      const missing = (stats.inject_result.count - stats.inject_result.with_tokens) + (stats.lazy_inject.count - stats.lazy_inject.with_tokens);
+      print(`    Note: ${missing} legacy event(s) lack token data (created before this version).`);
+    }
+    print("");
+  }
+
+  // NOT MEASURED
+  print("  NOT MEASURED");
+  print("    • MCP tool responses (get_stuck_threads, check_overlaps, etc.)");
+  print("      — these are AI-driven and depend on which tools the agent calls");
+  print("    • Manual CLI command output piped into prompts");
+  print("    • Audit data unsynced from teammates' branches");
+  print("");
+
+  // TIPS
+  print("  TIPS TO REDUCE FOOTPRINT");
+  print(`    • Lower 'inject_token_budget' in .sticky-note/sticky-note-config.json (currently ${injectBudget})`);
+  print("    • Run 'npx sticky-note gc' to expire stale closed threads");
+  print("    • Trim unused sections from CLAUDE.md (between sticky-note markers)");
+  print("    • Use focused prompts — scoring picks fewer threads with narrower keywords");
+  print("    • Pass '--all-users' to compare your usage vs the team");
+  print("");
+}
+
+
+// ──────────────────────────────────────────────
 // GC command (manual tombstone sweep)
 // ──────────────────────────────────────────────
 
@@ -3287,6 +3715,9 @@ async function main() {
     case "mcp-server":
       cmdMcpServer();
       break;
+    case "tokens":
+      cmdTokens();
+      break;
     case "--version":
     case "-v":
       print(`sticky-note v${VERSION}`);
@@ -3317,6 +3748,7 @@ async function main() {
     print("    bootstrap          Provision MCP servers with secrets from manifest");
     print("    env                Environment management (status, add-server, add-plugin)");
     print("    mcp-server         Launch the sticky-note MCP server (stdio JSON-RPC)");
+    print("    tokens             Report token footprint sticky-note adds to AI prompts");
       print("");
       print("  Options:");
       print("    --version  Show version");

@@ -263,6 +263,8 @@ function main() {
         const id = t.thread ? t.thread.id : t.id;
         return (id || "").substring(0, 8);
       }),
+      chars: output.length,
+      est_tokens: Math.floor(output.length / 4),
     });
   } catch (_) {
     // ignore

@@ -245,6 +245,12 @@ You have access to a `sticky-note` MCP server. Use it:
 4. **For audit history**: Call `get_audit_trail(file)` to understand who
    changed a file and when.
 
+5. **When asked about token cost / overhead**: Call `get_token_footprint()`
+   to report how many tokens sticky-note is adding to the user's prompts.
+   Returns a `summary` string suitable for quoting verbatim plus structured
+   static + measured data. Use whenever the user asks "how many tokens is
+   sticky-note costing me?", "is sticky-note expensive?", or similar.
+
 These tools are the primary way sticky-note communicates with you.
 Hook-injected context supplements but does not replace MCP tool calls.
 

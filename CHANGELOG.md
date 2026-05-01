@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### New: `tokens` command — token footprint reporting
+
+- **`npx sticky-note tokens`** reports how many tokens sticky-note adds to
+  your AI workflow. Combines static estimates (per-prompt instruction
+  overhead measured from the marked sections of installed `CLAUDE.md` and
+  `.github/copilot-instructions.md`) with measured data from the audit log.
+- **Audit enrichment**: `inject-context.js` and `pre-tool-use.js` now record
+  `chars` and `est_tokens` on every `inject_result` and `lazy_inject` audit
+  entry, enabling honest historical reporting. Backward-compatible with
+  legacy entries (counted but flagged as missing token data).
+- **Flags**: `--days N`, `--user`, `--all-users`, `--json`, `--estimate-only`, `--watch`.
+- **MCP tool `get_token_footprint`**: AI assistants can call this in-chat
+  when the user asks "how many tokens is sticky-note adding?". Returns
+  a `summary` string suitable for verbatim quoting plus structured
+  static + measured fields. Documented in `CLAUDE.md` and
+  `copilot-instructions.md` so the agent knows to call it on demand.
+- **Honest about limits**: clearly labels MCP tool responses, manual CLI
+  output, and unsynced teammate audit data as "not measured".
+- Estimator is `chars/4` (matches existing convention in the codebase,
+  ±20% vs real tokenizers).
+
 ## V2.7.0
 
 ### New: Team Environment Sync ("Vibe Coding Container")

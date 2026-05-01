@@ -34,11 +34,11 @@
       "id": "demo-grant-search-perf",
       "user": "grantharris",
       "project": "",
-      "status": "open",
+      "status": "stale",
       "branch": "feature/search-optimization",
       "created_at": "2026-04-09T10:00:00.000Z",
       "closed_at": null,
-      "last_activity_at": "2026-04-14T04:36:03.259Z",
+      "last_activity_at": "2026-04-30T21:54:31.545Z",
       "files_touched": [
         "bin/mcp-server.js",
         "bin/cli.js"
@@ -159,11 +159,11 @@
       "id": "c171b8a2-a202-4f3c-80c3-1c2457ceb6d1",
       "user": "dbandaru",
       "project": "",
-      "status": "open",
+      "status": "stale",
       "branch": "main",
       "created_at": "2026-04-13T21:25:13.990Z",
       "closed_at": null,
-      "last_activity_at": "2026-04-13T21:59:27.948Z",
+      "last_activity_at": "2026-04-30T21:54:31.547Z",
       "files_touched": [
         "templates/hooks/session-start.js",
         "templates/hooks.json",
@@ -197,11 +197,11 @@
       "id": "6a4963ee-1486-4c20-b34e-d2b337c9662c",
       "user": "dbandaru",
       "project": "",
-      "status": "open",
+      "status": "stale",
       "branch": "main",
       "created_at": "2026-04-13T22:20:18.241Z",
       "closed_at": null,
-      "last_activity_at": "2026-04-14T00:08:08.728Z",
+      "last_activity_at": "2026-04-30T21:54:31.547Z",
       "files_touched": [
         "bin",
         "bin/mcp-server.js",
@@ -240,7 +240,7 @@
       "branch": "fix/merge-driver-conflicts",
       "created_at": "2026-04-11T09:30:00.000Z",
       "closed_at": null,
-      "last_activity_at": "2026-04-14T04:38:50.402Z",
+      "last_activity_at": "2026-05-01T02:38:01.676Z",
       "files_touched": [
         "bin/cli.js",
         "bin/merge-driver.js",
@@ -254,7 +254,9 @@
       ],
       "handoff_summary": "The merge driver in bin/merge-driver.js needs a thread-ID-aware merge strategy: deduplicate by thread.id, prefer the version with the later last_activity_at, and concatenate files_touched with dedup. The test file has 3 passing cases and 2 failing cases that cover the concurrent-add scenario.",
       "related_session_ids": [
-        "59f244b6-0be4-415a-87e4-98fb01572f85"
+        "59f244b6-0be4-415a-87e4-98fb01572f85",
+        "9ca35f3c-31c2-4d08-b080-a023601615f6",
+        "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
       ],
       "resume_chain": [
         {
@@ -263,6 +265,97 @@
           "started_at": "2026-04-14T04:38:50.402Z",
           "ended_at": null,
           "resumed_from": "demo-session-bob-merge"
+        },
+        {
+          "session_id": "9ca35f3c-31c2-4d08-b080-a023601615f6",
+          "tool": "copilot-cli",
+          "started_at": "2026-04-30T21:54:31.548Z",
+          "ended_at": null,
+          "resumed_from": "59f244b6-0be4-415a-87e4-98fb01572f85"
+        },
+        {
+          "session_id": "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-01T02:11:45.348Z",
+          "ended_at": null,
+          "resumed_from": "9ca35f3c-31c2-4d08-b080-a023601615f6"
+        },
+        {
+          "session_id": "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-01T02:11:46.694Z",
+          "ended_at": null,
+          "resumed_from": "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
+        },
+        {
+          "session_id": "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-01T02:11:47.879Z",
+          "ended_at": null,
+          "resumed_from": "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
+        },
+        {
+          "session_id": "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-01T02:12:47.403Z",
+          "ended_at": null,
+          "resumed_from": "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
+        },
+        {
+          "session_id": "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-01T02:12:48.871Z",
+          "ended_at": null,
+          "resumed_from": "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
+        },
+        {
+          "session_id": "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-01T02:12:50.081Z",
+          "ended_at": null,
+          "resumed_from": "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
+        },
+        {
+          "session_id": "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-01T02:17:10.256Z",
+          "ended_at": null,
+          "resumed_from": "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
+        },
+        {
+          "session_id": "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-01T02:17:12.289Z",
+          "ended_at": null,
+          "resumed_from": "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
+        },
+        {
+          "session_id": "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-01T02:17:13.990Z",
+          "ended_at": null,
+          "resumed_from": "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
+        },
+        {
+          "session_id": "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-01T02:37:58.745Z",
+          "ended_at": null,
+          "resumed_from": "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
+        },
+        {
+          "session_id": "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-01T02:38:00.475Z",
+          "ended_at": null,
+          "resumed_from": "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
+        },
+        {
+          "session_id": "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-01T02:38:01.679Z",
+          "ended_at": null,
+          "resumed_from": "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
         }
       ],
       "tool": "claude-code",
