@@ -240,7 +240,7 @@
       "branch": "fix/merge-driver-conflicts",
       "created_at": "2026-04-11T09:30:00.000Z",
       "closed_at": null,
-      "last_activity_at": "2026-05-01T02:38:01.676Z",
+      "last_activity_at": "2026-05-10T22:46:32.478Z",
       "files_touched": [
         "bin/cli.js",
         "bin/merge-driver.js",
@@ -256,7 +256,8 @@
       "related_session_ids": [
         "59f244b6-0be4-415a-87e4-98fb01572f85",
         "9ca35f3c-31c2-4d08-b080-a023601615f6",
-        "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
+        "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
+        "3c4f3cfd-6654-437c-a212-b3635ab13617"
       ],
       "resume_chain": [
         {
@@ -354,6 +355,13 @@
           "session_id": "4f3eac2e-db9a-485b-bc7b-8f061090be1e",
           "tool": "copilot-cli",
           "started_at": "2026-05-01T02:38:01.679Z",
+          "ended_at": null,
+          "resumed_from": "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
+        },
+        {
+          "session_id": "3c4f3cfd-6654-437c-a212-b3635ab13617",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-10T22:46:32.480Z",
           "ended_at": null,
           "resumed_from": "4f3eac2e-db9a-485b-bc7b-8f061090be1e"
         }
