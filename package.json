@@ -32,5 +32,8 @@
   },
   "scripts": {
     "test": "node test/smoke.test.js"
+  },
+  "devDependencies": {
+    "sticky-note-cli": "^2.9.1"
   }
 }

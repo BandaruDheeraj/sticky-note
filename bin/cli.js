@@ -105,10 +105,12 @@ function findStaleHookPaths(settings) {
         const cmd = h && h.command;
         if (typeof cmd !== "string") continue;
         // Absolute paths (Unix /Users, /home, /root or Windows C:/, D:/ etc.)
-        // inside the quoted hook script argument are the smoking gun.
+        // inside the hook command are the smoking gun. Match anywhere in the
+        // string — the path may be preceded by other tokens (env vars, shell
+        // prefixes) and may contain spaces.
         if (
-          /node\s+["'][A-Za-z]:[\\/]/i.test(cmd) ||
-          /node\s+["']\/(?:Users|home|root|tmp)\//.test(cmd) ||
+          /["'][A-Za-z]:[\\/]/.test(cmd) ||
+          /["']\/(?:Users|home|root|tmp)\//.test(cmd) ||
           cmd.includes("$(git rev-parse")
         ) {
           stale.push(cmd);
