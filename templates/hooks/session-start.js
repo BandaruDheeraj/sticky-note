@@ -33,6 +33,58 @@ function _safeExit() {
   process.exit(0);
 }
 
+// Issue #12: warn (non-blocking) when the running CLI is below the project's
+// configured min_version. Returns "" when nothing to say. Also writes a
+// stderr banner so the user sees it directly even if the hook output is
+// swallowed by the host tool.
+function _parseSemver(v) {
+  if (typeof v !== "string") return null;
+  const m = v.trim().replace(/^v/, "").match(/^(\d+)\.(\d+)(?:\.(\d+))?/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3] || 0)];
+}
+function _cmpSemver(a, b) {
+  const pa = _parseSemver(a), pb = _parseSemver(b);
+  if (!pa || !pb) return 0;
+  for (let i = 0; i < 3; i++) {
+    if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1;
+  }
+  return 0;
+}
+function _installedCliVersion() {
+  // Try the package.json shipped alongside this hook script's CLI.
+  try {
+    const candidates = [
+      path.join(__dirname, "..", "..", "package.json"),
+      path.join(__dirname, "..", "..", "..", "sticky-note-cli", "package.json"),
+    ];
+    for (const p of candidates) {
+      try {
+        const pkg = JSON.parse(require("fs").readFileSync(p, "utf-8"));
+        if (pkg && pkg.name === "sticky-note-cli" && pkg.version) return pkg.version;
+      } catch (_) { /* try next */ }
+    }
+  } catch (_) { /* ignore */ }
+  return null;
+}
+function formatVersionWarning(config) {
+  try {
+    const min = config && config.min_version;
+    if (!min) return "";
+    const installed = _installedCliVersion();
+    if (!installed) return "";
+    if (_cmpSemver(installed, min) >= 0) return "";
+    const msg =
+      `[STICKY-NOTE] ⚠️ Installed sticky-note-cli v${installed} is below ` +
+      `this project's min_version v${min}. Run \`npm i -D sticky-note-cli@latest\` ` +
+      `to update — features and schema may differ until you do.`;
+    try { process.stderr.write(msg + "\n"); } catch (_) { /* non-fatal */ }
+    return msg;
+  } catch (_) {
+    return "";
+  }
+}
+
 let utils;
 try {
   utils = require("./sticky-utils.js");
@@ -964,6 +1016,7 @@ function main() {
   const overlapContext = formatOverlapWarnings(
     (memory.threads || []).filter(Boolean), getUser(), memory
   );
+  const versionWarning = formatVersionWarning(config);
 
   // V2.5: Mark eagerly-injected stuck threads so PreToolUse won't re-inject.
   // Skip for Copilot CLI — its sessionStart output is not surfaced to the AI,
@@ -1101,6 +1154,7 @@ function main() {
   }
 
   // Overlap warning comes first — most urgent signal
+  if (versionWarning) parts.push(versionWarning);
   if (overlapContext) parts.push(overlapContext);
 
   if (threadContext) parts.push(threadContext);

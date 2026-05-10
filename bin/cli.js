@@ -83,26 +83,106 @@ function readTemplate(name) {
   return fs.readFileSync(path.join(TEMPLATES_DIR, name), "utf-8");
 }
 
-// Replace $(git rev-parse --show-toplevel) with absolute root path
-// so hook commands work from any CWD without shell expansion.
-function resolveHookPaths(obj, rootDir) {
-  const root = rootDir.replace(/\\/g, "/");
-  const resolve = (s) =>
-    s.replace(/"\$\(git rev-parse --show-toplevel\)\//g, `"${root}/`);
-  const hooks = obj.hooks || {};
+// Hook commands in templates use relative paths (e.g. ".claude/hooks/foo.js")
+// because Claude Code and Copilot CLI both resolve hook commands relative to
+// the project root. Earlier versions rewrote these to absolute paths at init
+// time, but that path was machine-specific and got committed to settings.json,
+// causing every teammate's hooks to fail silently (issue #11). This is now a
+// no-op, kept only to avoid breaking any external callers of the function.
+function resolveHookPaths(_obj, _rootDir) {
+  return;
+}
+
+// Detects hook commands in an existing settings.json that point at an absolute
+// path (likely written by an older sticky-note-cli on another developer's
+// machine). Returns the list of stale command strings, or [] if all clean.
+function findStaleHookPaths(settings) {
+  const stale = [];
+  const hooks = (settings && settings.hooks) || {};
   for (const entries of Object.values(hooks)) {
     for (const entry of Array.isArray(entries) ? entries : []) {
-      if (entry.hooks) {
-        for (const h of entry.hooks) {
-          if (h.command) h.command = resolve(h.command);
+      for (const h of entry.hooks || []) {
+        const cmd = h && h.command;
+        if (typeof cmd !== "string") continue;
+        // Absolute paths (Unix /Users, /home, /root or Windows C:/, D:/ etc.)
+        // inside the quoted hook script argument are the smoking gun.
+        if (
+          /node\s+["'][A-Za-z]:[\\/]/i.test(cmd) ||
+          /node\s+["']\/(?:Users|home|root|tmp)\//.test(cmd) ||
+          cmd.includes("$(git rev-parse")
+        ) {
+          stale.push(cmd);
         }
       }
-      if (entry.bash) entry.bash = resolve(entry.bash);
-      if (entry.powershell) entry.powershell = resolve(entry.powershell);
-      if (entry.command) entry.command = resolve(entry.command);
     }
   }
-  return obj;
+  return stale;
+}
+
+// Parse a semver-ish version string ("2.9.1", "2.9.1-beta.1", "v2.9") into
+// [major, minor, patch] numbers. Pre-release suffixes are ignored. Returns
+// null if unparseable.
+function parseSemver(v) {
+  if (typeof v !== "string") return null;
+  const m = v.trim().replace(/^v/, "").match(/^(\d+)\.(\d+)(?:\.(\d+))?/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3] || 0)];
+}
+
+// Returns -1 if a < b, 0 if equal, 1 if a > b. Unparseable values sort last.
+function compareSemver(a, b) {
+  const pa = parseSemver(a), pb = parseSemver(b);
+  if (!pa && !pb) return 0;
+  if (!pa) return 1;
+  if (!pb) return -1;
+  for (let i = 0; i < 3; i++) {
+    if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1;
+  }
+  return 0;
+}
+
+// When updating an existing config, only bump min_version forward — never
+// downgrade if a teammate has already pinned a newer minimum.
+function bumpMinVersion(existing, current) {
+  if (!existing) return current;
+  return compareSemver(existing, current) >= 0 ? existing : current;
+}
+
+// Add sticky-note-cli to the project package.json devDependencies so every
+// teammate gets a pinned working copy on `npm install` (issue #12). No-ops
+// gracefully if there is no package.json or if the entry is already present
+// at >= the current version.
+function pinCliInPackageJson() {
+  const pkgPath = path.join(process.cwd(), "package.json");
+  if (!fs.existsSync(pkgPath)) {
+    print("  ⏭️  No package.json found — skipping devDependency pin");
+    return;
+  }
+  let pkg;
+  try {
+    pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+  } catch (err) {
+    print(`  ⏭️  Could not parse package.json: ${err.message}`);
+    return;
+  }
+  pkg.devDependencies = pkg.devDependencies || {};
+  const existing = pkg.devDependencies["sticky-note-cli"];
+  const desired = `^${VERSION}`;
+  if (existing) {
+    const existingClean = String(existing).replace(/^[\^~]/, "");
+    if (compareSemver(existingClean, VERSION) >= 0) {
+      print(`  ⏭️  package.json devDependencies already pin sticky-note-cli ${existing}`);
+      return;
+    }
+  }
+  pkg.devDependencies["sticky-note-cli"] = desired;
+  // Keep keys sorted for clean diffs
+  pkg.devDependencies = Object.fromEntries(
+    Object.entries(pkg.devDependencies).sort(([a], [b]) => a.localeCompare(b))
+  );
+  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+  print(`  [OK] package.json devDependencies: sticky-note-cli ${desired}`);
+  print("       Run `npm install` to lock the version for your team.");
 }
 
 function makeExecutable(filePath) {
@@ -654,17 +734,32 @@ async function cmdInit() {
     print(`  [OK] .claude/hooks/${file}`);
   }
 
-  // Create settings.json (Claude Code)
+  // Create settings.json (Claude Code) — uses relative hook paths so it can
+  // be safely committed and shared across teammates (issue #11).
   const settingsTemplate = JSON.parse(readTemplate("settings.json"));
-  resolveHookPaths(settingsTemplate, process.cwd());
   const settingsDest = path.join(process.cwd(), ".claude", "settings.json");
+  if (fs.existsSync(settingsDest)) {
+    const existing = readJsonSafe(settingsDest, {});
+    const stale = findStaleHookPaths(existing);
+    if (stale.length > 0) {
+      print("  ⚠️  .claude/settings.json contains absolute or shell-expanded hook paths:");
+      for (const cmd of stale.slice(0, 3)) print(`       ${cmd}`);
+      print("       Rewriting with relative paths so hooks work for every teammate.");
+    }
+  }
   fs.writeFileSync(settingsDest, JSON.stringify(settingsTemplate, null, 2) + "\n");
   print("  [OK] .claude/settings.json");
 
-  // Create hooks.json (Copilot CLI)
+  // Create hooks.json (Copilot CLI) — also relative paths.
   const hooksTemplate = JSON.parse(readTemplate("hooks.json"));
-  resolveHookPaths(hooksTemplate, process.cwd());
   const hooksDest = path.join(githubHooksDir, "hooks.json");
+  if (fs.existsSync(hooksDest)) {
+    const existing = readJsonSafe(hooksDest, {});
+    const stale = findStaleHookPaths(existing);
+    if (stale.length > 0) {
+      print("  ⚠️  .github/hooks/hooks.json contains absolute or shell-expanded hook paths — rewriting.");
+    }
+  }
   fs.writeFileSync(hooksDest, JSON.stringify(hooksTemplate, null, 2) + "\n");
   print("  [OK] .github/hooks/hooks.json");
 
@@ -718,6 +813,7 @@ async function cmdInit() {
     configTemplate.stale_days = staleDaysResolved;
     configTemplate.inject_token_budget = injectTokenBudgetResolved;
     configTemplate.hook_version = VERSION;
+    configTemplate.min_version = VERSION;
     fs.writeFileSync(configDest, JSON.stringify(configTemplate, null, 2) + "\n");
   } else {
     // Update existing config with new settings
@@ -728,9 +824,14 @@ async function cmdInit() {
     existing.stale_days = staleDaysResolved;
     existing.inject_token_budget = injectTokenBudgetResolved;
     existing.hook_version = VERSION;
+    existing.min_version = bumpMinVersion(existing.min_version, VERSION);
     fs.writeFileSync(configDest, JSON.stringify(existing, null, 2) + "\n");
   }
   print("  [OK] .sticky-note/sticky-note-config.json");
+
+  // Pin sticky-note-cli in the project package.json devDependencies so every
+  // teammate gets the same version on `npm install` (issue #12).
+  pinCliInPackageJson();
 
   // Update .gitignore
   const gitignorePath = path.join(process.cwd(), ".gitignore");
@@ -998,8 +1099,11 @@ function cmdUpdate() {
   const settingsPath = path.join(process.cwd(), ".claude", "settings.json");
   if (fs.existsSync(settingsPath)) {
     const settingsTemplate = JSON.parse(readTemplate("settings.json"));
-    resolveHookPaths(settingsTemplate, process.cwd());
     const existing = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+    const stale = findStaleHookPaths(existing);
+    if (stale.length > 0) {
+      print("  ⚠️  Existing settings.json had absolute hook paths — replacing with relative paths.");
+    }
     existing.hooks = settingsTemplate.hooks;
     fs.writeFileSync(settingsPath, JSON.stringify(existing, null, 2) + "\n");
     print("  [OK] .claude/settings.json (hooks updated)");
@@ -1009,7 +1113,6 @@ function cmdUpdate() {
   const hooksPath = path.join(process.cwd(), ".github", "hooks", "hooks.json");
   if (fs.existsSync(hooksPath)) {
     const hooksTemplate = JSON.parse(readTemplate("hooks.json"));
-    resolveHookPaths(hooksTemplate, process.cwd());
     fs.writeFileSync(hooksPath, JSON.stringify(hooksTemplate, null, 2) + "\n");
     print("  [OK] .github/hooks/hooks.json (updated)");
   }
@@ -1160,6 +1263,33 @@ function cmdStatus() {
   print(
     `    ${fs.existsSync(hooksJsonPath) ? "[OK]" : "[ERR]"} .github/hooks/hooks.json`
   );
+
+  // Issue #11 guard: warn about absolute hook paths in shared config files.
+  for (const [label, p] of [
+    [".claude/settings.json", settingsPath],
+    [".github/hooks/hooks.json", hooksJsonPath],
+  ]) {
+    if (!fs.existsSync(p)) continue;
+    const data = readJsonSafe(p, {});
+    const stale = findStaleHookPaths(data);
+    if (stale.length > 0) {
+      print(`    ⚠️  ${label} has absolute hook paths — hooks will fail for teammates.`);
+      print("        Run `npx sticky-note init` to rewrite with relative paths.");
+    }
+  }
+
+  // Issue #12 guard: warn if installed CLI is below the project's min_version.
+  const configPathForVersionCheck = path.join(stickyDir, "sticky-note-config.json");
+  if (fs.existsSync(configPathForVersionCheck)) {
+    const cfg = readJsonSafe(configPathForVersionCheck, {});
+    if (cfg.min_version && compareSemver(VERSION, cfg.min_version) < 0) {
+      print(
+        `    ⚠️  Installed sticky-note-cli v${VERSION} is below the project's ` +
+        `min_version v${cfg.min_version}.`
+      );
+      print("        Run `npm i -D sticky-note-cli@latest` to update.");
+    }
+  }
 
   // Sticky Note data — V2 format
   const memoryPath = path.join(stickyDir, "sticky-note.json");

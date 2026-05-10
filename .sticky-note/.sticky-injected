@@ -2,7 +2,12 @@
   "thread_ids": [
     "6869e313-b4fa-4f20-b894-c72da6265c8e",
     "demo-grant-search-perf",
-    "demo-alice-docs-update"
+    "demo-alice-docs-update",
+    "c171b8a2-a202-4f3c-80c3-1c2457ceb6d1",
+    "6a4963ee-1486-4c20-b34e-d2b337c9662c",
+    "demo-carol-hooks-windows",
+    "demo-dave-audit-perf",
+    "demo-bob-merge-driver"
   ],
-  "session_id": "3e69cfd5-a69e-42f2-967b-39942d4354e4"
+  "session_id": "3c4f3cfd-6654-437c-a212-b3635ab13617"
 }

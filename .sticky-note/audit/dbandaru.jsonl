@@ -4017,3 +4017,232 @@
 {"type":"inject_result","user":"dbandaru","ts":"2026-04-14T05:09:18.046Z","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85","prompt":"commit and push to the repo","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
 {"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:09:29.431Z","tool":"report_intent","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
 {"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:09:41.618Z","tool":"powershell","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:10:09.840Z","tool":"powershell","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:12:20.496Z","tool":"powershell","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-04-14T05:13:13.103Z","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85","prompt":"continue"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-04-14T05:13:14.013Z","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85","prompt":"continue","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:13:25.941Z","tool":"report_intent","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:13:30.344Z","tool":"powershell","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:13:39.397Z","tool":"powershell","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:13:52.699Z","tool":"powershell","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:13:53.491Z","tool":"powershell","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:14:19.616Z","tool":"powershell","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:14:36.382Z","tool":"powershell","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:14:44.870Z","tool":"powershell","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-04-14T05:16:28.811Z","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85","prompt":"i can barely see the words on the gif, can you make bigger and more visible and can you move the other image to the bottom of the readme and can you update the readme to say it works with claude and github copilot cli (drop codex I haven't tested it yet)"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-04-14T05:16:29.717Z","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85","prompt":"i can barely see the words on the gif, can you make bigger and more visible and can you move the other image to the bott","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:16:44.332Z","tool":"report_intent","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:16:45.482Z","tool":"view","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85","file":"README.md"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:16:59.534Z","tool":"powershell","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-14T05:17:09.057Z","tool":"view","session_id":"59f244b6-0be4-415a-87e4-98fb01572f85","file":"README.md"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-04-30T21:54:16.782Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"what branch are we on"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-04-30T21:54:19.534Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"what branch are we on","result":"injected","threads_scored":8,"threads_injected":5,"top_scores":[{"id":"c171b8a2","score":24},{"id":"6a4963ee","score":21},{"id":"demo-bob","score":13},{"id":"demo-dav","score":12},{"id":"demo-car","score":10}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-04-30T21:54:32.525Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"overlap_deny","user":"dbandaru","ts":"2026-04-30T21:54:42.774Z","copilot_pid":"20616"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:54:55.987Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-04-30T21:56:18.722Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"no that's ok I want you to create a branch called 'feature/token-counter' and switch to it"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-04-30T21:56:19.712Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"no that's ok I want you to create a branch called 'feature/token-counter' and switch to it","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:56:41.532Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:56:49.311Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-04-30T21:58:17.877Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"great can you brainstorm and design and build the ideal way for us to report or display how many tokens having sticky note is adding to the general user workflow, some users are concerned that having sticky note is consuming too many tokens"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-04-30T21:58:18.807Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"great can you brainstorm and design and build the ideal way for us to report or display how many tokens having sticky no","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:58:27.740Z","tool":"report_intent","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:58:28.930Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:58:36.170Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"package.json"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:58:37.218Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:58:38.080Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:58:45.357Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:58:47.019Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:59:09.556Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:59:10.821Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:59:13.334Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:59:14.586Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:59:38.889Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\inject-context.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:59:41.361Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:59:50.713Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:59:52.809Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:59:59.198Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\inject-context.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T21:59:59.995Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T22:00:25.101Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T22:00:30.860Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\inject-context.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T22:00:41.494Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\inject-context.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T22:00:42.659Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T22:00:43.730Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\pre-tool-use.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T22:00:51.609Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\pre-tool-use.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-04-30T22:00:52.902Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\sticky-utils.js"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-05-01T02:03:29.500Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"try now"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-05-01T02:03:35.792Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"try now","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:05:34.190Z","tool":"task","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:06:17.932Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\inject-context.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:06:20.860Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\pre-tool-use.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:06:24.198Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:06:43.907Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:06:57.409Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\inject-context.js","lines_changed":["379-379","383-383","393-394"],"checkpoint_topic":"try now"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:07:08.788Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\inject-context.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:08:35.885Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\inject-context.js","lines_changed":["379-379","383-383","393-394","439-439","554-554","558-558","621-623"],"checkpoint_topic":"try now"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:08:37.906Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\inject-context.js","lines_changed":["379-379","383-383","393-394","439-439","554-554","558-558","621-623"],"checkpoint_topic":"try now"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:08:39.612Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\inject-context.js","lines_changed":["379-379","383-383","393-394","439-439","554-554","558-558","621-623"],"checkpoint_topic":"try now"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:08:41.571Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\hooks\\pre-tool-use.js","lines_changed":["266-267"],"checkpoint_topic":"try now"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:09:46.837Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\cli.js","lines_changed":["2510-2510","2513-2825"],"checkpoint_topic":"try now"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:09:54.475Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:10:01.258Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:10:08.193Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:10:15.849Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\cli.js","lines_changed":["2509-2825"],"checkpoint_topic":"try now"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:10:27.797Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\cli.js","lines_changed":["2509-2825","3607-3609","3640-3640"],"checkpoint_topic":"try now"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:10:29.771Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\cli.js","lines_changed":["2509-2825","3607-3609","3640-3640"],"checkpoint_topic":"try now"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:10:47.053Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:11:02.102Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:11:22.210Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-01T02:11:46.148Z","session_id":"4f3eac2e-db9a-485b-bc7b-8f061090be1e"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-01T02:11:47.465Z","session_id":"4f3eac2e-db9a-485b-bc7b-8f061090be1e"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-01T02:11:48.671Z","session_id":"4f3eac2e-db9a-485b-bc7b-8f061090be1e"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:11:50.440Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:11:56.970Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"test\\smoke.test.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:12:06.688Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:12:08.212Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:12:14.047Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"test\\smoke.test.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:12:24.613Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"test\\smoke.test.js","lines_changed":["212-233"],"checkpoint_topic":"try now"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-01T02:12:48.277Z","session_id":"4f3eac2e-db9a-485b-bc7b-8f061090be1e"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-01T02:12:49.671Z","session_id":"4f3eac2e-db9a-485b-bc7b-8f061090be1e"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-01T02:12:51.108Z","session_id":"4f3eac2e-db9a-485b-bc7b-8f061090be1e"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:12:52.686Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:13:01.556Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"CHANGELOG.md"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:13:19.968Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"CHANGELOG.md","lines_changed":["3-20"],"checkpoint_topic":"try now"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:13:36.515Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-05-01T02:15:09.953Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"yeah add a --watch so I can watch the live tail"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-05-01T02:15:11.566Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"yeah add a --watch so I can watch the live tail","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:15:36.699Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\cli.js","lines_changed":["2509-2835","3617-3619","3650-3650"],"checkpoint_topic":"yeah add a --watch so I can watch the live tail"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:16:14.200Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\cli.js","lines_changed":["2509-2936","3718-3720","3751-3751"],"checkpoint_topic":"yeah add a --watch so I can watch the live tail"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:16:40.081Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"CHANGELOG.md","lines_changed":["3-20"],"checkpoint_topic":"yeah add a --watch so I can watch the live tail"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-01T02:17:11.453Z","session_id":"4f3eac2e-db9a-485b-bc7b-8f061090be1e"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-01T02:17:13.427Z","session_id":"4f3eac2e-db9a-485b-bc7b-8f061090be1e"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-01T02:17:15.047Z","session_id":"4f3eac2e-db9a-485b-bc7b-8f061090be1e"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:17:16.562Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:17:33.068Z","tool":"read_powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:18:14.193Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-04-30T19:18:27.804Z","session_id":"watch-demo","prompt":"test","result":"injected","threads_scored":3,"threads_injected":2,"chars":1840,"est_tokens":460}
+{"type":"lazy_inject","user":"dbandaru","ts":"2026-04-30T19:18:27.815Z","session_id":"watch-demo","file":"src/auth/refresh.ts","threads_injected":1,"thread_ids":["abc12345"],"chars":730,"est_tokens":182}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:18:37.366Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:18:46.670Z","tool":"read_powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:18:57.172Z","tool":"stop_powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:19:01.164Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-05-01T02:21:02.292Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"so when weill I see how many tokens sticky note is adding?"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-05-01T02:21:03.964Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"so when weill I see how many tokens sticky note is adding?","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:21:27.803Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:21:43.623Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-05-01T02:31:53.755Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"what is the ui in the coding assistant to see the tokens?"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-05-01T02:31:55.512Z","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","prompt":"what is the ui in the coding assistant to see the tokens?","result":"no_scored_threads","threads_scored":0,"threads_injected":0,"chars":1288,"est_tokens":322}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:32:23.835Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:32:35.968Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:32:43.849Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:32:51.396Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\mcp-server.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:33:52.135Z","tool":"ask_user","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:34:05.727Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\mcp-server.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:34:08.906Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\mcp-server.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:34:22.737Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:34:37.693Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\mcp-server.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:34:55.193Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\mcp-server.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:35:13.273Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\mcp-server.js","checkpoint_topic":"what is the ui in the coding assistant to see the tokens?"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:35:53.509Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\mcp-server.js","lines_changed":["252-386"],"checkpoint_topic":"what is the ui in the coding assistant to see the tokens?"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:36:12.535Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\mcp-server.js","lines_changed":["16-16","253-387","765-786"],"checkpoint_topic":"what is the ui in the coding assistant to see the tokens?"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:36:15.948Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"bin\\mcp-server.js","lines_changed":["16-16","253-387","765-786"],"checkpoint_topic":"what is the ui in the coding assistant to see the tokens?"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:36:47.400Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:37:00.748Z","tool":"grep","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:37:08.831Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\CLAUDE.md"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:37:10.018Z","tool":"view","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\copilot-instructions.md"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:37:24.295Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\CLAUDE.md","lines_changed":["248-253"],"checkpoint_topic":"what is the ui in the coding assistant to see the tokens?"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:37:26.251Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"templates\\copilot-instructions.md","lines_changed":["29-29"],"checkpoint_topic":"what is the ui in the coding assistant to see the tokens?"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:37:44.386Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"test\\smoke.test.js","lines_changed":["212-268"],"checkpoint_topic":"what is the ui in the coding assistant to see the tokens?"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-01T02:37:59.770Z","session_id":"4f3eac2e-db9a-485b-bc7b-8f061090be1e"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-01T02:38:01.284Z","session_id":"4f3eac2e-db9a-485b-bc7b-8f061090be1e"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-01T02:38:02.446Z","session_id":"4f3eac2e-db9a-485b-bc7b-8f061090be1e"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:38:04.868Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:38:15.177Z","tool":"edit","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6","file":"CHANGELOG.md","lines_changed":["3-25"],"checkpoint_topic":"what is the ui in the coding assistant to see the tokens?"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:38:29.440Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:38:39.591Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:39:21.270Z","tool":"powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-01T02:39:26.291Z","tool":"read_powershell","session_id":"9ca35f3c-31c2-4d08-b080-a023601615f6"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-05-10T22:45:57.816Z","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","prompt":"can you commit and push this branch to the remote repo and then switch back to main"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-05-10T22:46:00.156Z","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","prompt":"can you commit and push this branch to the remote repo and then switch back to main","result":"injected","threads_scored":5,"threads_injected":5,"chars":3518,"est_tokens":879,"top_scores":[{"id":"demo-car","score":15},{"id":"demo-bob","score":13},{"id":"demo-dav","score":12},{"id":"demo-ali","score":4},{"id":"6869e313","score":1}]}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-10T22:46:33.335Z","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:46:45.063Z","tool":"report_intent","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:46:49.708Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:47:06.941Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:47:47.952Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-05-10T22:51:53.105Z","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","prompt":"can you take a look at issues 11 and 12 that have been opened and figure out a plan to fix both"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-05-10T22:51:53.911Z","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","prompt":"can you take a look at issues 11 and 12 that have been opened and figure out a plan to fix both","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"overlap_deny","user":"dbandaru","ts":"2026-05-10T22:52:34.269Z","copilot_pid":"17124"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:52:37.534Z","tool":"github-mcp-server-issue_read","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:52:38.448Z","tool":"github-mcp-server-issue_read","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:52:57.099Z","tool":"grep","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:52:58.119Z","tool":"grep","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:52:59.241Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:53:05.852Z","tool":"grep","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:53:16.069Z","tool":"grep","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:53:18.559Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:54:26.700Z","tool":"sql","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:54:27.836Z","tool":"create","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"..\\..\\..\\..\\.copilot\\session-state\\3c4f3cfd-6654-437c-a212-b3635ab13617\\plan.md","checkpoint_topic":"can you take a look at issues 11 and 12 that have been opened and figure out a plan to fix both"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-05-10T22:55:47.104Z","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","prompt":"yeah fix everything and then test if it is actually working now or tell me how me and matt can test"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-05-10T22:55:48.105Z","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","prompt":"yeah fix everything and then test if it is actually working now or tell me how me and matt can test","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:56:01.102Z","tool":"report_intent","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:56:02.303Z","tool":"view","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"templates\\hooks\\session-start.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:56:08.617Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:56:09.626Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:56:25.736Z","tool":"view","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:56:26.585Z","tool":"view","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"test\\smoke.test.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:56:34.207Z","tool":"view","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:56:44.016Z","tool":"grep","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:56:44.843Z","tool":"grep","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:56:55.981Z","tool":"view","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:57:07.718Z","tool":"grep","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:57:12.756Z","tool":"view","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"templates\\hooks\\session-start.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:57:17.748Z","tool":"grep","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T22:57:23.146Z","tool":"view","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"templates\\hooks\\session-start.js"}
+{"type":"user_prompt","user":"dbandaru","ts":"2026-05-10T23:13:11.210Z","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","prompt":"try again"}
+{"type":"inject_result","user":"dbandaru","ts":"2026-05-10T23:13:12.796Z","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","prompt":"try again","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:13:39.101Z","tool":"report_intent","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:13:40.268Z","tool":"sql","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:13:41.317Z","tool":"create","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"templates\\settings.json.new","checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:13:42.808Z","tool":"create","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"templates\\hooks.json.new","checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:13:53.701Z","tool":"edit","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"templates\\sticky-note-config.json","lines_changed":["10-11"],"checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:14:00.398Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:14:18.740Z","tool":"edit","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"bin\\cli.js","lines_changed":["86-101","104-114","117-121"],"checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:14:25.604Z","tool":"view","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:14:32.762Z","tool":"edit","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"bin\\cli.js","lines_changed":["86-101","104-114","119-119"],"checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:14:47.908Z","tool":"edit","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"bin\\cli.js","lines_changed":["86-101","104-114","119-119","671-672","675-683","687-687","690-696"],"checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:15:00.469Z","tool":"edit","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"bin\\cli.js","lines_changed":["86-101","104-114","119-119","671-672","675-683","687-687","690-696","750-750","761-761","766-769"],"checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:15:11.197Z","tool":"edit","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"bin\\cli.js","lines_changed":["86-101","104-114","119-119","671-672","675-683","687-687","690-696","750-750","761-761","766-769","1037-1040"],"checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:15:16.339Z","tool":"grep","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:15:20.721Z","tool":"view","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:15:26.598Z","tool":"edit","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"bin\\cli.js","lines_changed":["86-101","104-114","119-119","671-672","675-683","687-687","690-696","750-750","761-761","766-769","1037-1040"],"checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:15:49.219Z","tool":"edit","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"bin\\cli.js","lines_changed":["86-101","104-114","119-185","737-738","741-749","753-753","756-762","816-816","827-827","832-835","1103-1106"],"checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:16:05.290Z","tool":"edit","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"bin\\cli.js","lines_changed":["86-101","104-114","119-185","737-738","741-749","753-753","756-762","816-816","827-827","832-835","1103-1106","1267-1293"],"checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:16:18.645Z","tool":"edit","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"templates\\hooks\\session-start.js","lines_changed":["967-967","1105-1105"],"checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:16:20.237Z","tool":"edit","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"templates\\hooks\\session-start.js","lines_changed":["967-967","1105-1105"],"checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:16:41.280Z","tool":"edit","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":"templates\\hooks\\session-start.js","lines_changed":["36-87","1019-1019","1157-1157"],"checkpoint_topic":"try again"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:16:50.428Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-10T23:17:08.264Z","session_id":"86cb30ad-756d-40d1-8baa-4e625c8d3e64"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-10T23:17:09.614Z","session_id":"86cb30ad-756d-40d1-8baa-4e625c8d3e64"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-10T23:17:10.667Z","session_id":"86cb30ad-756d-40d1-8baa-4e625c8d3e64"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:17:12.293Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:17:25.764Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:17:40.604Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:18:00.438Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:18:16.292Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:18:41.049Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:18:52.380Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:19:07.624Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:19:23.874Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:19:41.588Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:20:05.020Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-10T23:20:22.349Z","session_id":"86cb30ad-756d-40d1-8baa-4e625c8d3e64"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:20:23.378Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-10T23:20:42.968Z","session_id":"86cb30ad-756d-40d1-8baa-4e625c8d3e64"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:20:43.944Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"session_start","user":"dbandaru","ts":"2026-05-10T23:21:09.521Z","session_id":"86cb30ad-756d-40d1-8baa-4e625c8d3e64"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:21:10.487Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:21:27.297Z","tool":"sql","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:21:32.215Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:21:40.758Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:22:01.166Z","tool":"powershell","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617"}
+{"type":"tool_use","user":"dbandaru","ts":"2026-05-10T23:22:12.452Z","tool":"create","session_id":"3c4f3cfd-6654-437c-a212-b3635ab13617","file":".git\\COMMIT_MSG_FIX.txt","checkpoint_topic":"try again"}
