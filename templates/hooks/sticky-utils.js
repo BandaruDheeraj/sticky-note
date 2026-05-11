@@ -57,6 +57,94 @@ function logHookError(hookName, error) {
   }
 }
 
+// Issue #14: Surface hook failures to stderr so the host tool's generic
+// "<HookName> hook error" message has actionable detail next to it. Earlier
+// versions silently swallowed `require()` failures and top-level exceptions,
+// which made stale-path issues (#13) and other crashes impossible to diagnose
+// — particularly under UserPromptSubmit, which Claude Code reports without
+// a stack trace. This helper prefixes every line with `[STICKY-NOTE]` so the
+// user can spot it in mixed hook output.
+function reportHookError(hookName, error, hint) {
+  const msg = error instanceof Error ? (error.stack || error.message) : String(error);
+  const lines = [`[STICKY-NOTE] ${hookName} hook error: ${msg}`];
+  if (hint) lines.push(`[STICKY-NOTE]   hint: ${hint}`);
+  try { process.stderr.write(lines.join("\n") + "\n"); } catch (_) { /* ignore */ }
+  try { logHookError(hookName, error); } catch (_) { /* ignore */ }
+}
+
+// Issue #13: When a teammate copies `.claude/settings.json` from another
+// machine (or runs an older sticky-note-cli that wrote absolute paths), the
+// hook commands point at non-existent absolute paths and every hook fails
+// with MODULE_NOT_FOUND. Re-running `npx sticky-note init` fixes it, but
+// users typically don't know that — they just see "<Hook> hook error" each
+// session. This helper detects and rewrites those stale commands in-place
+// the first time any hook (e.g. session-start, inject-context) successfully
+// loads, so the next session starts clean.
+//
+// The rewritten command always uses the relative form `node ".claude/hooks/<basename>"`,
+// matching what `templates/settings.json` ships today. We extract `<basename>`
+// from the existing command so we never invent hook scripts that don't exist.
+//
+// Returns the list of (hookEvent, oldCommand, newCommand) tuples that were
+// rewritten, or [] if nothing was stale.
+function selfHealHookPaths(settingsPath) {
+  const result = [];
+  try {
+    if (!settingsPath) {
+      settingsPath = path.join(process.cwd(), ".claude", "settings.json");
+    }
+    if (!fs.existsSync(settingsPath)) return result;
+
+    const raw = fs.readFileSync(settingsPath, "utf-8");
+    let settings;
+    try { settings = JSON.parse(raw); } catch (_) { return result; }
+    if (!settings || !settings.hooks) return result;
+
+    // Match the same shapes findStaleHookPaths() in bin/cli.js looks for:
+    // any absolute path inside the command string, or a $(git rev-parse ...)
+    // shell expansion that won't work on Windows / under Claude Code.
+    const STALE = /["'][A-Za-z]:[\\/]|["']\/(?:Users|home|root|tmp)\/|\$\(git rev-parse/;
+    // Match the script basename in either quoted or bare form.
+    const BASENAME = /([A-Za-z0-9_.-]+\.(?:js|sh|cjs|mjs))(?:["'`\s]|$)/;
+
+    let changed = false;
+    for (const [event, entries] of Object.entries(settings.hooks)) {
+      if (!Array.isArray(entries)) continue;
+      for (const entry of entries) {
+        for (const h of (entry && entry.hooks) || []) {
+          const cmd = h && h.command;
+          if (typeof cmd !== "string" || !STALE.test(cmd)) continue;
+          const m = cmd.match(BASENAME);
+          if (!m) continue;
+          const basename = m[1];
+          const newCmd = `node ".claude/hooks/${basename}"`;
+          result.push({ event, oldCommand: cmd, newCommand: newCmd });
+          h.command = newCmd;
+          changed = true;
+        }
+      }
+    }
+
+    if (!changed) return result;
+
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+    try {
+      const summary =
+        `[STICKY-NOTE] ⚠️  Detected ${result.length} stale absolute hook path(s) in ` +
+        `${path.relative(process.cwd(), settingsPath) || settingsPath} — rewrote to ` +
+        `relative paths so hooks work on this machine. Commit the change to share ` +
+        `the fix with your team.`;
+      process.stderr.write(summary + "\n");
+      for (const { event, oldCommand, newCommand } of result.slice(0, 5)) {
+        process.stderr.write(`[STICKY-NOTE]   ${event}: ${oldCommand} → ${newCommand}\n`);
+      }
+    } catch (_) { /* non-fatal */ }
+  } catch (err) {
+    try { logHookError("selfHealHookPaths", err); } catch (_) { /* ignore */ }
+  }
+  return result;
+}
+
 const _paths = {
   memory: "sticky-note.json",
   config: "sticky-note-config.json",
@@ -947,6 +1035,8 @@ module.exports = {
   RETRY_PATTERNS,
   FILE_PATH_PATTERN,
   logHookError,
+  reportHookError,
+  selfHealHookPaths,
   getMemoryPath,
   getConfigPath,
   getAuditPath,

@@ -1,15 +1,15 @@
 {
-  "last_seen": "2026-05-10T23:34:41.043Z",
+  "last_seen": "2026-05-11T02:53:58.815Z",
   "active_files": [
-    "bin\\mcp-server.js",
-    "templates\\CLAUDE.md",
-    "templates\\copilot-instructions.md",
-    "..\\..\\..\\..\\.copilot\\session-state\\3c4f3cfd-6654-437c-a212-b3635ab13617\\plan.md",
     "templates\\hooks\\session-start.js",
     "templates\\settings.json.new",
     "templates\\hooks.json.new",
     "templates\\sticky-note-config.json",
     "bin\\cli.js",
-    ".git\\COMMIT_MSG_FIX.txt"
+    ".git\\COMMIT_MSG_FIX.txt",
+    "templates\\settings.json",
+    "templates\\hooks\\inject-context.js",
+    "templates\\hooks\\on-stop.js",
+    "templates\\hooks\\sticky-utils.js"
   ]
 }

@@ -39,9 +39,19 @@ function _safeExit() {
 let utils;
 try {
   utils = require("./sticky-utils.js");
-} catch (_) {
+} catch (err) {
+  try {
+    process.stderr.write(
+      `[STICKY-NOTE] UserPromptSubmit hook error: failed to load sticky-utils.js — ${err.message}\n` +
+      `[STICKY-NOTE]   hint: re-run \`npx sticky-note init\` to restore .claude/hooks/.\n`
+    );
+  } catch (_) { /* ignore */ }
   _safeExit();
 }
+
+// Issue #13: also self-heal from this hook (Copilot CLI doesn't fire
+// SessionStart, so inject-context may be the first hook to run successfully).
+try { utils.selfHealHookPaths && utils.selfHealHookPaths(); } catch (_) { /* non-fatal */ }
 
 let gitNotes;
 try {
@@ -626,6 +636,9 @@ if (require.main === module) {
   try {
     main();
   } catch (exc) {
+    try {
+      utils.reportHookError("UserPromptSubmit", exc);
+    } catch (_) { /* ignore */ }
     try {
       appendAuditLine({
         type: "inject_result",

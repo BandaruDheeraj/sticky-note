@@ -88,9 +88,22 @@ function formatVersionWarning(config) {
 let utils;
 try {
   utils = require("./sticky-utils.js");
-} catch (_) {
+} catch (err) {
+  try {
+    process.stderr.write(
+      `[STICKY-NOTE] session-start hook error: failed to load sticky-utils.js — ${err.message}\n` +
+      `[STICKY-NOTE]   hint: re-run \`npx sticky-note init\` to restore .claude/hooks/.\n`
+    );
+  } catch (_) { /* ignore */ }
   _safeExit();
 }
+
+// Issue #13: self-heal stale absolute hook paths in .claude/settings.json
+// before doing anything else, so the next session loads cleanly even if some
+// other hook (e.g. on-stop, inject-context) was pointing at a path that no
+// longer exists. Failures here are non-fatal — we still want the rest of
+// session-start to run.
+try { utils.selfHealHookPaths && utils.selfHealHookPaths(); } catch (_) { /* non-fatal */ }
 
 const {
   getMemoryPath,
@@ -1170,6 +1183,8 @@ function main() {
 try {
   main();
 } catch (err) {
-  try { utils.logHookError("session-start", err); } catch (_) {}
+  try { utils.reportHookError("session-start", err); } catch (_) {
+    try { utils.logHookError("session-start", err); } catch (_) {}
+  }
   _safeExit();
 }

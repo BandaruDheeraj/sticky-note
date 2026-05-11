@@ -22,7 +22,13 @@ function safeExit() {
 let utils;
 try {
   utils = require("./sticky-utils.js");
-} catch (_) {
+} catch (err) {
+  try {
+    process.stderr.write(
+      `[STICKY-NOTE] Stop hook error: failed to load sticky-utils.js — ${err.message}\n` +
+      `[STICKY-NOTE]   hint: re-run \`npx sticky-note init\` to restore .claude/hooks/.\n`
+    );
+  } catch (_) { /* ignore */ }
   safeExit();
 }
 
@@ -285,6 +291,8 @@ async function main() {
 }
 
 main().catch((err) => {
-  try { utils.logHookError("on-stop", err); } catch (_) {}
+  try { utils.reportHookError("Stop", err); } catch (_) {
+    try { utils.logHookError("on-stop", err); } catch (_) {}
+  }
   safeExit();
 });
