@@ -1,7 +1,6 @@
 {
-  "last_seen": "2026-05-11T02:53:58.815Z",
+  "last_seen": "2026-05-11T02:55:57.422Z",
   "active_files": [
-    "templates\\hooks\\session-start.js",
     "templates\\settings.json.new",
     "templates\\hooks.json.new",
     "templates\\sticky-note-config.json",
@@ -10,6 +9,7 @@
     "templates\\settings.json",
     "templates\\hooks\\inject-context.js",
     "templates\\hooks\\on-stop.js",
-    "templates\\hooks\\sticky-utils.js"
+    "templates\\hooks\\sticky-utils.js",
+    ".github\\workflows\\publish.yml"
   ]
 }
