@@ -774,7 +774,7 @@ function commitAndPushDataBranch() {
     const remote = dataBranch.getDefaultRemote();
     if (remote) {
       const pushResult = dataBranch.pushDataBranch(
-        remote, dataBranch.DATA_BRANCH, 3, getMemoryPath(), null, null
+        remote, dataBranch.DATA_BRANCH, 3, getMemoryPath(), loadJson, saveJson
       );
       if (!pushResult.ok) {
         process.stderr.write(

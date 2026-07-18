@@ -182,13 +182,16 @@ function pushDataBranch(remote, branchName, maxRetries, localMemPath, loadJsonFn
       if (attempt === maxRetries) {
         return { ok: false, error: err.message };
       }
-      // Push rejected — fetch, merge, rebuild local branch, retry
+      // Push rejected — fetch, merge, re-commit merged result, then retry
       try {
         const fetchResult = fetchDataBranch(remote, branchName);
-        if (fetchResult.ok && fetchResult.remoteRef && localMemPath && loadJsonFn && saveJsonFn) {
+        if (fetchResult.ok && fetchResult.remoteRef && localMemPath) {
           const remoteContent = readFileFromBranch(fetchResult.remoteRef, "sticky-note.json");
           if (remoteContent) {
             mergeAndSaveFromRemote(localMemPath, remoteContent, loadJsonFn, saveJsonFn);
+            // Re-commit the merged file so the retry push advances the ref
+            const mergedContent = fs.readFileSync(localMemPath, "utf-8");
+            commitFilesToBranch(branchName, { "sticky-note.json": mergedContent });
           }
         }
       } catch (_) {}
