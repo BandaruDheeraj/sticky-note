@@ -534,6 +534,58 @@ try {
     assert.ok(found, "remote thread should be merged into local memory after session-start");
   });
 
+  run("session-end: commits local data to sticky-note/data branch", () => {
+    const { execFileSync: exec2 } = require("child_process");
+    const utils = require(path.join(tmpDir, ".claude", "hooks", "sticky-utils.js"));
+
+    // Write a known thread to local memory
+    const thread = {
+      id: "session-end-test-thread",
+      user: "dheer",
+      status: "open",
+      branch: "main",
+      created_at: new Date().toISOString(),
+      last_activity_at: new Date().toISOString(),
+      files_touched: [],
+      narrative: "test session end commit",
+    };
+    const memory = { version: "2", project: "", threads: [thread] };
+    const memPath = utils.getMemoryPath();
+    fs.mkdirSync(path.dirname(memPath), { recursive: true });
+    fs.writeFileSync(memPath, JSON.stringify(memory, null, 2) + "\n", "utf-8");
+
+    // Create an empty transcript file so session-end doesn't have to handle missing file
+    const transcriptPath = path.join(tmpDir, "transcript.jsonl");
+    if (!fs.existsSync(transcriptPath)) {
+      fs.writeFileSync(transcriptPath, "", "utf-8");
+    }
+
+    // Run session-end
+    exec2(
+      process.execPath,
+      [path.join(tmpDir, ".claude", "hooks", "session-end.js")],
+      {
+        encoding: "utf-8", timeout: 15000,
+        cwd: tmpDir,
+        env: { ...process.env, HOME: tmpDir, USERPROFILE: tmpDir },
+        input: JSON.stringify({
+          hook_event_name: "SessionEnd",
+          session_id: "test-session-end",
+          transcript_path: transcriptPath,
+        }),
+        stdio: ["pipe", "pipe", "pipe"],
+      }
+    );
+
+    // Verify sticky-note/data branch contains the thread
+    const { readFileFromBranch } = require(path.join(tmpDir, ".claude", "hooks", "data-branch.js"));
+    const branchContent = readFileFromBranch("refs/heads/sticky-note/data", "sticky-note.json");
+    assert.ok(branchContent, "data branch should have sticky-note.json after session-end");
+    const branchMemory = JSON.parse(branchContent);
+    const found = (branchMemory.threads || []).find(t => t.id === "session-end-test-thread");
+    assert.ok(found, "data branch should contain the session thread");
+  });
+
 } finally {
   cleanup();
 }
