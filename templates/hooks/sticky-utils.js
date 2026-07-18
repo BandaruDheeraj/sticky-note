@@ -38,8 +38,16 @@ const FILE_PATH_PATTERN = /[\w./\\-]+\.\w{1,10}/g;
 // ── Path helpers ──────────────────────────────────────────
 
 function _stickyDir() {
-  const scriptDir = path.dirname(path.resolve(__filename));
-  return path.join(scriptDir, "..", "..", ".sticky-note");
+  try {
+    const gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    return path.resolve(gitDir, "sticky-note");
+  } catch (_) {
+    // Fallback for non-git environments (e.g., unit tests without git init)
+    const scriptDir = path.dirname(path.resolve(__filename));
+    return path.join(scriptDir, "..", "..", ".sticky-note");
+  }
 }
 
 // ── Error logging ─────────────────────────────────────────
@@ -81,9 +89,11 @@ function reportHookError(hookName, error, hint) {
 // the first time any hook (e.g. session-start, inject-context) successfully
 // loads, so the next session starts clean.
 //
-// The rewritten command always uses the relative form `node ".claude/hooks/<basename>"`,
-// matching what `templates/settings.json` ships today. We extract `<basename>`
-// from the existing command so we never invent hook scripts that don't exist.
+// The rewritten command uses `npx sticky-note run-hook <basename>` which walks
+// up the directory tree to find `.claude/hooks/<basename>.js`, so it works even
+// when Claude Code is launched from a subdirectory of the project root.
+// We extract `<basename>` from the existing command so we never invent hook
+// scripts that don't exist.
 //
 // Returns the list of (hookEvent, oldCommand, newCommand) tuples that were
 // rewritten, or [] if nothing was stale.
@@ -100,12 +110,15 @@ function selfHealHookPaths(settingsPath) {
     try { settings = JSON.parse(raw); } catch (_) { return result; }
     if (!settings || !settings.hooks) return result;
 
-    // Match the same shapes findStaleHookPaths() in bin/cli.js looks for:
-    // any absolute path inside the command string, or a $(git rev-parse ...)
-    // shell expansion that won't work on Windows / under Claude Code.
-    const STALE = /["'][A-Za-z]:[\\/]|["']\/(?:Users|home|root|tmp)\/|\$\(git rev-parse/;
+    // Two stale patterns:
+    // 1. Absolute paths (written by older sticky-note-cli or copied from another machine)
+    // 2. Old relative form `node ".claude/hooks/foo.js"` — fails when Claude Code
+    //    launches from a subdirectory, because the path resolves relative to the
+    //    launch cwd, not the directory containing .claude/settings.json.
+    const STALE_ABSOLUTE = /["'][A-Za-z]:[\\/]|["']\/(?:Users|home|root|tmp)\/|\$\(git rev-parse/;
+    const STALE_RELATIVE = /^node\s+["']\.claude[\\/]hooks[\\/][^"']+\.js["']\s*$/;
     // Match the script basename in either quoted or bare form.
-    const BASENAME = /([A-Za-z0-9_.-]+\.(?:js|sh|cjs|mjs))(?:["'`\s]|$)/;
+    const BASENAME = /([A-Za-z0-9_.-]+)\.(?:js|sh|cjs|mjs)(?:["'`\s]|$)/;
 
     let changed = false;
     for (const [event, entries] of Object.entries(settings.hooks)) {
@@ -113,11 +126,13 @@ function selfHealHookPaths(settingsPath) {
       for (const entry of entries) {
         for (const h of (entry && entry.hooks) || []) {
           const cmd = h && h.command;
-          if (typeof cmd !== "string" || !STALE.test(cmd)) continue;
+          if (typeof cmd !== "string") continue;
+          const isStale = STALE_ABSOLUTE.test(cmd) || STALE_RELATIVE.test(cmd);
+          if (!isStale) continue;
           const m = cmd.match(BASENAME);
           if (!m) continue;
           const basename = m[1];
-          const newCmd = `node ".claude/hooks/${basename}"`;
+          const newCmd = `npx sticky-note run-hook ${basename}`;
           result.push({ event, oldCommand: cmd, newCommand: newCmd });
           h.command = newCmd;
           changed = true;
@@ -130,10 +145,10 @@ function selfHealHookPaths(settingsPath) {
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
     try {
       const summary =
-        `[STICKY-NOTE] ⚠️  Detected ${result.length} stale absolute hook path(s) in ` +
+        `[STICKY-NOTE] ⚠️  Detected ${result.length} stale hook path(s) in ` +
         `${path.relative(process.cwd(), settingsPath) || settingsPath} — rewrote to ` +
-        `relative paths so hooks work on this machine. Commit the change to share ` +
-        `the fix with your team.`;
+        `"npx sticky-note run-hook <name>" so hooks work from any subdirectory. ` +
+        `Commit the change to share the fix with your team.`;
       process.stderr.write(summary + "\n");
       for (const { event, oldCommand, newCommand } of result.slice(0, 5)) {
         process.stderr.write(`[STICKY-NOTE]   ${event}: ${oldCommand} → ${newCommand}\n`);
@@ -1108,5 +1123,10 @@ module.exports = {
   rotateBackup,
   acquireLock,
   releaseLock,
+  // Cloud sync stubs (feature not yet implemented — on-stop.js uses these)
+  useCloud: () => false,
+  cloudReadThreads: async () => null,
+  cloudWriteThread: async () => {},
+  cloudAppendAudit: async () => {},
 };
 // tier1 test

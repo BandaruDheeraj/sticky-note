@@ -433,6 +433,18 @@ try {
     assert.ok(content.includes("get_environment_status"), "copilot-instructions.md should mention get_environment_status tool");
   });
 
+  run("_stickyDir() points to .git/sticky-note/", () => {
+    // Require sticky-utils from the installed hooks dir (set up by setupStickyNote)
+    const utils = require(path.join(tmpDir, ".claude", "hooks", "sticky-utils.js"));
+    const memPath = utils.getMemoryPath();
+    const expected = path.join(tmpDir, ".git", "sticky-note", "sticky-note.json");
+    assert.strictEqual(
+      path.normalize(memPath),
+      path.normalize(expected),
+      `Expected ${expected}, got ${memPath}`
+    );
+  });
+
 } finally {
   cleanup();
 }
