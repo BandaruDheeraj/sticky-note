@@ -29,9 +29,18 @@ try {
   _safeExit();
 }
 
+let dataBranch;
+try {
+  dataBranch = require("./data-branch.js");
+} catch (_) {
+  dataBranch = null;
+}
+
 const {
   getMemoryPath,
   getConfigPath,
+  getAuditDir,
+  getPresenceDir,
   getUserPresencePath,
   getAllAuditPaths,
   loadJson,
@@ -724,6 +733,63 @@ function clearPresence(user) {
   }
 }
 
+// ── Data-branch commit/push ───────────────────────────────
+
+function commitAndPushDataBranch() {
+  if (!dataBranch) return;
+  try {
+    const fileMap = {};
+
+    // Collect sticky-note.json
+    const memPath = getMemoryPath();
+    if (fs.existsSync(memPath)) {
+      fileMap["sticky-note.json"] = fs.readFileSync(memPath, "utf-8");
+    }
+
+    // Collect audit files
+    const auditDir = getAuditDir ? getAuditDir() : null;
+    if (auditDir && fs.existsSync(auditDir)) {
+      for (const file of fs.readdirSync(auditDir)) {
+        if (file.endsWith(".jsonl")) {
+          fileMap["audit/" + file] = fs.readFileSync(path.join(auditDir, file), "utf-8");
+        }
+      }
+    }
+
+    // Collect presence files
+    const presDir = getPresenceDir ? getPresenceDir() : null;
+    if (presDir && fs.existsSync(presDir)) {
+      for (const file of fs.readdirSync(presDir)) {
+        if (file.endsWith(".json")) {
+          fileMap["presence/" + file] = fs.readFileSync(path.join(presDir, file), "utf-8");
+        }
+      }
+    }
+
+    if (Object.keys(fileMap).length === 0) return;
+
+    dataBranch.commitFilesToBranch(dataBranch.DATA_BRANCH, fileMap);
+
+    // Push (non-blocking — failure is logged but doesn't prevent session exit)
+    const remote = dataBranch.getDefaultRemote();
+    if (remote) {
+      const pushResult = dataBranch.pushDataBranch(
+        remote, dataBranch.DATA_BRANCH, 3, getMemoryPath(), null, null
+      );
+      if (!pushResult.ok) {
+        process.stderr.write(
+          "[STICKY-NOTE] warning: failed to push data branch — " + pushResult.error + "\n" +
+          "[STICKY-NOTE] your data is safe locally in .git/sticky-note/\n"
+        );
+      }
+    }
+  } catch (err) {
+    process.stderr.write(
+      "[STICKY-NOTE] warning: data branch sync failed — " + err.message + "\n"
+    );
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────
 
 function main() {
@@ -937,14 +1003,17 @@ function main() {
   saveMemoryMerged(memoryPath, memory);
 
   // Auto-sync: commit (and optionally push) .sticky-note/ changes
-  const config = loadJson(getConfigPath(), {});
-  if (config.auto_sync !== false) {
+  const syncConfig = loadJson(getConfigPath(), {});
+  if (syncConfig.auto_sync !== false) {
     try {
-      syncStickyNote({ push: config.auto_push === true });
+      syncStickyNote({ push: syncConfig.auto_push === true });
     } catch (_) {
       // Non-fatal — sync failure shouldn't block session-end
     }
   }
+
+  // Commit current data to sticky-note/data branch and push
+  commitAndPushDataBranch();
 
   const fileCount = filesTouched.length;
   const commitCount = commitShas.length;

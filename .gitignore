@@ -1,4 +1,7 @@
 
+# Sticky Note - data moved to sticky-note/data branch (.git/sticky-note/ cache)
+.sticky-note/
+
 # Secrets — never commit
 .env
 

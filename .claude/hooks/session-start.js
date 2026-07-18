@@ -33,11 +33,85 @@ function _safeExit() {
   process.exit(0);
 }
 
+// Issue #12: warn (non-blocking) when the running CLI is below the project's
+// configured min_version. Returns "" when nothing to say. Also writes a
+// stderr banner so the user sees it directly even if the hook output is
+// swallowed by the host tool.
+function _parseSemver(v) {
+  if (typeof v !== "string") return null;
+  const m = v.trim().replace(/^v/, "").match(/^(\d+)\.(\d+)(?:\.(\d+))?/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3] || 0)];
+}
+function _cmpSemver(a, b) {
+  const pa = _parseSemver(a), pb = _parseSemver(b);
+  if (!pa || !pb) return 0;
+  for (let i = 0; i < 3; i++) {
+    if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1;
+  }
+  return 0;
+}
+function _installedCliVersion() {
+  // Try the package.json shipped alongside this hook script's CLI.
+  try {
+    const candidates = [
+      path.join(__dirname, "..", "..", "package.json"),
+      path.join(__dirname, "..", "..", "..", "sticky-note-cli", "package.json"),
+    ];
+    for (const p of candidates) {
+      try {
+        const pkg = JSON.parse(require("fs").readFileSync(p, "utf-8"));
+        if (pkg && pkg.name === "sticky-note-cli" && pkg.version) return pkg.version;
+      } catch (_) { /* try next */ }
+    }
+  } catch (_) { /* ignore */ }
+  return null;
+}
+function formatVersionWarning(config) {
+  try {
+    const min = config && config.min_version;
+    if (!min) return "";
+    const installed = _installedCliVersion();
+    if (!installed) return "";
+    if (_cmpSemver(installed, min) >= 0) return "";
+    const msg =
+      `[STICKY-NOTE] ⚠️ Installed sticky-note-cli v${installed} is below ` +
+      `this project's min_version v${min}. Run \`npm i -D sticky-note-cli@latest\` ` +
+      `to update — features and schema may differ until you do.`;
+    try { process.stderr.write(msg + "\n"); } catch (_) { /* non-fatal */ }
+    return msg;
+  } catch (_) {
+    return "";
+  }
+}
+
 let utils;
 try {
   utils = require("./sticky-utils.js");
-} catch (_) {
+} catch (err) {
+  try {
+    process.stderr.write(
+      `[STICKY-NOTE] session-start hook error: failed to load sticky-utils.js — ${err.message}\n` +
+      `[STICKY-NOTE]   hint: re-run \`npx sticky-note init\` to restore .claude/hooks/.\n`
+    );
+  } catch (_) { /* ignore */ }
   _safeExit();
+}
+
+// Issue #13: self-heal stale absolute hook paths in .claude/settings.json
+// before doing anything else, so the next session loads cleanly even if some
+// other hook (e.g. on-stop, inject-context) was pointing at a path that no
+// longer exists. Failures here are non-fatal — we still want the rest of
+// session-start to run.
+try { utils.selfHealHookPaths && utils.selfHealHookPaths(); } catch (_) { /* non-fatal */ }
+
+// Load data-branch module non-fatally — if missing, data-branch sync is
+// disabled for this session rather than crashing the hook.
+let dataBranch;
+try {
+  dataBranch = require("./data-branch.js");
+} catch (_) {
+  dataBranch = null; // non-fatal — data branch sync disabled
 }
 
 const {
@@ -62,6 +136,7 @@ const {
   clearActiveResumeThreadId,
   getActiveResumeThreadId,
   normalizeSep,
+  detectLostThreads,
 } = utils;
 
 // ── Stale-thread ageing ───────────────────────────────────
@@ -490,6 +565,393 @@ function formatOverlapWarnings(threads, currentUser, memory) {
   return lines.join("\n");
 }
 
+// ── MCP Server Auto-Registration ──────────────────────────
+
+// ── Backward compatibility migration ─────────────────────
+// Migrates old sticky-note-config.json arrays (mcp_servers, skills)
+// to the new .sticky-note/environment/ manifest format.
+function migrateOldEnvironmentConfig() {
+  const fs = require("fs");
+  const cwd = process.cwd();
+  const configPath = getConfigPath();
+  const config = loadJson(configPath, null);
+  if (!config) return;
+
+  // Only run once — skip if already migrated
+  if (config.environment_version) return;
+
+  const envDir = path.join(cwd, ".sticky-note", "environment");
+  const manifestPath = path.join(envDir, "manifest.json");
+
+  let changed = false;
+
+  // Migrate mcp_servers array to manifest.json keyed format
+  if (Array.isArray(config.mcp_servers) && config.mcp_servers.length > 0) {
+    fs.mkdirSync(envDir, { recursive: true });
+    const manifest = loadJson(manifestPath, { version: "1", mcp_servers: {} });
+    if (!manifest.mcp_servers) manifest.mcp_servers = {};
+    for (const entry of config.mcp_servers) {
+      if (!entry || !entry.name) continue;
+      if (manifest.mcp_servers[entry.name]) continue; // already present
+      const def = {};
+      if (entry.type) def.type = entry.type;
+      if (entry.command) def.command = entry.command;
+      if (entry.args) def.args = entry.args;
+      if (entry.env) def.env = entry.env;
+      manifest.mcp_servers[entry.name] = def;
+    }
+    saveJson(manifestPath, manifest);
+    changed = true;
+  }
+
+  // Migrate skills array to placeholder .md files
+  if (Array.isArray(config.skills) && config.skills.length > 0) {
+    const skillsDir = path.join(envDir, "skills");
+    fs.mkdirSync(skillsDir, { recursive: true });
+    for (const skill of config.skills) {
+      if (!skill || typeof skill !== "string") continue;
+      const skillFile = path.join(skillsDir, skill + ".md");
+      if (fs.existsSync(skillFile)) continue;
+      fs.writeFileSync(skillFile, `# ${skill}\n\nTODO: Add skill instructions here.\n`, "utf-8");
+    }
+    changed = true;
+  }
+
+  if (changed) {
+    config.environment_version = "1";
+    saveJson(configPath, config);
+  }
+}
+
+function ensureMcpServerRegistered() {
+  try {
+    const fs = require("fs");
+    const cwd = process.env.STICKY_CWD || process.cwd();
+    const mcpPath = path.join(cwd, ".mcp.json");
+
+    let mcp = {};
+    if (fs.existsSync(mcpPath)) {
+      try {
+        mcp = JSON.parse(fs.readFileSync(mcpPath, "utf-8"));
+      } catch (_) {
+        mcp = {};
+      }
+    }
+
+    mcp.mcpServers = mcp.mcpServers || {};
+    if (!mcp.mcpServers["sticky-note"]) {
+      mcp.mcpServers["sticky-note"] = {
+        type: "stdio",
+        command: "npx",
+        args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
+      };
+      fs.writeFileSync(mcpPath, JSON.stringify(mcp, null, 2) + "\n");
+    }
+
+    // Also register in Copilot CLI's ~/.copilot/mcp-config.json
+    try {
+      const utils = require("./sticky-utils");
+      utils.ensureMcpInCopilotCliConfig("sticky-note", {
+        type: "stdio",
+        command: "npx",
+        args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
+        tools: ["*"],
+      });
+    } catch (_) {
+      // sticky-utils not available — inline fallback
+      const home = process.env.COPILOT_HOME || path.join(process.env.HOME || process.env.USERPROFILE || "", ".copilot");
+      if (home && fs.existsSync(home)) {
+        const copilotMcpPath = path.join(home, "mcp-config.json");
+        let copilotMcp = {};
+        try { copilotMcp = JSON.parse(fs.readFileSync(copilotMcpPath, "utf-8")); } catch (_) {}
+        copilotMcp.mcpServers = copilotMcp.mcpServers || {};
+        if (!copilotMcp.mcpServers["sticky-note"]) {
+          copilotMcp.mcpServers["sticky-note"] = {
+            type: "stdio",
+            command: "npx",
+            args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
+            tools: ["*"],
+          };
+          fs.writeFileSync(copilotMcpPath, JSON.stringify(copilotMcp, null, 2) + "\n");
+        }
+      }
+    }
+  } catch (_) {
+    // Non-fatal — MCP server registration is best-effort
+  }
+}
+
+// ── Environment provisioning ──────────────────────────────
+
+function hasEnvPlaceholders(obj) {
+  if (obj == null) return false;
+  if (typeof obj === "string") return obj.includes("${");
+  if (Array.isArray(obj)) return obj.some(hasEnvPlaceholders);
+  if (typeof obj === "object") {
+    return Object.values(obj).some(hasEnvPlaceholders);
+  }
+  return false;
+}
+
+function ensureEnvironmentProvisioned() {
+  const fs = require("fs");
+  const cwd = process.cwd();
+  const envDir = path.join(cwd, ".sticky-note", "environment");
+  const hashFile = path.join(cwd, ".sticky-note", ".env-provision-hash");
+  const debug = !!process.env.STICKY_DEBUG;
+
+  if (!fs.existsSync(envDir)) return;
+
+  // Hash all files in .sticky-note/environment/ recursively
+  function hashDir(dir) {
+    const hash = crypto.createHash("sha256");
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return hash; }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const ent of entries) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        hash.update("d:" + ent.name + "\n");
+        hash.update(hashDir(full).digest());
+      } else if (ent.isFile()) {
+        hash.update("f:" + ent.name + "\n");
+        try { hash.update(fs.readFileSync(full)); } catch (_) { /* skip */ }
+      }
+    }
+    return hash;
+  }
+
+  const currentHash = hashDir(envDir).digest("hex");
+
+  // Skip if hash matches (idempotent)
+  try {
+    const stored = fs.readFileSync(hashFile, "utf-8").trim();
+    if (stored === currentHash) {
+      if (debug) process.stderr.write("[sticky-note] environment unchanged, skipping provisioning\n");
+      return;
+    }
+  } catch (_) { /* no hash file yet */ }
+
+  if (debug) process.stderr.write("[sticky-note] provisioning team environment...\n");
+
+  const manifest = loadJson(path.join(envDir, "manifest.json"), {});
+
+  // ── MCP server provisioning (secret-free only) ──
+  const mcpServers = manifest.mcp_servers || {};
+  if (Object.keys(mcpServers).length > 0) {
+    const mcpPath = path.join(cwd, ".mcp.json");
+    const mcpConfig = loadJson(mcpPath, { mcpServers: {} });
+    if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
+    let mcpChanged = false;
+    for (const [name, serverDef] of Object.entries(mcpServers)) {
+      if (mcpConfig.mcpServers[name]) continue; // already present
+      if (hasEnvPlaceholders(serverDef)) {
+        if (debug) process.stderr.write(`[sticky-note] skipping MCP server "${name}" (has placeholders)\n`);
+        continue;
+      }
+      mcpConfig.mcpServers[name] = serverDef;
+      mcpChanged = true;
+      if (debug) process.stderr.write(`[sticky-note] added MCP server "${name}"\n`);
+    }
+    if (mcpChanged) saveJson(mcpPath, mcpConfig);
+
+    // Also provision secret-free MCP servers to Copilot CLI's config
+    try {
+      const utils = require("./sticky-utils");
+      for (const [name, serverDef] of Object.entries(mcpServers)) {
+        if (hasEnvPlaceholders(serverDef)) continue;
+        utils.ensureMcpInCopilotCliConfig(name, serverDef);
+      }
+    } catch (_) { /* sticky-utils not available — skip Copilot CLI provisioning */ }
+  }
+
+  // ── Skill provisioning ──
+  const skillsDir = path.join(envDir, "skills");
+  if (fs.existsSync(skillsDir)) {
+    let skillFiles;
+    try { skillFiles = fs.readdirSync(skillsDir).filter((f) => f.endsWith(".md")); } catch (_) { skillFiles = []; }
+    for (const file of skillFiles) {
+      const name = path.basename(file, ".md");
+      const content = fs.readFileSync(path.join(skillsDir, file), "utf-8");
+
+      // Claude Code format
+      const claudeSkillDir = path.join(cwd, ".claude", "plugins", "sticky-note-team", "skills", name);
+      fs.mkdirSync(claudeSkillDir, { recursive: true });
+      fs.writeFileSync(path.join(claudeSkillDir, "SKILL.md"), content, "utf-8");
+
+      // Copilot CLI format
+      const copilotSkillDir = path.join(cwd, ".github", "extensions", "sticky-note-team", "skills");
+      fs.mkdirSync(copilotSkillDir, { recursive: true });
+      fs.writeFileSync(path.join(copilotSkillDir, name + ".md"), content, "utf-8");
+    }
+  }
+
+  // Auto-generate plugin.json for Claude Code
+  const pluginJsonDir = path.join(cwd, ".claude", "plugins", "sticky-note-team", ".claude-plugin");
+  fs.mkdirSync(pluginJsonDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(pluginJsonDir, "plugin.json"),
+    JSON.stringify({
+      name: "sticky-note-team",
+      version: "1.0.0",
+      description: "Team skills, agents, and commands provisioned by sticky-note",
+    }, null, 2) + "\n",
+    "utf-8"
+  );
+
+  // Auto-generate extension.mjs for Copilot CLI
+  const extDir = path.join(cwd, ".github", "extensions", "sticky-note-team");
+  fs.mkdirSync(extDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(extDir, "extension.mjs"),
+    [
+      "// Auto-generated by sticky-note environment provisioning",
+      "export default {",
+      '  name: "sticky-note-team",',
+      '  version: "1.0.0",',
+      '  description: "Team skills, agents, and commands provisioned by sticky-note",',
+      "};",
+      "",
+    ].join("\n"),
+    "utf-8"
+  );
+  fs.writeFileSync(
+    path.join(extDir, "package.json"),
+    JSON.stringify({
+      name: "sticky-note-team",
+      version: "1.0.0",
+      description: "Team skills, agents, and commands provisioned by sticky-note",
+      type: "module",
+      main: "extension.mjs",
+    }, null, 2) + "\n",
+    "utf-8"
+  );
+
+  // ── Agent provisioning ──
+  const agentsDir = path.join(envDir, "agents");
+  if (fs.existsSync(agentsDir)) {
+    let agentFiles;
+    try { agentFiles = fs.readdirSync(agentsDir).filter((f) => f.endsWith(".md")); } catch (_) { agentFiles = []; }
+    for (const file of agentFiles) {
+      const name = path.basename(file, ".md");
+      const content = fs.readFileSync(path.join(agentsDir, file), "utf-8");
+
+      const claudeAgentDir = path.join(cwd, ".claude", "plugins", "sticky-note-team", "agents");
+      fs.mkdirSync(claudeAgentDir, { recursive: true });
+      fs.writeFileSync(path.join(claudeAgentDir, name + ".md"), content, "utf-8");
+
+      const copilotAgentDir = path.join(cwd, ".github", "extensions", "sticky-note-team", "agents");
+      fs.mkdirSync(copilotAgentDir, { recursive: true });
+      fs.writeFileSync(path.join(copilotAgentDir, name + ".md"), content, "utf-8");
+    }
+  }
+
+  // ── Command provisioning ──
+  const commandsDir = path.join(envDir, "commands");
+  if (fs.existsSync(commandsDir)) {
+    let commandFiles;
+    try { commandFiles = fs.readdirSync(commandsDir).filter((f) => f.endsWith(".md")); } catch (_) { commandFiles = []; }
+    for (const file of commandFiles) {
+      const name = path.basename(file, ".md");
+      const content = fs.readFileSync(path.join(commandsDir, file), "utf-8");
+
+      const claudeCmdDir = path.join(cwd, ".claude", "plugins", "sticky-note-team", "commands");
+      fs.mkdirSync(claudeCmdDir, { recursive: true });
+      fs.writeFileSync(path.join(claudeCmdDir, name + ".md"), content, "utf-8");
+
+      const copilotCmdDir = path.join(cwd, ".github", "extensions", "sticky-note-team", "commands");
+      fs.mkdirSync(copilotCmdDir, { recursive: true });
+      fs.writeFileSync(path.join(copilotCmdDir, name + ".md"), content, "utf-8");
+    }
+  }
+
+  // ── Permission merging ──
+  const permissions = manifest.permissions;
+  if (Array.isArray(permissions) && permissions.length > 0) {
+    const settingsPath = path.join(cwd, ".claude", "settings.local.json");
+    const settings = loadJson(settingsPath, {});
+    if (!Array.isArray(settings.allowedTools)) settings.allowedTools = [];
+    let permChanged = false;
+    for (const perm of permissions) {
+      if (!settings.allowedTools.includes(perm)) {
+        settings.allowedTools.push(perm);
+        permChanged = true;
+      }
+    }
+    if (permChanged) saveJson(settingsPath, settings);
+  }
+
+  // Write provision hash after all provisioning succeeds
+  fs.mkdirSync(path.dirname(hashFile), { recursive: true });
+  fs.writeFileSync(hashFile, currentHash + "\n", "utf-8");
+
+  if (debug) process.stderr.write("[sticky-note] environment provisioning complete\n");
+}
+
+// ── Data branch fetch-and-merge ───────────────────────────
+
+/**
+ * Fetches the remote sticky-note/data branch (if a remote exists) and merges
+ * thread data into the local memory file. Also always reads from the LOCAL
+ * data branch (refs/heads/sticky-note/data), which covers:
+ *   (a) fresh clones after `npx sticky-note init`
+ *   (b) offline / no-remote repos
+ *   (c) smoke tests that commit data locally without a remote
+ *
+ * Failures are non-blocking — the session continues with whatever local data
+ * is already in the memory file.
+ */
+function fetchAndMergeDataBranch() {
+  if (!dataBranch) return;
+  try {
+    const remote = dataBranch.getDefaultRemote();
+
+    if (remote) {
+      // Attempt to fetch from the remote data branch
+      const fetchResult = dataBranch.fetchDataBranch(remote);
+      if (!fetchResult.ok) {
+        process.stderr.write(
+          "[STICKY-NOTE] offline — using local thread cache (" +
+            (fetchResult.error || "fetch failed") +
+            ")\n"
+        );
+      } else if (fetchResult.remoteRef) {
+        const remoteContent = dataBranch.readFileFromBranch(
+          fetchResult.remoteRef,
+          "sticky-note.json"
+        );
+        if (remoteContent) {
+          dataBranch.mergeAndSaveFromRemote(
+            getMemoryPath(),
+            remoteContent,
+            loadJson,
+            saveJson
+          );
+        }
+      }
+    }
+
+    // Always merge from local data branch — covers fresh clone and test harness
+    const localContent = dataBranch.readFileFromBranch(
+      dataBranch.DATA_REF,
+      "sticky-note.json"
+    );
+    if (localContent) {
+      dataBranch.mergeAndSaveFromRemote(
+        getMemoryPath(),
+        localContent,
+        loadJson,
+        saveJson
+      );
+    }
+  } catch (err) {
+    // Non-blocking — session continues with local data
+    process.stderr.write(
+      "[STICKY-NOTE] offline — using local thread cache (" + err.message + ")\n"
+    );
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────
 
 function main() {
@@ -502,6 +964,9 @@ function main() {
   } catch (_) {
     hookInput = {};
   }
+
+  // Fetch remote data branch and merge into local cache — before reading memory
+  fetchAndMergeDataBranch();
 
   let sessionId = getSessionId(hookInput);
   const aiTool = detectTool(hookInput);
@@ -523,12 +988,35 @@ function main() {
   // Migrate legacy single-file audit/presence to per-user dirs
   migrateAuditAndPresence();
 
+  // Migrate old config arrays to environment directory format
+  try { migrateOldEnvironmentConfig(); } catch (_) { /* migration must not break session */ }
+
+  // Auto-provision team environment from .sticky-note/environment/
+  try { ensureEnvironmentProvisioned(); } catch (_) { /* provisioning must not break session */ }
+
+  // Auto-register sticky-note MCP server in .mcp.json
+  ensureMcpServerRegistered();
+
   const memoryPath = getMemoryPath();
   const memory = loadJson(memoryPath, {
     version: "2",
     project: "",
     threads: [],
   });
+
+  // Rollback detection: warn if threads went missing (e.g., after git reset)
+  try {
+    const lost = detectLostThreads(memoryPath);
+    if (lost.length > 0) {
+      const ids = lost.slice(0, 5).map((t) => t.id).join(", ");
+      const extra = lost.length > 5 ? ` (+${lost.length - 5} more)` : "";
+      process.stderr.write(
+        `[sticky-note] ⚠️  ${lost.length} thread(s) missing since last backup: ${ids}${extra}\n` +
+        `[sticky-note] This may indicate a git rollback. Run 'npx sticky-note status' to inspect.\n`
+      );
+    }
+  } catch (_) { /* rollback detection must not break session */ }
+
   const config = loadJson(getConfigPath(), { stale_days: 14 });
   const staleDays = config.stale_days != null ? config.stale_days : 14;
   const autoCloseHours =
@@ -617,6 +1105,7 @@ function main() {
   const overlapContext = formatOverlapWarnings(
     (memory.threads || []).filter(Boolean), getUser(), memory
   );
+  const versionWarning = formatVersionWarning(config);
 
   // V2.5: Mark eagerly-injected stuck threads so PreToolUse won't re-inject.
   // Skip for Copilot CLI — its sessionStart output is not surfaced to the AI,
@@ -754,6 +1243,7 @@ function main() {
   }
 
   // Overlap warning comes first — most urgent signal
+  if (versionWarning) parts.push(versionWarning);
   if (overlapContext) parts.push(overlapContext);
 
   if (threadContext) parts.push(threadContext);
@@ -769,6 +1259,8 @@ function main() {
 try {
   main();
 } catch (err) {
-  try { utils.logHookError("session-start", err); } catch (_) {}
+  try { utils.reportHookError("session-start", err); } catch (_) {
+    try { utils.logHookError("session-start", err); } catch (_) {}
+  }
   _safeExit();
 }
