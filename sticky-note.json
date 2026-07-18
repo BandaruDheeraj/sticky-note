@@ -1,0 +1,650 @@
+{
+  "version": "2",
+  "project": "",
+  "claims": [],
+  "threads": [
+    {
+      "id": "6869e313-b4fa-4f20-b894-c72da6265c8e",
+      "user": "dbandaru",
+      "project": "",
+      "status": "closed",
+      "branch": "master",
+      "created_at": "2026-04-10T23:14:20.995Z",
+      "closed_at": "2026-04-13T21:25:13.814Z",
+      "last_activity_at": "2026-04-10T23:14:20.997Z",
+      "files_touched": [],
+      "last_note": "",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "25f34572-e3a0-4983-b475-a49e9ea3ba5b",
+      "work_type": "",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": [],
+      "contributors": [
+        "dbandaru"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "demo-grant-search-perf",
+      "user": "grantharris",
+      "project": "",
+      "status": "stale",
+      "branch": "feature/search-optimization",
+      "created_at": "2026-04-09T10:00:00.000Z",
+      "closed_at": null,
+      "last_activity_at": "2026-05-10T23:17:07.508Z",
+      "files_touched": [
+        "bin/mcp-server.js",
+        "bin/cli.js"
+      ],
+      "last_note": "Stuck — the search_threads regex is O(n*m) on large thread stores. 50+ threads causes visible lag on every MCP call.",
+      "narrative": "Optimizing the search_threads tool in the MCP server. With 50+ threads the regex-based keyword matching in handleSearchThreads() takes 800ms+, which blocks the JSON-RPC event loop. Profiled and confirmed the bottleneck is the nested loop over threads × search terms. Tried pre-indexing but hit issues with stale index after merges.",
+      "failed_approaches": [
+        "Built an in-memory inverted index on session start — worked for search but the index went stale after saveMemoryMerged() writes. Would need cache invalidation on every write path.",
+        "Tried switching to a single combined regex with alternation (term1|term2|term3) — faster but broke phrase matching and returned false positives on partial word matches."
+      ],
+      "handoff_summary": "The search bottleneck is in bin/mcp-server.js handleSearchThreads() around line 180. The current approach lowercases every field of every thread on each search call. A pre-computed search text per thread (built once on load, updated on write) would fix it without needing a full inverted index. The CLI search in bin/cli.js cmdThreads() has the same pattern and should get the same fix.",
+      "related_session_ids": [
+        "a9156cdf-f117-426f-8563-7fa8d18da62e",
+        "a9156cdf-f117-426f-8563-7fa8d18da62e",
+        "75c44351-f1a9-475a-8bea-622812eb5a46",
+        "59f244b6-0be4-415a-87e4-98fb01572f85"
+      ],
+      "resume_chain": [
+        {
+          "session_id": "a9156cdf-f117-426f-8563-7fa8d18da62e",
+          "tool": "copilot-cli",
+          "started_at": "2026-04-14T00:35:59.527Z",
+          "ended_at": null,
+          "resumed_from": "demo-session-grant-search"
+        },
+        {
+          "session_id": "a9156cdf-f117-426f-8563-7fa8d18da62e",
+          "tool": "copilot-cli",
+          "started_at": "2026-04-14T00:36:05.729Z",
+          "ended_at": null,
+          "resumed_from": "a9156cdf-f117-426f-8563-7fa8d18da62e"
+        },
+        {
+          "session_id": "75c44351-f1a9-475a-8bea-622812eb5a46",
+          "tool": "copilot-cli",
+          "started_at": "2026-04-14T01:18:20.335Z",
+          "ended_at": null,
+          "resumed_from": "a9156cdf-f117-426f-8563-7fa8d18da62e"
+        },
+        {
+          "session_id": "59f244b6-0be4-415a-87e4-98fb01572f85",
+          "tool": "copilot-cli",
+          "started_at": "2026-04-14T04:36:03.261Z",
+          "ended_at": null,
+          "resumed_from": "75c44351-f1a9-475a-8bea-622812eb5a46"
+        }
+      ],
+      "tool": "claude-code",
+      "session_id": "demo-session-grant-search",
+      "work_type": "performance",
+      "activities": [
+        "edited 2 file(s)",
+        "profiled MCP server response times",
+        "12 prompt(s)"
+      ],
+      "tool_calls": {
+        "bash": 15,
+        "Read": 22,
+        "Edit": 5,
+        "grep": 8
+      },
+      "prompts": [
+        "the search_threads MCP tool is really slow with lots of threads",
+        "can you profile where the time is spent in handleSearchThreads",
+        "try building an inverted index at startup",
+        "that goes stale after writes, try a simpler approach"
+      ],
+      "contributors": [
+        "grantharris"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "demo-alice-docs-update",
+      "user": "alice",
+      "project": "",
+      "status": "closed",
+      "branch": "feature/docs-refresh",
+      "created_at": "2026-04-10T14:00:00.000Z",
+      "closed_at": "2026-04-14T00:36:05.724Z",
+      "last_activity_at": "2026-04-10T22:15:00.000Z",
+      "files_touched": [
+        "README.md",
+        "CONTRIBUTING.md",
+        "docs/branch-switching.md"
+      ],
+      "last_note": "Updating docs to reflect v2.5 merge driver and bootstrap changes. README done, CONTRIBUTING in progress.",
+      "narrative": "Refreshing all documentation to cover the new merge driver, bootstrap secret handling, and rollback detection features. README has been updated with the new setup flow. CONTRIBUTING.md needs the section on how the merge driver works for contributors. Also updating branch-switching docs.",
+      "failed_approaches": [],
+      "handoff_summary": "README.md is updated. CONTRIBUTING.md still needs a 'How the merge driver works' section. docs/branch-switching.md needs review — may be outdated after the v2 branch was deleted.",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "demo-session-alice-docs",
+      "work_type": "documentation",
+      "activities": [
+        "edited 2 file(s)",
+        "touched 3 file(s)",
+        "6 prompt(s)"
+      ],
+      "tool_calls": {
+        "powershell": 4,
+        "view": 10,
+        "edit": 6,
+        "grep": 2
+      },
+      "prompts": [
+        "update the README to cover the new bootstrap flow",
+        "add merge driver docs to CONTRIBUTING.md",
+        "check if branch-switching.md is still accurate"
+      ],
+      "contributors": [
+        "alice"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "c171b8a2-a202-4f3c-80c3-1c2457ceb6d1",
+      "user": "dbandaru",
+      "project": "",
+      "status": "stale",
+      "branch": "main",
+      "created_at": "2026-04-13T21:25:13.990Z",
+      "closed_at": null,
+      "last_activity_at": "2026-05-10T23:17:07.510Z",
+      "files_touched": [
+        "templates/hooks/session-start.js",
+        "templates/hooks.json",
+        "templates",
+        "templates/gitignore-additions.txt",
+        ".claude/hooks/session-start.js",
+        ".gitignore",
+        "templates/CLAUDE.md",
+        "templates/copilot-instructions.md",
+        "CLAUDE.md",
+        ".github/copilot-instructions.md"
+      ],
+      "last_note": "",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "b3123fd5-188b-43d4-aedc-4c9a8d7ae9a9",
+      "work_type": "",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": [],
+      "contributors": [
+        "dbandaru"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "6a4963ee-1486-4c20-b34e-d2b337c9662c",
+      "user": "dbandaru",
+      "project": "",
+      "status": "stale",
+      "branch": "main",
+      "created_at": "2026-04-13T22:20:18.241Z",
+      "closed_at": null,
+      "last_activity_at": "2026-05-10T23:17:07.510Z",
+      "files_touched": [
+        "bin",
+        "bin/mcp-server.js",
+        "bin/cli.js",
+        "templates/hooks/session-start.js",
+        "templates/hooks/inject-context.js",
+        ".github/hooks/hooks.json",
+        "templates/hooks.json",
+        "README.md",
+        "templates/hooks/sticky-attribution.js",
+        "templates/hooks/sticky-git-notes.js",
+        "../../../../.copilot/session-state/31a5e3fb-4597-44c5-8054-97be525bbca3/files/demo-script.md"
+      ],
+      "last_note": "",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "31a5e3fb-4597-44c5-8054-97be525bbca3",
+      "work_type": "",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": [],
+      "contributors": [
+        "dbandaru"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "demo-bob-merge-driver",
+      "user": "bobsmith",
+      "project": "",
+      "status": "stale",
+      "branch": "fix/merge-driver-conflicts",
+      "created_at": "2026-04-11T09:30:00.000Z",
+      "closed_at": null,
+      "last_activity_at": "2026-07-17T17:07:08.985Z",
+      "files_touched": [
+        "bin/cli.js",
+        "bin/merge-driver.js",
+        "test/merge-driver.test.js"
+      ],
+      "last_note": "Stuck — three-way merge loses threads when both sides add new threads at the same array index. JSON merge is not array-aware.",
+      "narrative": "Fixing the sticky-note merge driver to handle concurrent thread additions. When two branches each add a new thread, the merge driver treats the threads array as a text blob and produces a conflict or silently drops one thread. Need array-aware JSON merging that deduplicates by thread ID.",
+      "failed_approaches": [
+        "Tried using JSON.parse on each side and concatenating arrays — works for additions but doesn't handle edits to the same thread (e.g., both sides update last_note on the same thread ID). Produces duplicate threads.",
+        "Attempted a deep-merge with lodash mergeWith — corrupts nested arrays like files_touched and failed_approaches by interleaving elements instead of replacing."
+      ],
+      "handoff_summary": "The merge driver in bin/merge-driver.js needs a thread-ID-aware merge strategy: deduplicate by thread.id, prefer the version with the later last_activity_at, and concatenate files_touched with dedup. The test file has 3 passing cases and 2 failing cases that cover the concurrent-add scenario.",
+      "related_session_ids": [
+        "59f244b6-0be4-415a-87e4-98fb01572f85",
+        "86cb30ad-756d-40d1-8baa-4e625c8d3e64",
+        "f943e7a5-5f1f-4ecd-9931-e8263180e73d",
+        "651e58c6-02d4-4761-ad81-04708d27a04e"
+      ],
+      "resume_chain": [
+        {
+          "session_id": "59f244b6-0be4-415a-87e4-98fb01572f85",
+          "tool": "copilot-cli",
+          "started_at": "2026-04-14T04:38:50.402Z",
+          "ended_at": null,
+          "resumed_from": "demo-session-bob-merge"
+        },
+        {
+          "session_id": "86cb30ad-756d-40d1-8baa-4e625c8d3e64",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-10T23:17:07.511Z",
+          "ended_at": null,
+          "resumed_from": "59f244b6-0be4-415a-87e4-98fb01572f85"
+        },
+        {
+          "session_id": "86cb30ad-756d-40d1-8baa-4e625c8d3e64",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-10T23:17:08.783Z",
+          "ended_at": null,
+          "resumed_from": "86cb30ad-756d-40d1-8baa-4e625c8d3e64"
+        },
+        {
+          "session_id": "86cb30ad-756d-40d1-8baa-4e625c8d3e64",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-10T23:17:09.974Z",
+          "ended_at": null,
+          "resumed_from": "86cb30ad-756d-40d1-8baa-4e625c8d3e64"
+        },
+        {
+          "session_id": "86cb30ad-756d-40d1-8baa-4e625c8d3e64",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-10T23:20:21.676Z",
+          "ended_at": null,
+          "resumed_from": "86cb30ad-756d-40d1-8baa-4e625c8d3e64"
+        },
+        {
+          "session_id": "86cb30ad-756d-40d1-8baa-4e625c8d3e64",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-10T23:20:42.364Z",
+          "ended_at": null,
+          "resumed_from": "86cb30ad-756d-40d1-8baa-4e625c8d3e64"
+        },
+        {
+          "session_id": "86cb30ad-756d-40d1-8baa-4e625c8d3e64",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-10T23:21:08.978Z",
+          "ended_at": null,
+          "resumed_from": "86cb30ad-756d-40d1-8baa-4e625c8d3e64"
+        },
+        {
+          "session_id": "86cb30ad-756d-40d1-8baa-4e625c8d3e64",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-10T23:34:07.437Z",
+          "ended_at": null,
+          "resumed_from": "86cb30ad-756d-40d1-8baa-4e625c8d3e64"
+        },
+        {
+          "session_id": "86cb30ad-756d-40d1-8baa-4e625c8d3e64",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-10T23:34:34.721Z",
+          "ended_at": null,
+          "resumed_from": "86cb30ad-756d-40d1-8baa-4e625c8d3e64"
+        },
+        {
+          "session_id": "86cb30ad-756d-40d1-8baa-4e625c8d3e64",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-10T23:34:36.181Z",
+          "ended_at": null,
+          "resumed_from": "86cb30ad-756d-40d1-8baa-4e625c8d3e64"
+        },
+        {
+          "session_id": "86cb30ad-756d-40d1-8baa-4e625c8d3e64",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-10T23:34:37.670Z",
+          "ended_at": null,
+          "resumed_from": "86cb30ad-756d-40d1-8baa-4e625c8d3e64"
+        },
+        {
+          "session_id": "f943e7a5-5f1f-4ecd-9931-e8263180e73d",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-11T02:47:37.483Z",
+          "ended_at": null,
+          "resumed_from": "86cb30ad-756d-40d1-8baa-4e625c8d3e64"
+        },
+        {
+          "session_id": "651e58c6-02d4-4761-ad81-04708d27a04e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-11T02:52:50.622Z",
+          "ended_at": null,
+          "resumed_from": "f943e7a5-5f1f-4ecd-9931-e8263180e73d"
+        },
+        {
+          "session_id": "651e58c6-02d4-4761-ad81-04708d27a04e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-11T02:52:51.554Z",
+          "ended_at": null,
+          "resumed_from": "651e58c6-02d4-4761-ad81-04708d27a04e"
+        },
+        {
+          "session_id": "651e58c6-02d4-4761-ad81-04708d27a04e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-11T02:52:52.392Z",
+          "ended_at": null,
+          "resumed_from": "651e58c6-02d4-4761-ad81-04708d27a04e"
+        },
+        {
+          "session_id": "651e58c6-02d4-4761-ad81-04708d27a04e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-11T02:53:32.081Z",
+          "ended_at": null,
+          "resumed_from": "651e58c6-02d4-4761-ad81-04708d27a04e"
+        },
+        {
+          "session_id": "651e58c6-02d4-4761-ad81-04708d27a04e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-11T02:53:33.190Z",
+          "ended_at": null,
+          "resumed_from": "651e58c6-02d4-4761-ad81-04708d27a04e"
+        },
+        {
+          "session_id": "651e58c6-02d4-4761-ad81-04708d27a04e",
+          "tool": "copilot-cli",
+          "started_at": "2026-05-11T02:53:34.122Z",
+          "ended_at": null,
+          "resumed_from": "651e58c6-02d4-4761-ad81-04708d27a04e"
+        }
+      ],
+      "tool": "claude-code",
+      "session_id": "demo-session-bob-merge",
+      "work_type": "bug-fix",
+      "activities": [
+        "edited 3 file(s)",
+        "ran test suite 6 times",
+        "9 prompt(s)"
+      ],
+      "tool_calls": {
+        "bash": 18,
+        "Read": 14,
+        "Edit": 9,
+        "grep": 3
+      },
+      "prompts": [
+        "the merge driver drops threads when two people add threads at the same time",
+        "try concatenating the thread arrays and deduplicating",
+        "lodash mergeWith is corrupting the nested arrays",
+        "can you write tests for the concurrent-add scenario"
+      ],
+      "contributors": [
+        "bobsmith"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "demo-carol-hooks-windows",
+      "user": "carolchen",
+      "project": "",
+      "status": "stuck",
+      "branch": "fix/windows-hooks",
+      "created_at": "2026-04-12T11:00:00.000Z",
+      "closed_at": null,
+      "last_activity_at": "2026-04-13T19:30:00.000Z",
+      "files_touched": [
+        "templates/hooks/session-start.js",
+        "templates/hooks/pre-tool-use.js",
+        "templates/hooks/inject-context.js",
+        "bin/cli.js"
+      ],
+      "last_note": "Stuck — hooks crash on Windows due to path separator issues and missing shebang handling. process.argv differs between cmd.exe and PowerShell.",
+      "narrative": "Claude Code hooks fail silently on Windows. The session-start hook uses unix paths with forward slashes to resolve .sticky-note/ paths, which breaks on Windows. Additionally, the inject-context hook spawns `git blame` with a shell command that doesn't work in cmd.exe. Tried normalizing paths but broke Linux in the process.",
+      "failed_approaches": [
+        "Replaced all path.join with forward-slash concatenation — fixed Windows but broke the git blame call on Linux where the path must match the repo-relative format exactly.",
+        "Tried using cross-spawn npm package to normalize shell execution — the hooks run in a constrained environment where node_modules from the project aren't available, only built-in Node modules."
+      ],
+      "handoff_summary": "The fix needs to use path.resolve() and path.sep consistently in all three hook files. The git blame call in inject-context.js line 45 needs to convert Windows backslashes to forward slashes ONLY for the git argument, not for the fs.readFile path. bin/cli.js init command should detect Windows and adjust the hooks.json command format (no shebang needed on Windows).",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "demo-session-carol-win",
+      "work_type": "bug-fix",
+      "activities": [
+        "edited 4 file(s)",
+        "tested on Windows and WSL",
+        "8 prompt(s)"
+      ],
+      "tool_calls": {
+        "powershell": 12,
+        "view": 16,
+        "edit": 8,
+        "grep": 5
+      },
+      "prompts": [
+        "the hooks don't work on Windows at all",
+        "try normalizing all paths with path.join",
+        "that broke Linux — we need platform-aware path handling",
+        "can cross-spawn help with the shell differences"
+      ],
+      "contributors": [
+        "carolchen"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "demo-dave-audit-perf",
+      "user": "davejones",
+      "project": "",
+      "status": "stuck",
+      "branch": "fix/audit-file-growth",
+      "created_at": "2026-04-10T08:00:00.000Z",
+      "closed_at": null,
+      "last_activity_at": "2026-04-12T14:20:00.000Z",
+      "files_touched": [
+        "bin/cli.js",
+        "bin/mcp-server.js",
+        ".sticky-note/audit/dbandaru.jsonl"
+      ],
+      "last_note": "Stuck — audit JSONL files grow unbounded and slow down git operations. A 2MB audit file adds 3+ seconds to every git status.",
+      "narrative": "The per-user audit JSONL files grow without limit. After a few weeks of active use, dbandaru.jsonl hit 2MB and git operations (status, diff, add) became noticeably slower because the file is tracked. Tried rotation but the pre-commit hook auto-stages all audit files, so rotated-out files still get committed.",
+      "failed_approaches": [
+        "Implemented log rotation (keep last 500 lines, archive the rest) — but the pre-commit hook stages .sticky-note/audit/*.jsonl which picks up the archive files too. Moving archives outside .sticky-note/ breaks the audit trail query.",
+        "Tried adding a max-lines config to sticky-note-config.json and truncating on write — this loses audit history silently, and the truncation races with concurrent writes from multiple hooks firing in the same session."
+      ],
+      "handoff_summary": "Best approach is probably: (1) add a configurable max_audit_lines to sticky-note-config.json, (2) on session close only, trim the JSONL to the last N entries, (3) update the pre-commit hook glob to exclude archive files (.sticky-note/audit/*.archive.jsonl). The trim should happen in the session-end hook, not on every write, to avoid the race condition.",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "claude-code",
+      "session_id": "demo-session-dave-audit",
+      "work_type": "performance",
+      "activities": [
+        "edited 3 file(s)",
+        "profiled git operations",
+        "7 prompt(s)"
+      ],
+      "tool_calls": {
+        "bash": 20,
+        "Read": 12,
+        "Edit": 6,
+        "grep": 4
+      },
+      "prompts": [
+        "git status is really slow in repos with sticky-note",
+        "profile where the time is going",
+        "the audit jsonl files are huge — try rotating them",
+        "rotation doesn't help because the pre-commit hook stages everything"
+      ],
+      "contributors": [
+        "davejones"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "2c636a72-5d45-4946-ba0c-aedb096252dc",
+      "user": "dheer",
+      "project": "",
+      "status": "stuck",
+      "branch": "main",
+      "created_at": "2026-07-17T17:07:09.078Z",
+      "closed_at": null,
+      "last_activity_at": "2026-07-18T00:53:28.707Z",
+      "files_touched": [
+        ".claude/settings.json",
+        ".claude/hooks/session-start.js",
+        ".claude/hooks/on-stop.js",
+        ".claude/hooks/pre-tool-use.js",
+        ".claude/hooks/track-work.js",
+        ".claude/hooks/sticky-utils.js",
+        ".claude/hooks",
+        "templates/hooks/sticky-utils.js",
+        "bin/cli.js",
+        "templates/settings.json",
+        "../MOBA/MOBA/.claude/settings.json",
+        "package.json",
+        ".claude\\settings.json",
+        ".claude\\hooks\\session-start.js",
+        ".claude\\hooks\\on-stop.js",
+        ".claude\\hooks\\pre-tool-use.js",
+        ".claude\\hooks\\track-work.js",
+        ".claude\\hooks\\sticky-utils.js",
+        ".claude\\hooks",
+        "templates\\hooks\\sticky-utils.js",
+        "bin\\cli.js",
+        "templates\\settings.json",
+        "..\\MOBA\\MOBA\\.claude\\settings.json",
+        ".sticky-note/.sticky-checkpoint",
+        ".claude/hooks/inject-context.js",
+        ".claude/hooks/session-end.js",
+        "templates/merge-driver.js",
+        ".claude\\hooks\\inject-context.js",
+        ".claude\\hooks\\session-end.js",
+        "templates\\merge-driver.js",
+        "docs/superpowers/specs/2026-07-17-data-branch-design.md",
+        "docs\\superpowers\\specs\\2026-07-17-data-branch-design.md",
+        "templates/hooks/session-start.js",
+        "templates/hooks/session-end.js",
+        "test/smoke.test.js",
+        "templates/gitignore-additions.txt",
+        "docs/superpowers/plans/2026-07-17-data-branch.md",
+        ".superpowers/sdd/progress.md",
+        ".superpowers/sdd/task-1-brief.md",
+        ".superpowers/sdd/task-1-report.md",
+        ".superpowers/sdd/review-283cf69..7497ebd.diff",
+        ".superpowers/sdd/task-2-brief.md",
+        "templates/hooks/data-branch.js",
+        ".superpowers/sdd/task-2-report.md",
+        ".superpowers/sdd/review-7497ebd..c5f8bfa.diff",
+        ".superpowers/sdd/task-3-brief.md",
+        ".superpowers/sdd/task-3-report.md",
+        ".superpowers/sdd/review-c5f8bfa..367c6f0.diff",
+        ".superpowers/sdd/task-4-brief.md",
+        ".superpowers/sdd/task-4-report.md",
+        ".superpowers/sdd/review-367c6f0..b70a942.diff",
+        "templates/hooks",
+        ".superpowers/sdd/task-5-brief.md",
+        ".superpowers/sdd/task-5-report.md",
+        ".superpowers/sdd/review-b70a942..b2497ed.diff",
+        ".superpowers/sdd/task-6-brief.md"
+      ],
+      "last_note": "Exit code 2\ngrep: /Users/dheer/OneDrive/Desktop/Projects/sticky-note/templates/hooks/session-end.js: No such file or directory",
+      "narrative": "running into errors rn \n● Ran 1 stop hook (ctrl+o to expand)\n  ⎿  Stop hook error: Failed with non-blocking status code: node:internal/modules/cjs/loader:1459\n    throw err;\n    ^\n\n  Error: Cannot find module 'C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\MOBA\\MOBA\\backend\\.claude\\hooks\\on-stop.js'",
+      "failed_approaches": [
+        {
+          "description": "Exit code 1\n0",
+          "error": "Exit code 1\n0"
+        },
+        {
+          "description": "File does not exist. Note: your current working directory is C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\sticky-note.",
+          "error": "File does not exist. Note: your current working directory is C:\\Users\\dheer\\OneDrive\\Desktop\\Project"
+        },
+        {
+          "description": "Exit code 2\ngrep: /Users/dheer/OneDrive/Desktop/Projects/sticky-note/templates/hooks/session-end.js: No such file or directory",
+          "error": "Exit code 2\ngrep: /Users/dheer/OneDrive/Desktop/Projects/sticky-note/templates/hooks/session-end.js:"
+        }
+      ],
+      "handoff_summary": "What done: feature-development on .claude/settings.json, .claude/hooks/session-start.js, .claude/hooks/on-stop.js, .claude/hooks/pre-tool-use.js, .claude/hooks/track-work.js | What failed: Exit code 1\n0 | Status: running into errors rn \n● Ran 1 stop hook (ctrl+o to expand)\n  ⎿  Stop hook error: Failed with non-blocking status code: node:internal/modules/cjs/loa",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "claude-code",
+      "session_id": "b9d87303-0159-44e6-a6b5-b017522c899d",
+      "work_type": "feature-development",
+      "activities": [],
+      "tool_calls": {
+        "Bash": 56761,
+        "Glob": 3069,
+        "Read": 24034,
+        "Grep": 4092,
+        "Edit": 8186,
+        "Write": 3070,
+        "Skill": 511,
+        "ToolSearch": 1022,
+        "TaskCreate": 512,
+        "TaskUpdate": 1024
+      },
+      "prompts": [
+        "running into errors rn \n● Ran 1 stop hook (ctrl+o to expand)\n  ⎿  Stop hook error: Failed with non-blocking status code: node:internal/modules/cjs/loader:1459\n    throw err;\n    ^\n\n  Error: Cannot find module 'C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\MOBA\\MOBA\\backend\\.claude\\hooks\\on-stop.js'\n     "
+      ],
+      "contributors": [
+        "dheer"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "180ae989-9354-45f3-bd1d-2ea3a1bc5d8d",
+      "user": "dheer",
+      "project": "",
+      "status": "open",
+      "branch": "master",
+      "created_at": "2026-07-18T00:10:57.284Z",
+      "closed_at": null,
+      "last_activity_at": "2026-07-18T00:10:57.285Z",
+      "files_touched": [],
+      "last_note": "",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "copilot-cli",
+      "session_id": "5648cc39-a948-49c8-ba57-8ae60b07a189",
+      "work_type": "",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": [],
+      "contributors": [
+        "dheer"
+      ],
+      "resume_history": []
+    }
+  ]
+}
