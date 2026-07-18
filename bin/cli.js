@@ -3532,7 +3532,8 @@ async function cmdMigrate() {
   let gitignoreUpdated = false;
   if (fs.existsSync(gitignorePath)) {
     const existing = fs.readFileSync(gitignorePath, "utf-8");
-    if (!existing.includes(IGNORE_LINE)) {
+    const gitignoreLines = existing.split(/\r?\n/).map(l => l.trim());
+    if (!gitignoreLines.includes(IGNORE_LINE)) {
       fs.appendFileSync(gitignorePath, "\n" + MARKER + "\n" + IGNORE_LINE + "\n");
       gitignoreUpdated = true;
     }

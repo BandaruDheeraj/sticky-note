@@ -627,6 +627,61 @@ try {
     assert.ok(gitignore.includes(".sticky-note/"), ".gitignore should include .sticky-note/");
   });
 
+  run("migrate: gitignore check uses line-exact match, not substring (regression test)", () => {
+    const { execFileSync: exec2 } = require("child_process");
+
+    // Create a .gitignore that already has .sticky-note/.sticky-session and .sticky-note/.sticky-resume
+    // (simulating a repo that ran `init`)
+    const gitignorePath = path.join(tmpDir, ".gitignore");
+    fs.writeFileSync(
+      gitignorePath,
+      ".sticky-note/.sticky-session\n.sticky-note/.sticky-resume\n"
+    );
+
+    // Set up .sticky-note/sticky-note.json with a thread
+    const stickyDir = path.join(tmpDir, ".sticky-note");
+    fs.mkdirSync(stickyDir, { recursive: true });
+    const thread = {
+      id: "regression-test-thread",
+      user: "dheer",
+      status: "open",
+      branch: "main",
+      created_at: "2026-01-01T00:00:00Z",
+      last_activity_at: "2026-01-01T01:00:00Z",
+      files_touched: [],
+    };
+    fs.writeFileSync(
+      path.join(stickyDir, "sticky-note.json"),
+      JSON.stringify({ version: "2", project: "", threads: [thread] }, null, 2) + "\n"
+    );
+
+    // Run migrate
+    exec2(process.execPath, [CLI, "migrate"], {
+      encoding: "utf-8",
+      timeout: 15000,
+      cwd: tmpDir,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    // Verify that .gitignore now contains the blanket .sticky-note/ rule as its own line
+    const gitignore = fs.readFileSync(gitignorePath, "utf-8");
+    const lines = gitignore.split("\n").map(l => l.trim());
+    assert.ok(
+      lines.includes(".sticky-note/"),
+      ".gitignore should contain .sticky-note/ as its own line (line-exact match)"
+    );
+
+    // Also verify that the old specific entries are still there (not removed)
+    assert.ok(
+      gitignore.includes(".sticky-note/.sticky-session"),
+      ".gitignore should still contain .sticky-note/.sticky-session"
+    );
+    assert.ok(
+      gitignore.includes(".sticky-note/.sticky-resume"),
+      ".gitignore should still contain .sticky-note/.sticky-resume"
+    );
+  });
+
 } finally {
   cleanup();
 }
