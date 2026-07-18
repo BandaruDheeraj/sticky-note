@@ -984,15 +984,9 @@ async function cmdInit() {
     print("  [OK] .git/hooks/post-rewrite (attribution survives rebase)");
   }
 
-  // Install pre-commit hook (auto-stage .sticky-note/ files)
-  if (installPreCommitHook()) {
-    print("  [OK] .git/hooks/pre-commit (auto-stage .sticky-note/ files)");
-  }
-
-  // Install post-commit hook (auto-commit leftover .sticky-note/ changes)
-  if (installPostCommitHook()) {
-    print("  [OK] .git/hooks/post-commit (auto-sync .sticky-note/ after commit)");
-  }
+  // Data branch sync handles persistence — no pre/post-commit hooks needed
+  print("  [OK] Skipping git pre/post-commit hooks (data branch sync handles this now)");
+  print("       Run `npx sticky-note migrate` to migrate existing .sticky-note/ data.");
 
   // Create environment directory structure
   const envDir = path.join(stickyNoteDir, "environment");
@@ -1132,11 +1126,35 @@ function cmdUpdate() {
   if (installGitHook("post-rewrite")) {
     print("  [OK] .git/hooks/post-rewrite (attribution survives rebase)");
   }
-  if (installPreCommitHook()) {
-    print("  [OK] .git/hooks/pre-commit (auto-stage .sticky-note/ files)");
-  }
-  if (installPostCommitHook()) {
-    print("  [OK] .git/hooks/post-commit (auto-sync .sticky-note/ after commit)");
+
+  // Remove sticky-note pre-commit and post-commit git hooks (replaced by data branch)
+  const gitDir2 = path.join(process.cwd(), ".git");
+  if (fs.existsSync(gitDir2)) {
+    const gitHooksDir2 = path.join(gitDir2, "hooks");
+    for (const hookName of ["pre-commit", "post-commit"]) {
+      const hookPath2 = path.join(gitHooksDir2, hookName);
+      if (!fs.existsSync(hookPath2)) continue;
+      const content2 = fs.readFileSync(hookPath2, "utf-8");
+      if (!content2.includes(STICKY_PRE_COMMIT_MARKER) && !content2.includes(STICKY_POST_COMMIT_MARKER)) continue;
+      let updated2 = content2;
+      const preStart2 = updated2.indexOf(STICKY_PRE_COMMIT_MARKER);
+      const preEnd2 = updated2.indexOf(STICKY_PRE_COMMIT_END);
+      if (preStart2 !== -1 && preEnd2 !== -1) {
+        updated2 = updated2.slice(0, preStart2) + updated2.slice(preEnd2 + STICKY_PRE_COMMIT_END.length);
+      }
+      const postStart2 = updated2.indexOf(STICKY_POST_COMMIT_MARKER);
+      const postEnd2 = updated2.indexOf(STICKY_POST_COMMIT_END);
+      if (postStart2 !== -1 && postEnd2 !== -1) {
+        updated2 = updated2.slice(0, postStart2) + updated2.slice(postEnd2 + STICKY_POST_COMMIT_END.length);
+      }
+      if (updated2.replace(/^#!.*\n/, "").trim() === "") {
+        fs.unlinkSync(hookPath2);
+        print("  [OK] Removed .git/hooks/" + hookName + " (no longer needed)");
+      } else {
+        fs.writeFileSync(hookPath2, updated2, "utf-8");
+        print("  [OK] Removed sticky-note blocks from .git/hooks/" + hookName);
+      }
+    }
   }
 
   // Update hook_version in config
@@ -3410,6 +3428,257 @@ function cmdRunHook() {
 }
 
 // ──────────────────────────────────────────────
+// MIGRATE command
+// ──────────────────────────────────────────────
+
+/**
+ * One-time migration from .sticky-note/ (feature-branch storage) to
+ * .git/sticky-note/ (data-branch storage).
+ *
+ * Idempotent — safe to run multiple times.
+ */
+async function cmdMigrate() {
+  printBanner();
+
+  if (!isGitRepo()) {
+    print("  [ERR] Not a git repository.");
+    process.exit(1);
+  }
+
+  const cwd = process.cwd();
+  const oldDir = path.join(cwd, ".sticky-note");
+
+  // Locate .git directory using plumbing (works from subdirectories)
+  let gitDir;
+  try {
+    gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+      cwd,
+    }).trim();
+  } catch (err) {
+    print("  [ERR] Could not locate .git directory: " + err.message);
+    process.exit(1);
+  }
+
+  const newDir = path.join(gitDir, "sticky-note");
+  print("  📂 Source: " + oldDir);
+  print("  📂 Target: " + newDir);
+  print("");
+
+  // Step 1: Copy files from .sticky-note/ to .git/sticky-note/
+  mkdirSafe(newDir);
+  mkdirSafe(path.join(newDir, "audit"));
+  mkdirSafe(path.join(newDir, "presence"));
+
+  let copiedFiles = 0;
+  const srcMemory = path.join(oldDir, "sticky-note.json");
+  const dstMemory = path.join(newDir, "sticky-note.json");
+  if (fs.existsSync(srcMemory)) {
+    fs.copyFileSync(srcMemory, dstMemory);
+    copiedFiles++;
+    print("  [OK] Copied sticky-note.json");
+  } else if (!fs.existsSync(dstMemory)) {
+    // No existing data — create empty memory
+    fs.writeFileSync(
+      dstMemory,
+      JSON.stringify({ version: "2", project: "", threads: [] }, null, 2) + "\n"
+    );
+    print("  [OK] Created empty sticky-note.json (no .sticky-note/ found)");
+  }
+
+  const oldAuditDir = path.join(oldDir, "audit");
+  if (fs.existsSync(oldAuditDir)) {
+    for (const file of fs.readdirSync(oldAuditDir)) {
+      if (file.endsWith(".jsonl")) {
+        const dst = path.join(newDir, "audit", file);
+        if (!fs.existsSync(dst)) {
+          fs.copyFileSync(path.join(oldAuditDir, file), dst);
+          copiedFiles++;
+        }
+      }
+    }
+  }
+
+  const oldPresenceDir = path.join(oldDir, "presence");
+  if (fs.existsSync(oldPresenceDir)) {
+    for (const file of fs.readdirSync(oldPresenceDir)) {
+      if (file.endsWith(".json")) {
+        const dst = path.join(newDir, "presence", file);
+        if (!fs.existsSync(dst)) {
+          fs.copyFileSync(path.join(oldPresenceDir, file), dst);
+          copiedFiles++;
+        }
+      }
+    }
+  }
+  if (copiedFiles > 0) print("  [OK] Copied " + copiedFiles + " file(s) to .git/sticky-note/");
+
+  // Step 2: Commit files to sticky-note/data branch using plumbing
+  print("");
+  print("  📌 Committing to sticky-note/data branch...");
+  try {
+    // Inline the plumbing here (data-branch.js lives in hooks, not in CLI path)
+    _commitFilesToDataBranch(newDir);
+    print("  [OK] sticky-note/data branch created/updated");
+  } catch (err) {
+    print("  [WARN] Could not commit to data branch: " + err.message);
+  }
+
+  // Step 3: Add .sticky-note/ to .gitignore
+  print("");
+  const gitignorePath = path.join(cwd, ".gitignore");
+  const MARKER = "# sticky-note: data branch migration";
+  const IGNORE_LINE = ".sticky-note/";
+  let gitignoreUpdated = false;
+  if (fs.existsSync(gitignorePath)) {
+    const existing = fs.readFileSync(gitignorePath, "utf-8");
+    if (!existing.includes(IGNORE_LINE)) {
+      fs.appendFileSync(gitignorePath, "\n" + MARKER + "\n" + IGNORE_LINE + "\n");
+      gitignoreUpdated = true;
+    }
+  } else {
+    fs.writeFileSync(gitignorePath, MARKER + "\n" + IGNORE_LINE + "\n");
+    gitignoreUpdated = true;
+  }
+  if (gitignoreUpdated) {
+    print("  [OK] Added .sticky-note/ to .gitignore");
+  } else {
+    print("  [OK] .gitignore already contains .sticky-note/");
+  }
+
+  // Step 4: Remove sticky-note pre-commit and post-commit hooks
+  print("");
+  const gitHooksDir = path.join(gitDir, "hooks");
+  for (const hookName of ["pre-commit", "post-commit"]) {
+    const hookPath = path.join(gitHooksDir, hookName);
+    if (!fs.existsSync(hookPath)) continue;
+    const content = fs.readFileSync(hookPath, "utf-8");
+    if (content.includes(STICKY_PRE_COMMIT_MARKER) || content.includes(STICKY_POST_COMMIT_MARKER)) {
+      // Remove sticky-note blocks
+      let updated = content;
+      // Remove pre-commit block
+      const preStart = updated.indexOf(STICKY_PRE_COMMIT_MARKER);
+      const preEnd = updated.indexOf(STICKY_PRE_COMMIT_END);
+      if (preStart !== -1 && preEnd !== -1) {
+        updated = updated.slice(0, preStart) + updated.slice(preEnd + STICKY_PRE_COMMIT_END.length);
+      }
+      // Remove post-commit block
+      const postStart = updated.indexOf(STICKY_POST_COMMIT_MARKER);
+      const postEnd = updated.indexOf(STICKY_POST_COMMIT_END);
+      if (postStart !== -1 && postEnd !== -1) {
+        updated = updated.slice(0, postStart) + updated.slice(postEnd + STICKY_POST_COMMIT_END.length);
+      }
+      // If only the shebang remains, delete the file
+      if (updated.replace(/^#!.*\n/, "").trim() === "") {
+        fs.unlinkSync(hookPath);
+        print("  [OK] Removed .git/hooks/" + hookName + " (was sticky-note only)");
+      } else {
+        fs.writeFileSync(hookPath, updated, "utf-8");
+        print("  [OK] Removed sticky-note blocks from .git/hooks/" + hookName);
+      }
+    }
+  }
+
+  // Step 5: Push data branch if remote exists
+  print("");
+  try {
+    const remote = execFileSync("git", ["remote"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+      cwd,
+    }).trim().split("\n")[0];
+    if (remote) {
+      print("  🔄 Pushing sticky-note/data to " + remote + "...");
+      execFileSync("git", ["push", remote, "refs/heads/sticky-note/data:refs/heads/sticky-note/data"], {
+        timeout: 30000, stdio: ["pipe", "pipe", "pipe"],
+        cwd,
+      });
+      print("  [OK] Pushed sticky-note/data");
+    } else {
+      print("  ⏭️  No remote configured — skipping push");
+    }
+  } catch (err) {
+    print("  [WARN] Push failed: " + err.message);
+    print("  [INFO] Your data is safe locally. Run `npx sticky-note migrate` again to retry.");
+  }
+
+  print("");
+  print("  ✅ Migration complete!");
+  print("");
+  print("  Next steps:");
+  print("  1. Commit the .gitignore change:  git add .gitignore && git commit -m 'chore: gitignore sticky-note data dir'");
+  print("  2. Each teammate runs:             npx sticky-note init");
+  print("");
+}
+
+/**
+ * Inline git plumbing to commit files from a local dir to sticky-note/data.
+ * Extracted from data-branch.js for use in CLI context (no hooks dir on PATH).
+ */
+function _commitFilesToDataBranch(srcDir) {
+  const os = require("os");
+  const crypto = require("crypto");
+  const branchRef = "refs/heads/sticky-note/data";
+  const tmpIndex = path.join(
+    os.tmpdir(),
+    "sticky-idx-" + process.pid + "-" + crypto.randomBytes(4).toString("hex")
+  );
+
+  try {
+    let parentSha = null;
+    try {
+      parentSha = execFileSync("git", ["rev-parse", "--verify", branchRef], {
+        encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
+    } catch (_) {}
+
+    const indexEnv = { ...process.env, GIT_INDEX_FILE: tmpIndex };
+    if (parentSha) {
+      execFileSync("git", ["read-tree", parentSha], {
+        timeout: 5000, stdio: ["pipe", "pipe", "pipe"], env: indexEnv,
+      });
+    }
+
+    // Walk srcDir and commit all files
+    function walkAndAdd(dir, prefix) {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        const relPath = prefix ? prefix + "/" + entry.name : entry.name;
+        if (entry.isDirectory()) {
+          walkAndAdd(full, relPath);
+        } else if (entry.isFile() && !entry.name.startsWith(".sticky-")) {
+          const content = fs.readFileSync(full);
+          const blobSha = execFileSync("git", ["hash-object", "-w", "--stdin"], {
+            input: content, encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+          }).trim();
+          execFileSync(
+            "git",
+            ["update-index", "--add", "--cacheinfo", "100644," + blobSha + "," + relPath],
+            { timeout: 5000, stdio: ["pipe", "pipe", "pipe"], env: indexEnv }
+          );
+        }
+      }
+    }
+    walkAndAdd(srcDir, "");
+
+    const treeSha = execFileSync("git", ["write-tree"], {
+      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"], env: indexEnv,
+    }).trim();
+
+    const commitArgs = ["commit-tree", treeSha, "-m", "chore(sticky-note): migrate to data branch"];
+    if (parentSha) commitArgs.push("-p", parentSha);
+    const commitSha = execFileSync("git", commitArgs, {
+      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+
+    execFileSync("git", ["update-ref", branchRef, commitSha], {
+      timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+    });
+  } finally {
+    try { fs.unlinkSync(tmpIndex); } catch (_) {}
+  }
+}
+
+// ──────────────────────────────────────────────
 // Main
 // ──────────────────────────────────────────────
 
@@ -3480,6 +3749,12 @@ async function main() {
       break;
     case "run-hook":
       cmdRunHook();
+      break;
+    case "migrate":
+      cmdMigrate().catch((err) => {
+        console.error(err);
+        process.exit(1);
+      });
       break;
     case "--version":
     case "-v":

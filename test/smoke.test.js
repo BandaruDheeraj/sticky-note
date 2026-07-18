@@ -586,6 +586,47 @@ try {
     assert.ok(found, "data branch should contain the session thread");
   });
 
+  run("migrate: copies .sticky-note/ to .git/sticky-note/ and creates data branch", () => {
+    const { execFileSync: exec2 } = require("child_process");
+
+    // Create old-style .sticky-note/ structure
+    const stickyDir = path.join(tmpDir, ".sticky-note");
+    fs.mkdirSync(stickyDir, { recursive: true });
+    const oldThread = {
+      id: "migrate-thread-1", user: "dheer", status: "closed",
+      branch: "main", created_at: "2026-01-01T00:00:00Z",
+      last_activity_at: "2026-01-01T01:00:00Z", files_touched: [],
+    };
+    fs.writeFileSync(
+      path.join(stickyDir, "sticky-note.json"),
+      JSON.stringify({ version: "2", project: "", threads: [oldThread] }, null, 2) + "\n"
+    );
+
+    // Run migrate
+    exec2(process.execPath, [CLI, "migrate"], {
+      encoding: "utf-8", timeout: 15000,
+      cwd: tmpDir,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    // Verify .git/sticky-note/sticky-note.json exists with old thread
+    const utils = require(path.join(tmpDir, ".claude", "hooks", "sticky-utils.js"));
+    const memory = utils.loadJson(utils.getMemoryPath(), { threads: [] });
+    assert.ok(
+      (memory.threads || []).find(t => t.id === "migrate-thread-1"),
+      "migrated thread should appear in .git/sticky-note/sticky-note.json"
+    );
+
+    // Verify sticky-note/data branch was created
+    const { readFileFromBranch } = require(path.join(tmpDir, ".claude", "hooks", "data-branch.js"));
+    const branchContent = readFileFromBranch("refs/heads/sticky-note/data", "sticky-note.json");
+    assert.ok(branchContent, "sticky-note/data branch should exist after migrate");
+
+    // Verify .sticky-note/ is in .gitignore
+    const gitignore = fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf-8");
+    assert.ok(gitignore.includes(".sticky-note/"), ".gitignore should include .sticky-note/");
+  });
+
 } finally {
   cleanup();
 }
