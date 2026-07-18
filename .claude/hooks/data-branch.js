@@ -1,14 +1,11 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * data-branch.js — Git plumbing module for the sticky-note/data branch.
+ * data-branch.js — Git plumbing for the sticky-note/data orphan branch.
  *
- * Commits files to and reads files from the sticky-note/data orphan branch
- * using git plumbing commands (hash-object, update-index, write-tree,
+ * Reads/writes files via git plumbing (hash-object, update-index, write-tree,
  * commit-tree, update-ref). No working-tree checkout is ever performed.
- *
- * All operations are synchronous and non-blocking on failure — callers
- * receive a result object indicating success/failure rather than an exception.
+ * All operations are synchronous; callers receive result objects on failure.
  */
 
 const fs = require("fs");
@@ -19,6 +16,8 @@ const { execFileSync } = require("child_process");
 
 const DATA_BRANCH = "sticky-note/data";
 const DATA_REF = "refs/heads/" + DATA_BRANCH;
+
+const GIT_OPTS = { encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] };
 
 // ── Git helpers ───────────────────────────────────────────
 
@@ -33,27 +32,18 @@ function getDefaultRemote() {
   }
 }
 
-/**
- * Read a file's content from a git ref (branch, commit, remote-tracking ref).
- * Returns the file content as a string, or null if not found.
- */
+/** Returns file content from a git ref as a string, or null if not found. */
 function readFileFromBranch(ref, filePath) {
   try {
-    return execFileSync("git", ["show", ref + ":" + filePath], {
-      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
-    });
+    return execFileSync("git", ["show", ref + ":" + filePath], GIT_OPTS);
   } catch (_) {
     return null;
   }
 }
 
 /**
- * Commit a map of { relativePath: content } to the sticky-note/data branch
- * using git plumbing. Does not touch the working tree or the main index.
- * Returns the new commit SHA.
- *
- * @param {string} branchName  e.g. "sticky-note/data"
- * @param {Object} fileMap     e.g. { "sticky-note.json": "...", "audit/user.jsonl": "..." }
+ * Commit { relativePath: content } to a branch using git plumbing.
+ * Does not touch the working tree or the main index. Returns the new commit SHA.
  */
 function commitFilesToBranch(branchName, fileMap) {
   const branchRef = "refs/heads/" + branchName;
@@ -63,19 +53,17 @@ function commitFilesToBranch(branchName, fileMap) {
   );
 
   try {
-    // Resolve parent commit SHA (null if branch doesn't exist yet)
     let parentSha = null;
     try {
       parentSha = execFileSync("git", ["rev-parse", "--verify", branchRef], {
         encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
       }).trim();
     } catch (_) {
-      // Branch doesn't exist yet — first commit will create it (orphan)
+      // Branch doesn't exist yet — first commit creates it as orphan
     }
 
     const indexEnv = { ...process.env, GIT_INDEX_FILE: tmpIndex };
 
-    // Seed the temp index from the existing tree so we only update changed files
     if (parentSha) {
       execFileSync("git", ["read-tree", parentSha], {
         timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
@@ -83,7 +71,6 @@ function commitFilesToBranch(branchName, fileMap) {
       });
     }
 
-    // Write each file as a blob and add to index
     for (const [filePath, content] of Object.entries(fileMap)) {
       const blobSha = execFileSync("git", ["hash-object", "-w", "--stdin"], {
         input: content,
@@ -97,26 +84,18 @@ function commitFilesToBranch(branchName, fileMap) {
       );
     }
 
-    // Write tree from temp index
     const treeSha = execFileSync("git", ["write-tree"], {
       encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
       env: indexEnv,
     }).trim();
 
-    // Build commit-tree args
-    const commitArgs = [
-      "commit-tree", treeSha,
-      "-m", "chore(sticky-note): sync thread data",
-    ];
+    const commitArgs = ["commit-tree", treeSha, "-m", "chore(sticky-note): sync thread data"];
     if (parentSha) {
       commitArgs.push("-p", parentSha);
     }
 
-    const commitSha = execFileSync("git", commitArgs, {
-      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    const commitSha = execFileSync("git", commitArgs, GIT_OPTS).trim();
 
-    // Advance the branch ref
     execFileSync("git", ["update-ref", branchRef, commitSha], {
       timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
     });
@@ -131,7 +110,7 @@ function commitFilesToBranch(branchName, fileMap) {
 
 /**
  * Fetch the remote data branch into a local remote-tracking ref.
- * Returns { ok: bool, sha: string|null, error: string|null, remoteRef: string }
+ * Returns { ok, sha, error, remoteRef }.
  */
 function fetchDataBranch(remote, branchName) {
   branchName = branchName || DATA_BRANCH;
@@ -160,9 +139,9 @@ function fetchDataBranch(remote, branchName) {
 // ── Push with retry ────────────────────────────────────────
 
 /**
- * Push the local data branch to the remote with up to maxRetries attempts.
- * On push rejection (non-fast-forward), fetches and merges before retrying.
- * Returns { ok: bool, error: string|null }
+ * Push the local data branch to the remote, retrying on rejection.
+ * On non-fast-forward rejection, fetches and merges before retrying.
+ * Returns { ok, error }.
  */
 function pushDataBranch(remote, branchName, maxRetries, localMemPath, loadJsonFn, saveJsonFn) {
   branchName = branchName || DATA_BRANCH;
@@ -182,22 +161,22 @@ function pushDataBranch(remote, branchName, maxRetries, localMemPath, loadJsonFn
       if (attempt === maxRetries) {
         return { ok: false, error: err.message };
       }
-      // Push rejected — fetch, merge, re-commit merged result, then retry
+
+      // Fetch, merge, and re-commit so the next push attempt advances the ref
       try {
         const fetchResult = fetchDataBranch(remote, branchName);
         if (fetchResult.ok && fetchResult.remoteRef && localMemPath) {
           const remoteContent = readFileFromBranch(fetchResult.remoteRef, "sticky-note.json");
           if (remoteContent) {
             mergeAndSaveFromRemote(localMemPath, remoteContent, loadJsonFn, saveJsonFn);
-            // Re-commit the merged file so the retry push advances the ref
             const mergedContent = fs.readFileSync(localMemPath, "utf-8");
             commitFilesToBranch(branchName, { "sticky-note.json": mergedContent });
           }
         }
       } catch (_) {}
-      // Brief backoff before retry (busy-wait, synchronous context)
-      const waitMs = Math.pow(2, attempt) * 300;
-      const end = Date.now() + waitMs;
+
+      // Brief exponential backoff (busy-wait — synchronous context)
+      const end = Date.now() + Math.pow(2, attempt) * 300;
       while (Date.now() < end) {}
     }
   }
@@ -206,9 +185,13 @@ function pushDataBranch(remote, branchName, maxRetries, localMemPath, loadJsonFn
 
 // ── Thread merge ──────────────────────────────────────────
 
+function _mostRecentTimestamp(thread) {
+  return thread.last_activity_at || thread.updated_at || thread.created_at || "";
+}
+
 /**
- * Merge two thread arrays, preferring the more-recently-active copy for
- * same-id threads. Threads only present in one array are preserved as-is.
+ * Merge two thread arrays, preferring the more-recently-active copy
+ * when both contain the same thread ID.
  */
 function mergeThreadArrays(localThreads, remoteThreads) {
   const merged = new Map();
@@ -220,14 +203,7 @@ function mergeThreadArrays(localThreads, remoteThreads) {
   for (const t of (remoteThreads || [])) {
     if (!t || !t.id) continue;
     const existing = merged.get(t.id);
-    if (!existing) {
-      merged.set(t.id, t);
-      continue;
-    }
-    // Same thread on both sides — keep the more recent one
-    const localTs = existing.last_activity_at || existing.updated_at || existing.created_at || "";
-    const remoteTs = t.last_activity_at || t.updated_at || t.created_at || "";
-    if (remoteTs > localTs) {
+    if (!existing || _mostRecentTimestamp(t) > _mostRecentTimestamp(existing)) {
       merged.set(t.id, t);
     }
   }
@@ -235,14 +211,11 @@ function mergeThreadArrays(localThreads, remoteThreads) {
   return Array.from(merged.values());
 }
 
+const EMPTY_MEMORY = { version: "2", project: "", threads: [] };
+
 /**
  * Merge remote sticky-note.json content into the local memory file.
- * Writes the merged result back to localMemPath.
- *
- * @param {string} localMemPath   Absolute path to local sticky-note.json
- * @param {string} remoteContent  Raw JSON string from the remote branch
- * @param {Function|null} loadJsonFn  Optional: (filePath, defaultVal) => object
- * @param {Function|null} saveJsonFn  Optional: (filePath, object) => void
+ * Uses loadJsonFn/saveJsonFn when provided, otherwise reads/writes directly.
  */
 function mergeAndSaveFromRemote(localMemPath, remoteContent, loadJsonFn, saveJsonFn) {
   let remoteMemory;
@@ -253,15 +226,13 @@ function mergeAndSaveFromRemote(localMemPath, remoteContent, loadJsonFn, saveJso
   }
 
   const localMemory = loadJsonFn
-    ? loadJsonFn(localMemPath, { version: "2", project: "", threads: [] })
-    : { version: "2", project: "", threads: [] };
+    ? loadJsonFn(localMemPath, { ...EMPTY_MEMORY })
+    : { ...EMPTY_MEMORY };
 
-  const mergedThreads = mergeThreadArrays(
-    Array.isArray(localMemory.threads) ? localMemory.threads.filter(Boolean) : [],
-    Array.isArray(remoteMemory.threads) ? remoteMemory.threads.filter(Boolean) : []
-  );
+  const localThreads = Array.isArray(localMemory.threads) ? localMemory.threads.filter(Boolean) : [];
+  const remoteThreads = Array.isArray(remoteMemory.threads) ? remoteMemory.threads.filter(Boolean) : [];
+  localMemory.threads = mergeThreadArrays(localThreads, remoteThreads);
 
-  localMemory.threads = mergedThreads;
   if (saveJsonFn) {
     saveJsonFn(localMemPath, localMemory);
   } else {

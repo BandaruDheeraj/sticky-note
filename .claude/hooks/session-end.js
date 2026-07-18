@@ -29,12 +29,8 @@ try {
   _safeExit();
 }
 
-let dataBranch;
-try {
-  dataBranch = require("./data-branch.js");
-} catch (_) {
-  dataBranch = null;
-}
+let dataBranch = null;
+try { dataBranch = require("./data-branch.js"); } catch (_) {}
 
 const {
   getMemoryPath,
@@ -735,42 +731,32 @@ function clearPresence(user) {
 
 // ── Data-branch commit/push ───────────────────────────────
 
+/** Collect files from a directory matching an extension into fileMap. */
+function _collectDirFiles(dir, ext, prefix, fileMap) {
+  if (!dir || !fs.existsSync(dir)) return;
+  for (const file of fs.readdirSync(dir)) {
+    if (file.endsWith(ext)) {
+      fileMap[prefix + file] = fs.readFileSync(path.join(dir, file), "utf-8");
+    }
+  }
+}
+
 function commitAndPushDataBranch() {
   if (!dataBranch) return;
   try {
     const fileMap = {};
-
-    // Collect sticky-note.json
     const memPath = getMemoryPath();
     if (fs.existsSync(memPath)) {
       fileMap["sticky-note.json"] = fs.readFileSync(memPath, "utf-8");
     }
 
-    // Collect audit files
-    const auditDir = getAuditDir ? getAuditDir() : null;
-    if (auditDir && fs.existsSync(auditDir)) {
-      for (const file of fs.readdirSync(auditDir)) {
-        if (file.endsWith(".jsonl")) {
-          fileMap["audit/" + file] = fs.readFileSync(path.join(auditDir, file), "utf-8");
-        }
-      }
-    }
-
-    // Collect presence files
-    const presDir = getPresenceDir ? getPresenceDir() : null;
-    if (presDir && fs.existsSync(presDir)) {
-      for (const file of fs.readdirSync(presDir)) {
-        if (file.endsWith(".json")) {
-          fileMap["presence/" + file] = fs.readFileSync(path.join(presDir, file), "utf-8");
-        }
-      }
-    }
+    _collectDirFiles(getAuditDir(), ".jsonl", "audit/", fileMap);
+    _collectDirFiles(getPresenceDir(), ".json", "presence/", fileMap);
 
     if (Object.keys(fileMap).length === 0) return;
 
     dataBranch.commitFilesToBranch(dataBranch.DATA_BRANCH, fileMap);
 
-    // Push (non-blocking — failure is logged but doesn't prevent session exit)
     const remote = dataBranch.getDefaultRemote();
     if (remote) {
       const pushResult = dataBranch.pushDataBranch(
