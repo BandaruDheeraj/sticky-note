@@ -105,6 +105,15 @@ try {
 // session-start to run.
 try { utils.selfHealHookPaths && utils.selfHealHookPaths(); } catch (_) { /* non-fatal */ }
 
+// Load data-branch module non-fatally — if missing, data-branch sync is
+// disabled for this session rather than crashing the hook.
+let dataBranch;
+try {
+  dataBranch = require("./data-branch.js");
+} catch (_) {
+  dataBranch = null; // non-fatal — data branch sync disabled
+}
+
 const {
   getMemoryPath,
   getConfigPath,
@@ -879,6 +888,70 @@ function ensureEnvironmentProvisioned() {
   if (debug) process.stderr.write("[sticky-note] environment provisioning complete\n");
 }
 
+// ── Data branch fetch-and-merge ───────────────────────────
+
+/**
+ * Fetches the remote sticky-note/data branch (if a remote exists) and merges
+ * thread data into the local memory file. Also always reads from the LOCAL
+ * data branch (refs/heads/sticky-note/data), which covers:
+ *   (a) fresh clones after `npx sticky-note init`
+ *   (b) offline / no-remote repos
+ *   (c) smoke tests that commit data locally without a remote
+ *
+ * Failures are non-blocking — the session continues with whatever local data
+ * is already in the memory file.
+ */
+function fetchAndMergeDataBranch() {
+  if (!dataBranch) return;
+  try {
+    const remote = dataBranch.getDefaultRemote();
+
+    if (remote) {
+      // Attempt to fetch from the remote data branch
+      const fetchResult = dataBranch.fetchDataBranch(remote);
+      if (!fetchResult.ok) {
+        process.stderr.write(
+          "[STICKY-NOTE] offline — using local thread cache (" +
+            (fetchResult.error || "fetch failed") +
+            ")\n"
+        );
+      } else if (fetchResult.remoteRef) {
+        const remoteContent = dataBranch.readFileFromBranch(
+          fetchResult.remoteRef,
+          "sticky-note.json"
+        );
+        if (remoteContent) {
+          dataBranch.mergeAndSaveFromRemote(
+            getMemoryPath(),
+            remoteContent,
+            loadJson,
+            saveJson
+          );
+        }
+      }
+    }
+
+    // Always merge from local data branch — covers fresh clone and test harness
+    const localContent = dataBranch.readFileFromBranch(
+      dataBranch.DATA_REF,
+      "sticky-note.json"
+    );
+    if (localContent) {
+      dataBranch.mergeAndSaveFromRemote(
+        getMemoryPath(),
+        localContent,
+        loadJson,
+        saveJson
+      );
+    }
+  } catch (err) {
+    // Non-blocking — session continues with local data
+    process.stderr.write(
+      "[STICKY-NOTE] offline — using local thread cache (" + err.message + ")\n"
+    );
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────
 
 function main() {
@@ -891,6 +964,9 @@ function main() {
   } catch (_) {
     hookInput = {};
   }
+
+  // Fetch remote data branch and merge into local cache — before reading memory
+  fetchAndMergeDataBranch();
 
   let sessionId = getSessionId(hookInput);
   const aiTool = detectTool(hookInput);

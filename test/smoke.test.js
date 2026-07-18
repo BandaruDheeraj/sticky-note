@@ -492,6 +492,48 @@ try {
     assert.strictEqual(merged[0].last_note, "new", "newer version should win");
   });
 
+  run("session-start: merges remote data branch threads on boot", () => {
+    const { commitFilesToBranch } = require(
+      path.join(tmpDir, ".claude", "hooks", "data-branch.js")
+    );
+
+    // Simulate a remote teammate's thread on the data branch
+    const remoteThread = {
+      id: "remote-thread-1",
+      user: "alice",
+      status: "open",
+      branch: "feature/remote",
+      created_at: "2026-01-01T10:00:00Z",
+      last_activity_at: "2026-01-01T10:00:00Z",
+      files_touched: ["src/api.ts"],
+      narrative: "remote work",
+    };
+    const remoteMemory = { version: "2", project: "", threads: [remoteThread] };
+    commitFilesToBranch("sticky-note/data", {
+      "sticky-note.json": JSON.stringify(remoteMemory, null, 2) + "\n",
+    });
+
+    // Run session-start (it reads the data branch on start)
+    execFileSync(
+      process.execPath,
+      [path.join(tmpDir, ".claude", "hooks", "session-start.js")],
+      {
+        encoding: "utf-8",
+        timeout: 15000,
+        cwd: tmpDir,
+        env: { ...process.env, HOME: tmpDir, USERPROFILE: tmpDir },
+        input: '{"hook_event_name":"SessionStart","session_id":"test-session-fetch"}',
+        stdio: ["pipe", "pipe", "pipe"],
+      }
+    );
+
+    // After session-start, local memory should contain the remote thread
+    const utils = require(path.join(tmpDir, ".claude", "hooks", "sticky-utils.js"));
+    const memory = utils.loadJson(utils.getMemoryPath(), { threads: [] });
+    const found = (memory.threads || []).find((t) => t.id === "remote-thread-1");
+    assert.ok(found, "remote thread should be merged into local memory after session-start");
+  });
+
 } finally {
   cleanup();
 }
