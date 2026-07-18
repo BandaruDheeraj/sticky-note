@@ -445,6 +445,53 @@ try {
     );
   });
 
+  // ── data-branch tests ──
+
+  run("data-branch: commitFilesToBranch round-trips content", () => {
+    const { commitFilesToBranch, readFileFromBranch } = require(
+      path.join(tmpDir, ".claude", "hooks", "data-branch.js")
+    );
+    const content = JSON.stringify({ version: "2", project: "", threads: [{ id: "abc123" }] }, null, 2) + "\n";
+    commitFilesToBranch("sticky-note/data", { "sticky-note.json": content });
+    const read = readFileFromBranch("refs/heads/sticky-note/data", "sticky-note.json");
+    assert.strictEqual(read, content, "round-trip content mismatch");
+  });
+
+  run("data-branch: commitFilesToBranch creates second commit on same branch", () => {
+    const { commitFilesToBranch, readFileFromBranch } = require(
+      path.join(tmpDir, ".claude", "hooks", "data-branch.js")
+    );
+    const v1 = '{"version":"2","threads":[]}\n';
+    const v2 = '{"version":"2","threads":[{"id":"xyz"}]}\n';
+    commitFilesToBranch("sticky-note/data", { "sticky-note.json": v1 });
+    commitFilesToBranch("sticky-note/data", { "sticky-note.json": v2 });
+    const read = readFileFromBranch("refs/heads/sticky-note/data", "sticky-note.json");
+    assert.strictEqual(read, v2, "second commit should overwrite first");
+  });
+
+  run("data-branch: mergeThreadArrays preserves threads from both sides", () => {
+    const { mergeThreadArrays } = require(
+      path.join(tmpDir, ".claude", "hooks", "data-branch.js")
+    );
+    const local = [{ id: "a", status: "open", last_activity_at: "2026-01-01T00:00:00Z" }];
+    const remote = [{ id: "b", status: "closed", last_activity_at: "2026-01-02T00:00:00Z" }];
+    const merged = mergeThreadArrays(local, remote);
+    assert.strictEqual(merged.length, 2, "should have 2 threads");
+    assert.ok(merged.find(t => t.id === "a"), "local thread preserved");
+    assert.ok(merged.find(t => t.id === "b"), "remote thread preserved");
+  });
+
+  run("data-branch: mergeThreadArrays takes more-recent copy for same id", () => {
+    const { mergeThreadArrays } = require(
+      path.join(tmpDir, ".claude", "hooks", "data-branch.js")
+    );
+    const older = { id: "a", status: "open", last_activity_at: "2026-01-01T00:00:00Z", last_note: "old" };
+    const newer = { id: "a", status: "closed", last_activity_at: "2026-01-02T00:00:00Z", last_note: "new" };
+    const merged = mergeThreadArrays([older], [newer]);
+    assert.strictEqual(merged.length, 1);
+    assert.strictEqual(merged[0].last_note, "new", "newer version should win");
+  });
+
 } finally {
   cleanup();
 }

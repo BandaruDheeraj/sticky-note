@@ -25,6 +25,7 @@ const VERSION = require("../package.json").version;
 
 const HOOK_FILES = [
   "sticky-utils.js",
+  "data-branch.js",          // git plumbing module for sticky-note/data branch
   "session-start.js",
   "session-end.js",
   "inject-context.js",
@@ -113,6 +114,14 @@ function findStaleHookPaths(settings) {
           /["']\/(?:Users|home|root|tmp)\//.test(cmd) ||
           cmd.includes("$(git rev-parse")
         ) {
+          stale.push(cmd);
+        }
+        // Old relative-path format: node ".claude/hooks/foo.js"
+        // This fails when Claude Code launches from a subdirectory of the
+        // project root, because the path resolves relative to the launch cwd,
+        // not relative to where .claude/settings.json lives. The fix is to
+        // use `npx sticky-note run-hook foo` which walks up to find the hooks.
+        if (/node\s+["']\.claude[\\/]hooks[\\/][^"']+\.js["']/.test(cmd)) {
           stale.push(cmd);
         }
       }
@@ -3351,6 +3360,56 @@ async function cmdEnvAddPlugin() {
 }
 
 // ──────────────────────────────────────────────
+// run-hook: locate and execute a hook from any directory
+// ──────────────────────────────────────────────
+
+function cmdRunHook() {
+  const { spawnSync } = require("child_process");
+  const hookName = process.argv[3]; // e.g. "session-start"
+
+  if (!hookName) {
+    process.stderr.write(
+      "[sticky-note] run-hook: missing hook name\n" +
+      "  Usage: npx sticky-note run-hook <name>\n" +
+      "  Names: session-start, session-end, inject-context, pre-tool-use,\n" +
+      "         track-work, on-stop, on-error\n"
+    );
+    // Emit empty output so Claude Code doesn't choke on missing stdout JSON
+    process.stdout.write(JSON.stringify({ output: "" }) + "\n");
+    process.exit(0);
+  }
+
+  // Walk up from cwd to find .claude/hooks/<name>.js
+  const hookFile = hookName.endsWith(".js") ? hookName : `${hookName}.js`;
+  let dir = process.cwd();
+  let hookPath = null;
+  for (let i = 0; i < 20; i++) {
+    const candidate = path.join(dir, ".claude", "hooks", hookFile);
+    if (fs.existsSync(candidate)) {
+      hookPath = candidate;
+      break;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break; // filesystem root
+    dir = parent;
+  }
+
+  if (!hookPath) {
+    // Hook not installed — exit silently (non-fatal)
+    process.stdout.write(JSON.stringify({ output: "" }) + "\n");
+    process.exit(0);
+  }
+
+  // Spawn the hook with stdin/stdout/stderr inherited so Claude Code's pipe
+  // flows through to the hook process unchanged.
+  const result = spawnSync(process.execPath, [hookPath], {
+    stdio: "inherit",
+    env: process.env,
+  });
+  process.exit(result.status != null ? result.status : 0);
+}
+
+// ──────────────────────────────────────────────
 // Main
 // ──────────────────────────────────────────────
 
@@ -3419,6 +3478,9 @@ async function main() {
     case "mcp-server":
       cmdMcpServer();
       break;
+    case "run-hook":
+      cmdRunHook();
+      break;
     case "--version":
     case "-v":
       print(`sticky-note v${VERSION}`);
@@ -3449,6 +3511,7 @@ async function main() {
     print("    bootstrap          Provision MCP servers with secrets from manifest");
     print("    env                Environment management (status, add-server, add-plugin)");
     print("    mcp-server         Launch the sticky-note MCP server (stdio JSON-RPC)");
+    print("    run-hook <name>    Run a hook from any subdirectory (finds .claude/hooks/ up the tree)");
       print("");
       print("  Options:");
       print("    --version  Show version");
