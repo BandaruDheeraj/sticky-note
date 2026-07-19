@@ -37,9 +37,133 @@ const FILE_PATH_PATTERN = /[\w./\\-]+\.\w{1,10}/g;
 
 // ── Path helpers ──────────────────────────────────────────
 
+let _cachedStickyDir = null;
 function _stickyDir() {
-  const scriptDir = path.dirname(path.resolve(__filename));
-  return path.join(scriptDir, "..", "..", ".sticky-note");
+  if (_cachedStickyDir) return _cachedStickyDir;
+  try {
+    const gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    _cachedStickyDir = path.resolve(gitDir, "sticky-note");
+    return _cachedStickyDir;
+  } catch (_) {
+    // Fallback for non-git environments (e.g., unit tests without git init)
+    const scriptDir = path.dirname(path.resolve(__filename));
+    return path.join(scriptDir, "..", "..", ".sticky-note");
+  }
+}
+
+// ── Error logging ─────────────────────────────────────────
+
+function logHookError(hookName, error) {
+  try {
+    const logPath = path.join(_stickyDir(), ".sticky-errors.log");
+    const ts = new Date().toISOString();
+    const msg = error instanceof Error ? error.stack || error.message : String(error);
+    const line = `[${ts}] ${hookName}: ${msg}\n`;
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    fs.appendFileSync(logPath, line, "utf-8");
+  } catch (_) {
+    // Last resort — can't even log the error
+  }
+}
+
+// Issue #14: Surface hook failures to stderr so the host tool's generic
+// "<HookName> hook error" message has actionable detail next to it. Earlier
+// versions silently swallowed `require()` failures and top-level exceptions,
+// which made stale-path issues (#13) and other crashes impossible to diagnose
+// — particularly under UserPromptSubmit, which Claude Code reports without
+// a stack trace. This helper prefixes every line with `[STICKY-NOTE]` so the
+// user can spot it in mixed hook output.
+function reportHookError(hookName, error, hint) {
+  const msg = error instanceof Error ? (error.stack || error.message) : String(error);
+  const lines = [`[STICKY-NOTE] ${hookName} hook error: ${msg}`];
+  if (hint) lines.push(`[STICKY-NOTE]   hint: ${hint}`);
+  try { process.stderr.write(lines.join("\n") + "\n"); } catch (_) { /* ignore */ }
+  try { logHookError(hookName, error); } catch (_) { /* ignore */ }
+}
+
+// Issue #13: When a teammate copies `.claude/settings.json` from another
+// machine (or runs an older sticky-note-cli that wrote absolute paths), the
+// hook commands point at non-existent absolute paths and every hook fails
+// with MODULE_NOT_FOUND. Re-running `npx sticky-note init` fixes it, but
+// users typically don't know that — they just see "<Hook> hook error" each
+// session. This helper detects and rewrites those stale commands in-place
+// the first time any hook (e.g. session-start, inject-context) successfully
+// loads, so the next session starts clean.
+//
+// The rewritten command uses `npx sticky-note run-hook <basename>` which walks
+// up the directory tree to find `.claude/hooks/<basename>.js`, so it works even
+// when Claude Code is launched from a subdirectory of the project root.
+// We extract `<basename>` from the existing command so we never invent hook
+// scripts that don't exist.
+//
+// Returns the list of (hookEvent, oldCommand, newCommand) tuples that were
+// rewritten, or [] if nothing was stale.
+function selfHealHookPaths(settingsPath) {
+  const result = [];
+  try {
+    if (!settingsPath) {
+      settingsPath = path.join(process.cwd(), ".claude", "settings.json");
+    }
+    let raw;
+    try {
+      raw = fs.readFileSync(settingsPath, "utf-8");
+    } catch (_) {
+      return result;
+    }
+    let settings;
+    try { settings = JSON.parse(raw); } catch (_) { return result; }
+    if (!settings || !settings.hooks) return result;
+
+    // Two stale patterns:
+    // 1. Absolute paths (written by older sticky-note-cli or copied from another machine)
+    // 2. Old relative form `node ".claude/hooks/foo.js"` — fails when Claude Code
+    //    launches from a subdirectory, because the path resolves relative to the
+    //    launch cwd, not the directory containing .claude/settings.json.
+    const STALE_ABSOLUTE = /["'][A-Za-z]:[\\/]|["']\/(?:Users|home|root|tmp)\/|\$\(git rev-parse/;
+    const STALE_RELATIVE = /^node\s+["']\.claude[\\/]hooks[\\/][^"']+\.js["']\s*$/;
+    // Match the script basename in either quoted or bare form.
+    const BASENAME = /([A-Za-z0-9_.-]+)\.(?:js|sh|cjs|mjs)(?:["'`\s]|$)/;
+
+    let changed = false;
+    for (const [event, entries] of Object.entries(settings.hooks)) {
+      if (!Array.isArray(entries)) continue;
+      for (const entry of entries) {
+        for (const h of (entry && entry.hooks) || []) {
+          const cmd = h && h.command;
+          if (typeof cmd !== "string") continue;
+          const isStale = STALE_ABSOLUTE.test(cmd) || STALE_RELATIVE.test(cmd);
+          if (!isStale) continue;
+          const m = cmd.match(BASENAME);
+          if (!m) continue;
+          const basename = m[1];
+          const newCmd = `npx sticky-note run-hook ${basename}`;
+          result.push({ event, oldCommand: cmd, newCommand: newCmd });
+          h.command = newCmd;
+          changed = true;
+        }
+      }
+    }
+
+    if (!changed) return result;
+
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
+    try {
+      const summary =
+        `[STICKY-NOTE] ⚠️  Detected ${result.length} stale hook path(s) in ` +
+        `${path.relative(process.cwd(), settingsPath) || settingsPath} — rewrote to ` +
+        `"npx sticky-note run-hook <name>" so hooks work from any subdirectory. ` +
+        `Commit the change to share the fix with your team.`;
+      process.stderr.write(summary + "\n");
+      for (const { event, oldCommand, newCommand } of result.slice(0, 5)) {
+        process.stderr.write(`[STICKY-NOTE]   ${event}: ${oldCommand} → ${newCommand}\n`);
+      }
+    } catch (_) { /* non-fatal */ }
+  } catch (err) {
+    try { logHookError("selfHealHookPaths", err); } catch (_) { /* ignore */ }
+  }
+  return result;
 }
 
 const _paths = {
@@ -125,6 +249,76 @@ function clearSessionFile() {
   }
 }
 
+// ── Git sync (auto-commit/push .sticky-note/ files) ──────
+
+function _gitRepoRoot() {
+  try {
+    return execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Stage, commit, and optionally push .sticky-note/ files.
+ * Returns { committed: bool, pushed: bool, skipped: bool, error?: string }
+ */
+function syncStickyNote(opts) {
+  const push = opts && opts.push;
+  const result = { committed: false, pushed: false, skipped: false };
+  try {
+    const root = _gitRepoRoot();
+    if (!root) { result.skipped = true; return result; }
+
+    const syncGuard = path.join(_stickyDir(), ".sticky-syncing");
+
+    // Check for dirty .sticky-note/ files (staged or unstaged)
+    const status = execFileSync("git", [
+      "status", "--porcelain", "--", ".sticky-note/sticky-note.json",
+      ".sticky-note/audit/", ".sticky-note/presence/"
+    ], { encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] }).trim();
+
+    if (!status) { result.skipped = true; return result; }
+
+    // Write guard atomically to prevent recursive post-commit triggers
+    try {
+      fs.writeFileSync(syncGuard, process.pid.toString(), { flag: "wx", encoding: "utf-8" });
+    } catch (_) {
+      result.skipped = true; return result;
+    }
+
+    try {
+      // Stage the relevant files
+      execFileSync("git", [
+        "add", "--", ".sticky-note/sticky-note.json",
+        ".sticky-note/audit/", ".sticky-note/presence/"
+      ], { timeout: 10000, stdio: ["pipe", "pipe", "pipe"] });
+
+      // Commit only what was staged
+      execFileSync("git", [
+        "commit", "-m", "chore(sticky-note): sync thread data", "--no-verify"
+      ], { timeout: 15000, stdio: ["pipe", "pipe", "pipe"] });
+      result.committed = true;
+
+      // Push if requested
+      if (push) {
+        execFileSync("git", ["push"], {
+          timeout: 30000, stdio: ["pipe", "pipe", "pipe"],
+        });
+        result.pushed = true;
+      }
+    } finally {
+      try { fs.unlinkSync(syncGuard); } catch (_) {}
+    }
+  } catch (err) {
+    result.error = err.message;
+    logHookError("syncStickyNote", err);
+  }
+  return result;
+}
+
 // ── Git HEAD snapshot (for files_touched fallback) ────────
 
 function saveHeadSha() {
@@ -202,32 +396,167 @@ function loadJson(filePath, defaultVal) {
 
 function saveJson(filePath, data) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n", "utf-8");
+  // Atomic write: write to temp file then rename to prevent partial/truncated JSON
+  const tmpPath = filePath + ".tmp." + process.pid;
+  try {
+    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2) + "\n", "utf-8");
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    // Rename can fail on some Windows configs; fall back to direct write
+    try { fs.unlinkSync(tmpPath); } catch (_) {}
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n", "utf-8");
+  }
+}
+
+// ── File locking ─────────────────────────────────────────
+
+const LOCK_STALE_MS = 10000; // 10 seconds
+const LOCK_RETRY_MS = 50;
+const LOCK_MAX_RETRIES = 60; // 3 seconds max wait
+
+function acquireLock(memoryPath) {
+  const lockPath = memoryPath + ".lock";
+  for (let i = 0; i < LOCK_MAX_RETRIES; i++) {
+    try {
+      // Exclusive create — fails if lock already exists
+      fs.writeFileSync(lockPath, JSON.stringify({ pid: process.pid, ts: Date.now() }), { flag: "wx" });
+      return lockPath;
+    } catch (_) {
+      // Lock exists — check if stale
+      try {
+        const lock = JSON.parse(fs.readFileSync(lockPath, "utf-8"));
+        if (Date.now() - lock.ts > LOCK_STALE_MS) {
+          // Stale lock — remove and retry
+          try { fs.unlinkSync(lockPath); } catch (_) {}
+          continue;
+        }
+      } catch (_) {
+        // Can't read lock — remove and retry
+        try { fs.unlinkSync(lockPath); } catch (_) {}
+        continue;
+      }
+      // Lock is fresh — wait and retry
+      const waitUntil = Date.now() + LOCK_RETRY_MS;
+      while (Date.now() < waitUntil) { /* busy wait */ }
+    }
+  }
+  // Couldn't acquire after retries — proceed without lock (best effort)
+  return null;
+}
+
+function releaseLock(lockPath) {
+  if (!lockPath) return;
+  try { fs.unlinkSync(lockPath); } catch (_) {}
+}
+
+// ── Backup rotation ──────────────────────────────────────
+
+const MAX_BACKUPS = 3;
+
+function rotateBackup(memoryPath) {
+  const dir = path.dirname(memoryPath);
+  const backupDir = path.join(dir, ".sticky-backups");
+  try {
+    fs.mkdirSync(backupDir, { recursive: true });
+    // Read current file
+    const current = fs.readFileSync(memoryPath, "utf-8");
+    // Rotate: remove oldest, shift names
+    for (let i = MAX_BACKUPS; i > 1; i--) {
+      const older = path.join(backupDir, `sticky-note.${i - 1}.json`);
+      const newer = path.join(backupDir, `sticky-note.${i}.json`);
+      try {
+        if (fs.existsSync(older)) fs.renameSync(older, newer);
+      } catch (_) {}
+    }
+    // Write newest backup
+    fs.writeFileSync(path.join(backupDir, "sticky-note.1.json"), current, "utf-8");
+  } catch (_) {
+    // Backup failure is non-fatal
+  }
+}
+
+function loadLatestBackup(memoryPath) {
+  const backupDir = path.join(path.dirname(memoryPath), ".sticky-backups");
+  for (let i = 1; i <= MAX_BACKUPS; i++) {
+    try {
+      const bp = path.join(backupDir, `sticky-note.${i}.json`);
+      return JSON.parse(fs.readFileSync(bp, "utf-8"));
+    } catch (_) {
+      continue;
+    }
+  }
+  return null;
+}
+
+/**
+ * Detect threads lost since last backup (e.g., after git reset/rollback).
+ * Returns array of thread IDs that are in backup but not in current.
+ */
+function detectLostThreads(memoryPath) {
+  try {
+    const current = loadJson(memoryPath, { threads: [] });
+    const backup = loadLatestBackup(memoryPath);
+    if (!backup || !Array.isArray(backup.threads)) return [];
+    const currentIds = new Set(
+      (current.threads || []).filter(Boolean).map((t) => t.id)
+    );
+    return (backup.threads || []).filter(
+      (t) => t && t.id && !currentIds.has(t.id) && t.status !== "expired"
+    );
+  } catch (_) {
+    return [];
+  }
 }
 
 /**
  * Merge-on-write for the memory file. Re-reads the file from disk before
  * writing and preserves any threads (by ID) that exist on disk but not in
- * the in-memory copy. This prevents concurrent sessions or un-pulled commits
- * from silently dropping other users' threads.
+ * the in-memory copy. For same-ID threads, performs field-level 2-way merge
+ * to prevent concurrent sessions from clobbering each other's changes.
+ *
+ * Uses file locking, atomic writes, and rolling backups.
  */
 function saveMemoryMerged(memoryPath, memory) {
+  const lockPath = acquireLock(memoryPath);
   try {
-    const onDisk = loadJson(memoryPath, { threads: [] });
-    const onDiskThreads = Array.isArray(onDisk.threads) ? onDisk.threads : [];
-    const inMemoryThreads = Array.isArray(memory.threads) ? memory.threads : [];
-    const inMemoryIds = new Set(inMemoryThreads.map((t) => t.id));
+    // Create backup before writing
+    rotateBackup(memoryPath);
 
-    for (const diskThread of onDiskThreads) {
-      if (diskThread.id && !inMemoryIds.has(diskThread.id)) {
-        memory.threads.push(diskThread);
+    // Load merge helpers (field-level thread merge)
+    let mergeOneThread2Way = null;
+    try {
+      const md = require(path.join(path.dirname(memoryPath), "merge-driver.js"));
+      mergeOneThread2Way = md.mergeOneThread2Way;
+    } catch (_) {}
+
+    try {
+      const onDisk = loadJson(memoryPath, { threads: [] });
+      const onDiskThreads = Array.isArray(onDisk.threads) ? onDisk.threads.filter(Boolean) : [];
+      const inMemoryThreads = Array.isArray(memory.threads) ? memory.threads.filter(Boolean) : [];
+      const inMemoryMap = new Map(inMemoryThreads.map((t) => [t.id, t]));
+
+      for (const diskThread of onDiskThreads) {
+        if (!diskThread.id) continue;
+        if (!inMemoryMap.has(diskThread.id)) {
+          // Thread only on disk — preserve it
+          memory.threads.push(diskThread);
+        } else if (mergeOneThread2Way) {
+          // Thread on both — field-level merge
+          const inMemThread = inMemoryMap.get(diskThread.id);
+          const merged = mergeOneThread2Way(inMemThread, diskThread);
+          // Replace in-memory version with merged version
+          const idx = memory.threads.findIndex((t) => t && t.id === diskThread.id);
+          if (idx >= 0) memory.threads[idx] = merged;
+        }
       }
+    } catch (_) {
+      // If re-read/merge fails, proceed with what we have
     }
-  } catch (_) {
-    // If re-read fails, proceed with what we have
-  }
 
-  saveJson(memoryPath, memory);
+    saveJson(memoryPath, memory);
+  } finally {
+    releaseLock(lockPath);
+  }
 }
 
 function appendAuditLine(entry) {
@@ -286,16 +615,20 @@ function getSessionId(hookInput) {
   return "unknown";
 }
 
+let _cachedBranch = null;
 function getBranch() {
+  if (_cachedBranch !== null) return _cachedBranch;
   try {
     const result = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     }).trim();
-    return result;
+    _cachedBranch = result;
+    return _cachedBranch;
   } catch (_) {
-    return "";
+    _cachedBranch = "";
+    return _cachedBranch;
   }
 }
 
@@ -569,8 +902,14 @@ function clearInjectedSet() {
   }
 }
 
-function isThreadInjected(threadId) {
+function isThreadInjected(threadId, sessionId) {
   const data = loadInjectedSet();
+  // Only consider threads injected in the SAME session — the file is shared
+  // across concurrent sessions and stale entries from other sessions must
+  // not suppress injection.
+  if (sessionId && data.session_id && data.session_id !== sessionId) {
+    return false;
+  }
   return (data.thread_ids || []).includes(threadId);
 }
 
@@ -583,6 +922,54 @@ function markThreadInjected(threadId, sessionId) {
   }
   saveInjectedSet(data);
 }
+
+// ── Overlap warning tracking (V2.6.11) ────────────────────
+// Uses COPILOT_LOADER_PID to identify each Copilot CLI session uniquely.
+// Each session gets its own overlap-warned flag, preventing cross-session
+// poisoning. The flag file stores a JSON object keyed by PID.
+
+const _overlapFlagPath = () => path.join(_stickyDir(), ".overlap-warned");
+
+function _getCopilotPid() {
+  return process.env.COPILOT_LOADER_PID || null;
+}
+
+function isOverlapWarned() {
+  const pid = _getCopilotPid();
+  if (!pid) return false;
+  try {
+    const data = JSON.parse(fs.readFileSync(_overlapFlagPath(), "utf-8"));
+    return !!data[pid];
+  } catch (_) {
+    return false;
+  }
+}
+
+function markOverlapWarned() {
+  const pid = _getCopilotPid();
+  if (!pid) return;
+  let data = {};
+  try {
+    data = JSON.parse(fs.readFileSync(_overlapFlagPath(), "utf-8"));
+  } catch (_) { /* empty or missing */ }
+  // Clean up stale PIDs (older than 1 hour)
+  const now = Date.now();
+  for (const [k, v] of Object.entries(data)) {
+    if (now - v > 3600000) delete data[k];
+  }
+  data[pid] = now;
+  try {
+    fs.writeFileSync(_overlapFlagPath(), JSON.stringify(data), "utf-8");
+  } catch (_) { /* ignore */ }
+}
+
+// Signal file helpers — kept for backward compat but no longer primary
+const _overlapPendingPath = () => path.join(_stickyDir(), ".overlap-pending");
+const _overlapDismissedPath = () => path.join(_stickyDir(), ".overlap-dismissed");
+function writeOverlapSignal(text) { try { fs.writeFileSync(_overlapPendingPath(), text, "utf-8"); } catch (_) {} }
+function readAndDeleteOverlapSignal() { try { const c = fs.readFileSync(_overlapPendingPath(), "utf-8"); fs.unlinkSync(_overlapPendingPath()); return c || null; } catch (_) { return null; } }
+function isOverlapDismissed(ttlMs) { try { const e = Date.now() - new Date(fs.readFileSync(_overlapDismissedPath(), "utf-8").trim()).getTime(); return e < (ttlMs || 300000); } catch (_) { return false; } }
+function markOverlapDismissed() { try { fs.writeFileSync(_overlapDismissedPath(), new Date().toISOString(), "utf-8"); } catch (_) {} }
 
 // ── Active resumed thread tracking (V2.5) ─────────────────
 
@@ -611,12 +998,74 @@ function clearActiveResumeThreadId() {
   }
 }
 
+// ── Copilot CLI MCP config helpers ────────────────────────
+
+function getCopilotCliConfigDir() {
+  if (process.env.COPILOT_HOME) return process.env.COPILOT_HOME;
+  const home = process.env.HOME || process.env.USERPROFILE;
+  if (!home) return null;
+  return path.join(home, ".copilot");
+}
+
+function getCopilotCliMcpConfigPath() {
+  const dir = getCopilotCliConfigDir();
+  return dir ? path.join(dir, "mcp-config.json") : null;
+}
+
+/**
+ * Register an MCP server in Copilot CLI's ~/.copilot/mcp-config.json.
+ * Only writes if the ~/.copilot/ directory already exists (Copilot CLI installed).
+ * Returns true if written, false if skipped.
+ */
+function ensureMcpInCopilotCliConfig(serverName, serverConfig) {
+  try {
+    const configDir = getCopilotCliConfigDir();
+    if (!configDir || !fs.existsSync(configDir)) return false;
+
+    const configPath = path.join(configDir, "mcp-config.json");
+    let config = {};
+    if (fs.existsSync(configPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      } catch (_) {
+        config = {};
+      }
+    }
+
+    config.mcpServers = config.mcpServers || {};
+    const existing = config.mcpServers[serverName];
+    // Copilot CLI requires "tools" field — fix entries missing it
+    if (existing) {
+      if (!existing.tools) {
+        existing.tools = ["*"];
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+        return true;
+      }
+      return false; // already registered with tools
+    }
+
+    // Ensure tools field is present for Copilot CLI compatibility
+    if (!serverConfig.tools) serverConfig.tools = ["*"];
+    config.mcpServers[serverName] = serverConfig;
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 // ── Exports ───────────────────────────────────────────────
+
+// Declared here so module.exports can reference it before the cloud section below
+let _cloudWarned = false;
 
 module.exports = {
   ERROR_PATTERNS,
   RETRY_PATTERNS,
   FILE_PATH_PATTERN,
+  logHookError,
+  reportHookError,
+  selfHealHookPaths,
   getMemoryPath,
   getConfigPath,
   getAuditPath,
@@ -667,9 +1116,17 @@ module.exports = {
   getActiveResumeThreadId,
   setActiveResumeThreadId,
   clearActiveResumeThreadId,
+  // V2.6: overlap warning tracking
+  isOverlapWarned,
+  markOverlapWarned,
+  // V2.6.10: overlap signal file
+  writeOverlapSignal,
+  readAndDeleteOverlapSignal,
+  isOverlapDismissed,
+  markOverlapDismissed,
   // V2.5: cross-platform path helper
   normalizeSep,
-  // V3: cloud transport
+  // V3: cloud transport (opt-in when STICKY_URL is set)
   useCloud,
   getCloudConfig,
   getProjectName,
@@ -686,6 +1143,17 @@ module.exports = {
   cloudReadConfig,
   cloudWriteConfig,
   _cloudWarned,
+  // V2.7: auto-sync
+  syncStickyNote,
+  // V2.9: Copilot CLI MCP config
+  getCopilotCliMcpConfigPath,
+  ensureMcpInCopilotCliConfig,
+  // V2.10: rollback detection + backups
+  detectLostThreads,
+  loadLatestBackup,
+  rotateBackup,
+  acquireLock,
+  releaseLock,
 };
 
 // ── V3: Cloud transport layer ─────────────────────────────
@@ -736,8 +1204,11 @@ function getCloudConfig() {
   };
 }
 
+let _cachedUseCloud = null;
 function useCloud() {
-  return !!getCloudConfig().url;
+  if (_cachedUseCloud !== null) return _cachedUseCloud;
+  _cachedUseCloud = !!getCloudConfig().url;
+  return _cachedUseCloud;
 }
 
 function getProjectName() {
@@ -763,9 +1234,6 @@ function getProjectName() {
   return "default";
 }
 
-// Track whether we've warned about cloud being unreachable this session
-let _cloudWarned = false;
-
 async function cloudFetch(method, endpoint, body) {
   const { url, apiKey } = getCloudConfig();
   if (!url) return null;
@@ -789,7 +1257,6 @@ async function cloudFetch(method, endpoint, body) {
     const fetchFn = typeof fetch !== "undefined" ? fetch : (await import("node:http")).default;
     const resp = await fetchFn(`${url}${endpoint}`, opts);
     if (!resp.ok) {
-      debugLog(`Cloud ${method} ${endpoint} returned ${resp.status}`);
       return null;
     }
     const text = await resp.text();
@@ -801,7 +1268,6 @@ async function cloudFetch(method, endpoint, body) {
         "[STICKY-NOTE] Cloud unreachable, using local fallback\n"
       );
     }
-    debugLog(`Cloud fetch error: ${err.message}`);
     return null;
   }
 }

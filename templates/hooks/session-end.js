@@ -29,9 +29,14 @@ try {
   _safeExit();
 }
 
+let dataBranch = null;
+try { dataBranch = require("./data-branch.js"); } catch (_) {}
+
 const {
   getMemoryPath,
   getConfigPath,
+  getAuditDir,
+  getPresenceDir,
   getUserPresencePath,
   getAllAuditPaths,
   loadJson,
@@ -63,6 +68,7 @@ const {
   cloudWriteThread,
   cloudAppendAudit,
   cloudDeletePresence,
+  syncStickyNote,
 } = utils;
 
 // ── Constants ─────────────────────────────────────────────
@@ -719,12 +725,53 @@ function tombstoneSweep(threads, staleDays) {
 
 function clearPresence(user) {
   const presencePath = getUserPresencePath(user);
-  try {
-    if (fs.existsSync(presencePath)) {
-      fs.unlinkSync(presencePath);
+  try { fs.unlinkSync(presencePath); } catch (_) {}
+}
+
+// ── Data-branch commit/push ───────────────────────────────
+
+/** Collect files from a directory matching an extension into fileMap. */
+function _collectDirFiles(dir, ext, prefix, fileMap) {
+  if (!dir || !fs.existsSync(dir)) return;
+  for (const file of fs.readdirSync(dir)) {
+    if (file.endsWith(ext)) {
+      fileMap[prefix + file] = fs.readFileSync(path.join(dir, file), "utf-8");
     }
-  } catch (_) {
-    // ignore
+  }
+}
+
+function commitAndPushDataBranch() {
+  if (!dataBranch) return;
+  try {
+    const fileMap = {};
+    const memPath = getMemoryPath();
+    if (fs.existsSync(memPath)) {
+      fileMap["sticky-note.json"] = fs.readFileSync(memPath, "utf-8");
+    }
+
+    _collectDirFiles(getAuditDir(), ".jsonl", "audit/", fileMap);
+    _collectDirFiles(getPresenceDir(), ".json", "presence/", fileMap);
+
+    if (Object.keys(fileMap).length === 0) return;
+
+    dataBranch.commitFilesToBranch(dataBranch.DATA_BRANCH, fileMap);
+
+    const remote = dataBranch.getDefaultRemote();
+    if (remote) {
+      const pushResult = dataBranch.pushDataBranch(
+        remote, dataBranch.DATA_BRANCH, 3, getMemoryPath(), loadJson, saveJson
+      );
+      if (!pushResult.ok) {
+        process.stderr.write(
+          "[STICKY-NOTE] warning: failed to push data branch — " + pushResult.error + "\n" +
+          "[STICKY-NOTE] your data is safe locally in .git/sticky-note/\n"
+        );
+      }
+    }
+  } catch (err) {
+    process.stderr.write(
+      "[STICKY-NOTE] warning: data branch sync failed — " + err.message + "\n"
+    );
   }
 }
 
@@ -775,7 +822,7 @@ async function main() {
     filesTouched = [...new Set([...filesTouched, ...gitFiles])];
   }
 
-  const threads = memory.threads || [];
+  const threads = (memory.threads || []).filter(Boolean);
   memory.threads = threads;
   let existing = null;
 
@@ -961,6 +1008,18 @@ async function main() {
     }
   }
 
+  // Auto-sync: commit (and optionally push) .sticky-note/ changes
+  if (config.auto_sync !== false) {
+    try {
+      syncStickyNote({ push: config.auto_push === true });
+    } catch (_) {
+      // Non-fatal — sync failure shouldn't block session-end
+    }
+  }
+
+  // Commit current data to sticky-note/data branch and push
+  commitAndPushDataBranch();
+
   const fileCount = filesTouched.length;
   const commitCount = commitShas.length;
   const statusLabel = isCopilotCli ? "updated" : "closed";
@@ -973,4 +1032,7 @@ async function main() {
   process.exit(0);
 }
 
-main().catch(() => _safeExit());
+main().catch((err) => {
+  try { utils.logHookError("session-end", err); } catch (_) {}
+  _safeExit();
+});

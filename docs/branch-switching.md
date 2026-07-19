@@ -82,6 +82,11 @@ npx sticky-note switch feature/v3
 4. On conflict: `git checkout --theirs -- .sticky-note/` (local data wins,
    since it's always more recent than what's on the target branch)
 
+**Error recovery:** If the branch switch fails after stashing (e.g., the
+branch doesn't exist), the command attempts to pop the stash back so your
+data isn't stranded. If the pop itself fails after a successful switch, it
+warns you to run `git stash pop` manually rather than silently losing data.
+
 **When to use:** Any time you want a guaranteed clean switch.
 
 ### Layer B: git alias (`git sw`)

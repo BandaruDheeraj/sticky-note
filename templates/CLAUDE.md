@@ -159,6 +159,7 @@ Example format:
 - `.sticky-note/.sticky-head` — transient HEAD snapshot
 - `.sticky-note/.sticky-injected` — transient injection tracking (V2.5)
 - `.sticky-note/.sticky-active-resume` — transient active resume marker (V2.5)
+- `.sticky-note/.sticky-banner-shown` — transient startup banner dedup
 
 When a session ends or the user asks to commit, **always include
 `sticky-note.json` and the `audit/` and `presence/` directories**
@@ -185,6 +186,67 @@ This auto-stashes `.sticky-note/` data before switching and restores it
 after. A raw `git checkout` or `git switch` will fail if sticky-note
 files have uncommitted changes. The alias `git sw <branch>` also works
 if set up by `npx sticky-note init`.
+
+### Pulling changes
+
+**IMPORTANT:** Before pulling remote changes, always use:
+```bash
+npx sticky-note pull
+```
+This auto-commits `.sticky-note/` tracking data before pulling, preventing
+"local changes would be overwritten" errors. The alias `git spull` also
+works if set up by `npx sticky-note init`. The PreToolUse hook handles
+this automatically for AI tool calls, but prefer `git spull` when running
+git commands directly.
+
+### ⚠️ Overlap warnings
+
+Sticky-note detects when your files overlap with other teammates'
+open or stuck threads. When the MCP server is available, use the
+`check_overlaps` tool before editing files for the most reliable detection.
+
+Hooks also inject overlap context through two fallback channels:
+
+1. **Injected context** — `[STICKY-NOTE] ⚠️ OVERLAP DETECTED` appears in
+   your hook output. This fires on every user prompt.
+2. **Tool call deny** — Your first tool call may be denied with a reason
+   containing overlap details (Copilot CLI only).
+
+When you detect an overlap (via MCP tool or hook), surface it to the user
+using this styled banner format:
+
+```
+⚠️ ━━━ OVERLAP DETECTED ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  🔴 [user] (STUCK) · [branch]
+     Files: [file1], [file2], [file3]
+     "[narrative summary]"
+     → Resume: npx sticky-note resume [id]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+Use 🔴 for STUCK threads, 🟡 for OPEN threads. For multiple overlaps,
+add additional entries between the bars.
+
+## Sticky Note MCP Server
+
+You have access to a `sticky-note` MCP server. Use it:
+
+1. **At session start**: Call `get_stuck_threads()` and `get_environment_status()`
+   to check for team blockers and environment changes. Surface any warnings.
+
+2. **Before editing files**: Call `check_overlaps(files)` with the files you
+   plan to edit. If overlaps exist, warn the user before proceeding.
+
+3. **For prior work context**: Call `get_thread_context_for_files(files)` or
+   `search_threads(query)` to find relevant thread history.
+
+4. **For audit history**: Call `get_audit_trail(file)` to understand who
+   changed a file and when.
+
+These tools are the primary way sticky-note communicates with you.
+Hook-injected context supplements but does not replace MCP tool calls.
 
 ### `[STICKY-NOTE]` tags
 

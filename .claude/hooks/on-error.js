@@ -19,7 +19,7 @@ function _safeExit() {
   process.exit(0);
 }
 
-let getMemoryPath, loadJson, saveJson, saveMemoryMerged, appendAuditLine, getUser, detectTool, getSessionId;
+let getMemoryPath, loadJson, saveJson, saveMemoryMerged, appendAuditLine, getUser, detectTool, getSessionId, logHookError;
 try {
   ({
     getMemoryPath,
@@ -30,6 +30,7 @@ try {
     getUser,
     detectTool,
     getSessionId,
+    logHookError,
   } = require("./sticky-utils.js"));
 } catch (_) {
   _safeExit();
@@ -88,27 +89,10 @@ function main() {
     if (existing.failed_approaches.length > 5) {
       existing.failed_approaches = existing.failed_approaches.slice(-5);
     }
-  } else {
-    const thread = {
-      id: crypto.randomUUID(),
-      user: user,
-      project: memory.project || "",
-      status: "stuck",
-      branch: "",
-      created_at: now,
-      closed_at: null,
-      last_activity_at: now,
-      files_touched: [],
-      last_note: errorMsg,
-      narrative: "",
-      failed_approaches: [{ description: errorMsg.substring(0, 150), error: errorMsg.substring(0, 100) }],
-      handoff_summary: "",
-      related_session_ids: [],
-      tool: toolName,
-      session_id: sessionId,
-    };
-    threads.push(thread);
   }
+  // If no thread exists for this session, skip — session-start.js creates the
+  // thread now. Creating standalone "stuck" threads from tool failures produced
+  // garbage entries (tool="Bash"/"Glob", no branch, no context).
 
   appendAuditLine({
     type: "error",
@@ -131,6 +115,7 @@ function main() {
 
 try {
   main();
-} catch (_) {
+} catch (err) {
+  try { logHookError("on-error", err); } catch (_) {}
   _safeExit();
 }

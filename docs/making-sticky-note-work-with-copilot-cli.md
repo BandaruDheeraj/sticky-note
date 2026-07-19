@@ -116,6 +116,27 @@ forced us into workarounds:
    the instructions can focus on conventions and guidelines rather than
    including fallback "do this manually if hooks aren't working" sections.
 
+ 8. **Hook output is invisible to users.** This is the one that bit us
+    hardest. Both runtimes let hooks inject context into the AI's working
+    memory via stdout (`additionalContext` or `output`). But that context
+    goes to the *model*, not the *user*. The AI decides whether to surface
+    it. For background context (thread data, attribution), that's fine —
+    the AI uses it silently. For urgent warnings (someone else is editing
+    your files), it's a problem. The AI routinely absorbs the warning and
+    says nothing.
+
+    We tried stronger language in the injected text ("TELL THE USER
+    IMMEDIATELY"), prescribed exact banner formats, and added instructions
+    to `copilot-instructions.md`. None of it was reliable — the model
+    sometimes complied, sometimes didn't.
+
+    *How Claude Code does it:* Claude Code doesn't have this problem in
+    the same way because its model tends to surface injected context more
+    reliably. We still hit absorption issues occasionally, but less often.
+
+    The solution we found — using `preToolUse` deny responses as a
+    user-visible message channel — is covered in Challenge 8 below.
+
 These aren't bugs. They're what happens when two tools get built
 independently with different assumptions. But they mean that
 "write a hook once, run it everywhere" is aspirational for now. Every
@@ -186,17 +207,25 @@ function detectTool(hookInput) {
   if (process.argv.includes("--copilot-cli")) return "copilot-cli";
   if (process.env.COPILOT_CLI) return "copilot-cli";
 
-  const event = hookInput.hook_event_name || "";
-  // PascalCase = Claude Code, camelCase = Copilot CLI
-  if (event && event[0] === event[0].toUpperCase()) return "claude-code";
-  if (event && event[0] === event[0].toLowerCase()) return "copilot-cli";
+  if (hookInput) {
+    const event = hookInput.hook_event_name || "";
+    // PascalCase = Claude Code, camelCase = Copilot CLI
+    if (event && event[0] === event[0].toUpperCase()
+             && event[0] !== event[0].toLowerCase()) return "claude-code";
+    if (event && event[0] === event[0].toLowerCase()
+             && event[0] !== event[0].toUpperCase()) return "copilot-cli";
+    // Only Claude Code provides transcript access
+    if ("transcript_path" in hookInput) return "claude-code";
+  }
 
   return "unknown";
 }
 ```
 
-This three-layer check (explicit flag → env var → event name casing)
-means the right runtime gets detected even if one signal is missing.
+This four-layer check (explicit flag → env var → event name casing →
+transcript presence) means the right runtime gets detected even if one
+signal is missing. The extra `!== toLowerCase()`/`!== toUpperCase()`
+guards prevent false positives on digits or symbols in the event name.
 
 ---
 
@@ -417,6 +446,178 @@ vice versa. This required:
 
 ---
 
+## Challenge 8: getting messages to the user
+
+This one took us twelve releases to solve.
+
+### The problem
+
+Overlap detection landed in v2.6.0: when you start working and someone
+else has an open thread touching the same files, you should know about
+it. The detection logic was straightforward. Getting the warning in
+front of the user was not.
+
+Hook output (`additionalContext` in Copilot CLI) goes to the AI model's
+context window. The model *sees* it, but it doesn't necessarily *show*
+it. For thread context and attribution data, that's the right behavior —
+the AI should absorb it silently and use it when relevant. But for
+"hey, Alice is actively editing the same files you're about to touch,"
+silent absorption defeats the purpose.
+
+### What we tried (and what failed)
+
+**Attempt 1: sessionStart output.** Put the overlap warning in
+`session-start.js` output. Copilot CLI silently dropped it. Turns out
+`sessionStart` hook output isn't reliably surfaced at all.
+
+**Attempt 2: userPromptSubmitted output.** Moved the warning into
+`inject-context.js` so it arrives with every prompt. The AI received it
+but treated it as background context. No mention to the user.
+
+**Attempt 3: stronger language.** Added directives like "TELL THE USER
+IMMEDIATELY" and "You MUST surface this warning" to the injected text.
+Sometimes the AI complied. Sometimes it didn't. Not reliable enough for
+a safety-critical warning.
+
+**Attempt 4: exact banner format.** Prescribed the exact text the AI
+should display, down to the emoji and formatting. Added matching rules
+to both `CLAUDE.md` and `copilot-instructions.md`. Better compliance
+rate, but still not guaranteed.
+
+**Attempt 5: stderr.** Wrote a concise banner directly to `stderr` so
+it appears in the user's terminal regardless of what the AI does:
+
+```javascript
+process.stderr.write("\n⚠️  OVERLAP DETECTED — someone else is touching your files:\n");
+process.stderr.write(`   [STUCK] alice: src/auth.ts — token refresh race condition\n`);
+```
+
+This works for humans reading the terminal, but AI assistants don't
+relay stderr content. So the user sees a raw banner scrolling past in
+the hook output, potentially before the AI has even started responding.
+Better than nothing, but not great.
+
+### What actually works: preToolUse deny
+
+The breakthrough was realizing that Copilot CLI's `preToolUse` hook can
+return a **deny response**:
+
+```javascript
+return {
+  permissionDecision: "deny",
+  permissionDecisionReason: "⚠️ Overlap detected: alice is working on src/auth.ts..."
+};
+```
+
+When a tool call is denied, the AI *has* to tell the user about it —
+it needs to explain why the action failed. This is the one output
+channel where the model can't silently absorb the message, because the
+tool call didn't succeed and the user needs to know why.
+
+The pattern: on the first tool call of a session, if file overlaps
+exist, deny it with the warning as the reason. Copilot CLI auto-retries
+the tool call. On retry, the overlap check passes (already warned), and
+the tool proceeds normally. The user sees the warning, the work
+continues, and the deny is invisible except for a brief pause.
+
+```javascript
+function _checkOverlapsAndDeny() {
+  if (!_isCopilotCli()) return null;
+  if (isOverlapWarned()) return null;
+
+  // ... detect file overlaps with other users' open threads ...
+
+  if (warnings.length === 0) return null;
+
+  markOverlapWarned();
+
+  return {
+    permissionDecision: "deny",
+    permissionDecisionReason: formatOverlapWarning(warnings),
+  };
+}
+```
+
+### The dedup problem
+
+One deny per session. Sounds simple. It wasn't.
+
+Copilot CLI sessions share the filesystem. The `.sticky-session` file
+that tracks session identity gets reused across concurrent sessions on
+the same machine. So "already warned for this session" leaked between
+sessions: warn Session A, Session B thinks it was already warned, skips
+the warning entirely.
+
+We tried several approaches:
+
+**TTL-based dedup (v2.6.9):** If the warning was shown more than 60
+seconds ago, reset and re-warn. The idea was that a retry comes within
+seconds (so it passes), but a new session would be more than 60 seconds
+later. Broke because long-running sessions would get re-denied every 60
+seconds.
+
+**Signal file (v2.6.10):** `inject-context.js` writes an
+`.overlap-pending` file when overlaps are detected. `pre-tool-use.js`
+reads and deletes it atomically on the first tool call. No shared state,
+no TTL. Broke because the signal file was shared across concurrent
+sessions — Session A's pending file got consumed by Session B.
+
+**PID-keyed dedup (v2.6.11):** The fix that stuck. Copilot CLI sets a
+`COPILOT_LOADER_PID` environment variable that's unique per session and
+inherited by hook child processes. The warned state is stored as a JSON
+object keyed by PID:
+
+```javascript
+// .sticky-note/.overlap-warned
+{
+  "12345": { "warned_at": "2026-03-14T..." },
+  "67890": { "warned_at": "2026-03-14T..." }
+}
+```
+
+Each session gets its own deny state. A 1-hour TTL cleans up stale
+entries from dead sessions. No cross-session interference.
+
+### Auto-closing orphaned threads
+
+The per-turn lifecycle creates another problem: Copilot CLI threads
+never close. There's no reliable session-end signal, so threads stay
+`"open"` indefinitely. This pollutes overlap detection — a thread from
+yesterday looks active today.
+
+The fix: `session-start.js` now runs `autoCloseCopilotCliThreads()`,
+which closes any `copilot-cli` thread that's been inactive for longer
+than a configurable threshold (default 24 hours):
+
+```javascript
+if (thread.tool === "copilot-cli" && thread.status === "open") {
+  const hoursInactive = (now - lastActivity) / (1000 * 60 * 60);
+  if (hoursInactive >= autoCloseHours) {
+    thread.status = "closed";
+  }
+}
+```
+
+Configurable via `copilot_cli_auto_close_hours` in
+`sticky-note-config.json`.
+
+### The final architecture
+
+Overlap warnings now use a three-channel approach:
+
+1. **`additionalContext`** (inject-context.js) — full formatted warning
+   with CRITICAL INSTRUCTION directive. The AI *might* surface it.
+2. **stderr** (inject-context.js) — concise terminal banner. The user
+   *will* see it scroll past in hook output.
+3. **preToolUse deny** (pre-tool-use.js) — blocks the first tool call
+   with the warning as the deny reason. The AI *must* report it.
+
+Channels 1 and 2 fire on every prompt where overlaps exist. Channel 3
+fires once per session (PID-keyed). Together they guarantee the user
+sees the warning through at least one path.
+
+---
+
 ## The result
 
 The full hook mapping, both tools running the same scripts:
@@ -435,10 +636,12 @@ Six hooks, one codebase, two runtimes. The `--copilot-cli` flag and
 differences where the two runtimes diverge:
 
 - Output protocol (`output` vs `additionalContext`)
-- Thread lifecycle (`closed` vs `open`)
+- Thread lifecycle (`closed` vs `open`, with auto-close for stale threads)
 - State cleanup (full cleanup vs preserve across turns)
 - Status messaging ("closed" vs "updated")
-- Dedup handling (clear per session vs preserve across turns)
+- Dedup handling (clear per session vs PID-keyed persistence)
+- User-facing warnings (injected context vs preToolUse deny + stderr)
+- Thread garbage collection (manual gc vs auto-close after 24h inactivity)
 
 Everything else — the attribution engine, git blame pipeline, Git Notes,
 thread scoring, resume search — works identically in both tools.
@@ -447,21 +650,29 @@ thread scoring, resume search — works identically in both tools.
 
 ## What we'd do differently
 
+The biggest lesson: **hook output is not user output.** We spent twelve
+releases learning that injected context goes to the model, not the
+user, and the model decides what to surface. If you need guaranteed
+user visibility from a hook, the only reliable mechanism in Copilot CLI
+is a `preToolUse` deny. We'd design around that constraint from day one
+instead of discovering it through trial and error.
+
 The silent protocol mismatch (`output` vs `additionalContext`) wasted
-more debugging time than any other issue. No errors, no warnings,
+more debugging time than any other single issue. No errors, no warnings,
 context just vanished. We log every emit call during development now.
 
-The other thing that bit us: assuming "session" means the same thing
-everywhere. It doesn't. If we were starting over, we'd design for
-per-turn semantics first and treat per-session as the special case.
+Assuming "session" means the same thing everywhere was wrong. Copilot
+CLI's per-turn model means session IDs, dedup state, and cleanup logic
+all need different semantics. If we were starting over, we'd design for
+per-turn first and treat per-session as the special case.
 
-The rest is standard cross-platform stuff. Normalize paths at the
-boundary. Detect the runtime once and branch only where behavior
-actually differs. About 95% of the hook code is shared between both
-tools, which feels about right.
+Concurrent sessions sharing filesystem state was a recurring headache.
+The `COPILOT_LOADER_PID` discovery solved the dedup problem, but we
+could have avoided three intermediate releases if we'd looked for a
+per-session environment variable sooner.
 
-One thing that turned out better than expected: the instruction file
-fallback. Even when hooks aren't configured at all, the AI reads
+The instruction file fallback turned out better than expected. Even when
+hooks aren't configured at all, the AI reads
 `.github/copilot-instructions.md` and self-serves the same
 functionality by calling CLI commands directly. We almost didn't build
 that, and it's saved us more than once.

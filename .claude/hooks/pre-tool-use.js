@@ -61,6 +61,9 @@ const {
   appendAuditLine,
   isThreadInjected,
   markThreadInjected,
+  getMemoryPath,
+  loadJson,
+  normalizeSep,
 } = utils;
 
 // ── File path extraction from tool input ──────────────────
@@ -131,6 +134,7 @@ function formatThreadForInjection(threadData, file) {
   return lines.join("\n");
 }
 
+
 // ── Main ──────────────────────────────────────────────────
 
 function main() {
@@ -169,7 +173,7 @@ function main() {
 
   // Filter out already-injected threads
   const newThreads = fileAttr.threads.filter(
-    (t) => !isThreadInjected(t.thread ? t.thread.id : t.id)
+    (t) => !isThreadInjected(t.thread ? t.thread.id : t.id, sessionId)
   );
 
   if (newThreads.length === 0) {

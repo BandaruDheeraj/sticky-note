@@ -25,6 +25,7 @@ const VERSION = require("../package.json").version;
 
 const HOOK_FILES = [
   "sticky-utils.js",
+  "data-branch.js",          // git plumbing module for sticky-note/data branch
   "session-start.js",
   "session-end.js",
   "inject-context.js",
@@ -81,6 +82,118 @@ function copyFile(src, dest) {
 
 function readTemplate(name) {
   return fs.readFileSync(path.join(TEMPLATES_DIR, name), "utf-8");
+}
+
+// Hook commands in templates use relative paths (e.g. ".claude/hooks/foo.js")
+// because Claude Code and Copilot CLI both resolve hook commands relative to
+// the project root. Earlier versions rewrote these to absolute paths at init
+// time, but that path was machine-specific and got committed to settings.json,
+// causing every teammate's hooks to fail silently (issue #11). This is now a
+// no-op, kept only to avoid breaking any external callers of the function.
+function resolveHookPaths(_obj, _rootDir) {
+  return;
+}
+
+// Detects hook commands in an existing settings.json that point at an absolute
+// path (likely written by an older sticky-note-cli on another developer's
+// machine). Returns the list of stale command strings, or [] if all clean.
+function findStaleHookPaths(settings) {
+  const stale = [];
+  const hooks = (settings && settings.hooks) || {};
+  for (const entries of Object.values(hooks)) {
+    for (const entry of Array.isArray(entries) ? entries : []) {
+      for (const h of entry.hooks || []) {
+        const cmd = h && h.command;
+        if (typeof cmd !== "string") continue;
+        // Absolute paths (Unix /Users, /home, /root or Windows C:/, D:/ etc.)
+        // inside the hook command are the smoking gun. Match anywhere in the
+        // string — the path may be preceded by other tokens (env vars, shell
+        // prefixes) and may contain spaces.
+        if (
+          /["'][A-Za-z]:[\\/]/.test(cmd) ||
+          /["']\/(?:Users|home|root|tmp)\//.test(cmd) ||
+          cmd.includes("$(git rev-parse")
+        ) {
+          stale.push(cmd);
+        }
+        // Old relative-path format: node ".claude/hooks/foo.js"
+        // This fails when Claude Code launches from a subdirectory of the
+        // project root, because the path resolves relative to the launch cwd,
+        // not relative to where .claude/settings.json lives. The fix is to
+        // use `npx sticky-note run-hook foo` which walks up to find the hooks.
+        if (/node\s+["']\.claude[\\/]hooks[\\/][^"']+\.js["']/.test(cmd)) {
+          stale.push(cmd);
+        }
+      }
+    }
+  }
+  return stale;
+}
+
+// Parse a semver-ish version string ("2.9.1", "2.9.1-beta.1", "v2.9") into
+// [major, minor, patch] numbers. Pre-release suffixes are ignored. Returns
+// null if unparseable.
+function parseSemver(v) {
+  if (typeof v !== "string") return null;
+  const m = v.trim().replace(/^v/, "").match(/^(\d+)\.(\d+)(?:\.(\d+))?/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3] || 0)];
+}
+
+// Returns -1 if a < b, 0 if equal, 1 if a > b. Unparseable values sort last.
+function compareSemver(a, b) {
+  const pa = parseSemver(a), pb = parseSemver(b);
+  if (!pa && !pb) return 0;
+  if (!pa) return 1;
+  if (!pb) return -1;
+  for (let i = 0; i < 3; i++) {
+    if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1;
+  }
+  return 0;
+}
+
+// When updating an existing config, only bump min_version forward — never
+// downgrade if a teammate has already pinned a newer minimum.
+function bumpMinVersion(existing, current) {
+  if (!existing) return current;
+  return compareSemver(existing, current) >= 0 ? existing : current;
+}
+
+// Add sticky-note-cli to the project package.json devDependencies so every
+// teammate gets a pinned working copy on `npm install` (issue #12). No-ops
+// gracefully if there is no package.json or if the entry is already present
+// at >= the current version.
+function pinCliInPackageJson() {
+  const pkgPath = path.join(process.cwd(), "package.json");
+  if (!fs.existsSync(pkgPath)) {
+    print("  ⏭️  No package.json found — skipping devDependency pin");
+    return;
+  }
+  let pkg;
+  try {
+    pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+  } catch (err) {
+    print(`  ⏭️  Could not parse package.json: ${err.message}`);
+    return;
+  }
+  pkg.devDependencies = pkg.devDependencies || {};
+  const existing = pkg.devDependencies["sticky-note-cli"];
+  const desired = `^${VERSION}`;
+  if (existing) {
+    const existingClean = String(existing).replace(/^[\^~]/, "");
+    if (compareSemver(existingClean, VERSION) >= 0) {
+      print(`  ⏭️  package.json devDependencies already pin sticky-note-cli ${existing}`);
+      return;
+    }
+  }
+  pkg.devDependencies["sticky-note-cli"] = desired;
+  // Keep keys sorted for clean diffs
+  pkg.devDependencies = Object.fromEntries(
+    Object.entries(pkg.devDependencies).sort(([a], [b]) => a.localeCompare(b))
+  );
+  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+  print(`  [OK] package.json devDependencies: sticky-note-cli ${desired}`);
+  print("       Run `npm install` to lock the version for your team.");
 }
 
 function makeExecutable(filePath) {
@@ -193,6 +306,62 @@ function countJsonlLines(filePath) {
 }
 
 // ──────────────────────────────────────────────
+// Copilot CLI MCP config helpers
+// ──────────────────────────────────────────────
+
+function getCopilotCliConfigDir() {
+  if (process.env.COPILOT_HOME) return process.env.COPILOT_HOME;
+  const home = process.env.HOME || process.env.USERPROFILE;
+  if (!home) return null;
+  return path.join(home, ".copilot");
+}
+
+function getCopilotCliMcpConfigPath() {
+  const dir = getCopilotCliConfigDir();
+  return dir ? path.join(dir, "mcp-config.json") : null;
+}
+
+/**
+ * Register an MCP server in Copilot CLI's ~/.copilot/mcp-config.json.
+ * Only writes if the ~/.copilot/ directory exists (Copilot CLI is installed).
+ */
+function ensureMcpInCopilotCliConfig(serverName, serverConfig) {
+  try {
+    const configDir = getCopilotCliConfigDir();
+    if (!configDir || !fs.existsSync(configDir)) return false;
+
+    const configPath = path.join(configDir, "mcp-config.json");
+    let config = {};
+    if (fs.existsSync(configPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      } catch (_) {
+        config = {};
+      }
+    }
+
+    config.mcpServers = config.mcpServers || {};
+    const existing = config.mcpServers[serverName];
+    // Copilot CLI requires "tools" field — fix entries missing it
+    if (existing) {
+      if (!existing.tools) {
+        existing.tools = ["*"];
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+        return true;
+      }
+      return false;
+    }
+
+    if (!serverConfig.tools) serverConfig.tools = ["*"];
+    config.mcpServers[serverName] = serverConfig;
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+// ──────────────────────────────────────────────
 // Auto-detection
 // ──────────────────────────────────────────────
 
@@ -217,6 +386,28 @@ function detectMcpServers() {
         servers.set(name, entry);
       }
     } catch (err) { debugLog("detectMcpServers settings.json: " + (err.message || err)); }
+  }
+
+  // Also detect from Copilot CLI's ~/.copilot/mcp-config.json
+  const copilotMcpPath = getCopilotCliMcpConfigPath();
+  if (copilotMcpPath && fs.existsSync(copilotMcpPath)) {
+    try {
+      const copilotMcp = JSON.parse(fs.readFileSync(copilotMcpPath, "utf-8"));
+      const mcpServers = copilotMcp.mcpServers || {};
+      for (const [name, config] of Object.entries(mcpServers)) {
+        if (servers.has(name)) continue; // repo-level takes precedence
+        const entry = {
+          name,
+          type: config.type || config.transport || "unknown",
+          source: "~/.copilot/mcp-config.json",
+        };
+        if (config.command) entry.command = config.command;
+        if (config.args) entry.args = config.args;
+        if (config.env) entry.env = config.env;
+        if (config.url) entry.url = config.url;
+        servers.set(name, entry);
+      }
+    } catch (err) { debugLog("detectMcpServers copilot mcp-config: " + (err.message || err)); }
   }
 
   const localSettingsPath = path.join(process.cwd(), ".claude", "settings.local.json");
@@ -322,13 +513,18 @@ async function syncMcpFromStickyNote(rl) {
   }
 
   for (const s of missing) {
-    const config = { type: s.type || "stdio" };
-    if (s.command) config.command = s.command;
-    if (s.args) config.args = s.args;
-    if (s.env) config.env = s.env;
-    if (s.url) config.url = s.url;
-    mcpJson.mcpServers[s.name] = config;
+    const serverEntry = { type: s.type || "stdio" };
+    if (s.command) serverEntry.command = s.command;
+    if (s.args) serverEntry.args = s.args;
+    if (s.env) serverEntry.env = s.env;
+    if (s.url) serverEntry.url = s.url;
+    mcpJson.mcpServers[s.name] = serverEntry;
     print(`  [OK] Added ${s.name} to .mcp.json`);
+
+    // Also register in Copilot CLI config
+    if (ensureMcpInCopilotCliConfig(s.name, serverEntry)) {
+      print(`  [OK] Added ${s.name} to ~/.copilot/mcp-config.json`);
+    }
   }
 
   fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2) + "\n");
@@ -482,15 +678,32 @@ async function cmdInit() {
     print(`  [OK] .claude/hooks/${file}`);
   }
 
-  // Create settings.json (Claude Code)
+  // Create settings.json (Claude Code) — uses relative hook paths so it can
+  // be safely committed and shared across teammates (issue #11).
   const settingsTemplate = JSON.parse(readTemplate("settings.json"));
   const settingsDest = path.join(process.cwd(), ".claude", "settings.json");
+  if (fs.existsSync(settingsDest)) {
+    const existing = readJsonSafe(settingsDest, {});
+    const stale = findStaleHookPaths(existing);
+    if (stale.length > 0) {
+      print("  ⚠️  .claude/settings.json contains absolute or shell-expanded hook paths:");
+      for (const cmd of stale.slice(0, 3)) print(`       ${cmd}`);
+      print("       Rewriting with relative paths so hooks work for every teammate.");
+    }
+  }
   fs.writeFileSync(settingsDest, JSON.stringify(settingsTemplate, null, 2) + "\n");
   print("  [OK] .claude/settings.json");
 
-  // Create hooks.json (Copilot CLI)
+  // Create hooks.json (Copilot CLI) — also relative paths.
   const hooksTemplate = JSON.parse(readTemplate("hooks.json"));
   const hooksDest = path.join(githubHooksDir, "hooks.json");
+  if (fs.existsSync(hooksDest)) {
+    const existing = readJsonSafe(hooksDest, {});
+    const stale = findStaleHookPaths(existing);
+    if (stale.length > 0) {
+      print("  ⚠️  .github/hooks/hooks.json contains absolute or shell-expanded hook paths — rewriting.");
+    }
+  }
   fs.writeFileSync(hooksDest, JSON.stringify(hooksTemplate, null, 2) + "\n");
   print("  [OK] .github/hooks/hooks.json");
 
@@ -544,6 +757,7 @@ async function cmdInit() {
     configTemplate.stale_days = staleDaysResolved;
     configTemplate.inject_token_budget = injectTokenBudgetResolved;
     configTemplate.hook_version = VERSION;
+    configTemplate.min_version = VERSION;
     fs.writeFileSync(configDest, JSON.stringify(configTemplate, null, 2) + "\n");
   } else {
     // Update existing config with new settings
@@ -554,9 +768,14 @@ async function cmdInit() {
     existing.stale_days = staleDaysResolved;
     existing.inject_token_budget = injectTokenBudgetResolved;
     existing.hook_version = VERSION;
+    existing.min_version = bumpMinVersion(existing.min_version, VERSION);
     fs.writeFileSync(configDest, JSON.stringify(existing, null, 2) + "\n");
   }
   print("  [OK] .sticky-note/sticky-note-config.json");
+
+  // Pin sticky-note-cli in the project package.json devDependencies so every
+  // teammate gets the same version on `npm install` (issue #12).
+  pinCliInPackageJson();
 
   // Update .gitignore
   const gitignorePath = path.join(process.cwd(), ".gitignore");
@@ -571,12 +790,29 @@ async function cmdInit() {
     gitignoreContent = fs.readFileSync(gitignorePath, "utf-8");
   }
 
+  // Fix overly broad .claude/ ignore that blocks hook sharing
+  let gitignoreChanged = false;
+  if (gitignoreContent) {
+    const lines = gitignoreContent.split(/\r?\n/);
+    const filtered = lines.filter((line) => {
+      const trimmed = line.trim();
+      // Remove lines that ignore all of .claude/ (but keep targeted entries)
+      return trimmed !== ".claude/" && trimmed !== ".claude";
+    });
+    if (filtered.length !== lines.length) {
+      gitignoreContent = filtered.join("\n");
+      fs.writeFileSync(gitignorePath, gitignoreContent);
+      gitignoreChanged = true;
+      print("  [OK] .gitignore: removed broad .claude/ ignore (hooks will be shared via git)");
+    }
+  }
+
   const missingEntries = ignoreAdditions.filter((e) => !gitignoreContent.includes(e.trim()));
   if (missingEntries.length > 0) {
     const block = "\n# Sticky Note\n" + missingEntries.join("\n") + "\n";
     fs.appendFileSync(gitignorePath, block);
     print("  [OK] .gitignore updated");
-  } else {
+  } else if (!gitignoreChanged) {
     print("  ⏭️  .gitignore already configured");
   }
 
@@ -605,14 +841,15 @@ async function cmdInit() {
 
   // Install merge driver script and git config
   const mergeDriverSrc = path.join(TEMPLATES_DIR, "merge-driver.js");
-  const mergeDriverDest = path.join(stickyDir, "merge-driver.js");
+  const mergeDriverDest = path.join(stickyNoteDir, "merge-driver.js");
   copyFile(mergeDriverSrc, mergeDriverDest);
   print("  [OK] .sticky-note/merge-driver.js installed");
   try {
+    const mergeRoot = process.cwd().replace(/\\/g, "/");
     execFileSync("git", ["config", "merge.sticky-note.name", "Sticky Note thread merge"], {
       cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
     });
-    execFileSync("git", ["config", "merge.sticky-note.driver", "node .sticky-note/merge-driver.js %O %A %B"], {
+    execFileSync("git", ["config", "merge.sticky-note.driver", `node "${mergeRoot}/.sticky-note/merge-driver.js" %O %A %B`], {
       cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
     });
     print("  [OK] git merge driver configured (merge.sticky-note)");
@@ -630,6 +867,18 @@ async function cmdInit() {
     print("  [OK] git alias: git sw <branch> (safe switch with auto-stash)");
   } catch (_) {
     print("  ⏭️  Could not set git alias (non-fatal)");
+  }
+
+  // Add git alias for safe pull with auto-sync
+  try {
+    const spullAlias = '!f() { npx sticky-note pull "$@"; }; f';
+    execFileSync("git", ["config", "alias.spull", spullAlias], {
+      cwd: process.cwd(),
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    print("  [OK] git alias: git spull (auto-sync + pull)");
+  } catch (_) {
+    print("  ⏭️  Could not set git spull alias (non-fatal)");
   }
 
   // Deploy AI instruction files (CLAUDE.md + .github/copilot-instructions.md)
@@ -666,6 +915,85 @@ async function cmdInit() {
   // Install git hooks (.git/hooks/) for attribution persistence
   if (installGitHook("post-rewrite")) {
     print("  [OK] .git/hooks/post-rewrite (attribution survives rebase)");
+  }
+
+  // Data branch sync handles persistence — no pre/post-commit hooks needed
+  print("  [OK] Skipping git pre/post-commit hooks (data branch sync handles this now)");
+  print("       Run `npx sticky-note migrate` to migrate existing .sticky-note/ data.");
+
+  // Create environment directory structure
+  const envDir = path.join(stickyNoteDir, "environment");
+  const envManifestDest = path.join(envDir, "manifest.json");
+  mkdirSafe(path.join(envDir, "skills"));
+  mkdirSafe(path.join(envDir, "agents"));
+  mkdirSafe(path.join(envDir, "commands"));
+  if (!fs.existsSync(envManifestDest)) {
+    // Build manifest from detected MCP servers and skills
+    const manifestData = { version: "1", mcp_servers: {}, permissions: [], env_vars: {} };
+    for (const server of mcpServers) {
+      const entry = { type: server.type || "stdio", description: server.name, required: false };
+      if (server.command) entry.command = server.command;
+      if (server.args) entry.args = server.args;
+      if (server.env) {
+        entry.env = {};
+        for (const [k, v] of Object.entries(server.env)) {
+          entry.env[k] = `\${${k}}`;
+          manifestData.env_vars[k] = { description: k, required: true };
+        }
+      }
+      manifestData.mcp_servers[server.name] = entry;
+    }
+    fs.writeFileSync(envManifestDest, JSON.stringify(manifestData, null, 2) + "\n");
+    if (mcpServers.length > 0) {
+      print(`  [OK] Manifest populated with ${mcpServers.length} detected MCP server(s)`);
+    }
+    // Copy detected skills into environment/skills/
+    for (const skillName of skills) {
+      const claudeSkillPath = path.join(process.cwd(), ".claude", "plugins");
+      const possibleSkillPaths = [
+        path.join(claudeSkillPath, skillName, "SKILL.md"),
+        path.join(claudeSkillPath, skillName, "skills", skillName, "SKILL.md"),
+      ];
+      for (const sp of possibleSkillPaths) {
+        if (fs.existsSync(sp)) {
+          fs.copyFileSync(sp, path.join(envDir, "skills", skillName + ".md"));
+          break;
+        }
+      }
+    }
+    if (skills.length > 0) {
+      print(`  [OK] Copied ${skills.length} detected skill(s) to environment/skills/`);
+    }
+  }
+  print("  [OK] Created environment directory (.sticky-note/environment/)");
+
+  // Force-add .claude/hooks/ and .claude/settings.json so git tracks them
+  // (needed if .claude/ was previously in .gitignore)
+  try {
+    execFileSync("git", ["add", "--force", ".claude/hooks/", ".claude/settings.json"], {
+      cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
+    });
+    print("  [OK] .claude/hooks/ and .claude/settings.json staged for git");
+  } catch (err) {
+    debugLog("git add --force .claude/ failed: " + (err.message || err));
+  }
+
+  // Register sticky-note MCP server in Copilot CLI's ~/.copilot/mcp-config.json
+  const stickyMcpEntry = {
+    type: "stdio",
+    command: "npx",
+    args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
+    tools: ["*"],
+  };
+  if (ensureMcpInCopilotCliConfig("sticky-note", stickyMcpEntry)) {
+    print("  [OK] Registered sticky-note MCP server in ~/.copilot/mcp-config.json (Copilot CLI)");
+  } else {
+    const copilotDir = getCopilotCliConfigDir();
+    if (!copilotDir || !fs.existsSync(copilotDir)) {
+      print("  ⏭️  Copilot CLI not detected (~/.copilot/ not found) — skipped mcp-config.json");
+    } else {
+      print("  ⏭️  sticky-note already registered in ~/.copilot/mcp-config.json");
+    }
   }
 
   // Done!
@@ -710,6 +1038,10 @@ function cmdUpdate() {
   if (fs.existsSync(settingsPath)) {
     const settingsTemplate = JSON.parse(readTemplate("settings.json"));
     const existing = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+    const stale = findStaleHookPaths(existing);
+    if (stale.length > 0) {
+      print("  ⚠️  Existing settings.json had absolute hook paths — replacing with relative paths.");
+    }
     existing.hooks = settingsTemplate.hooks;
     fs.writeFileSync(settingsPath, JSON.stringify(existing, null, 2) + "\n");
     print("  [OK] .claude/settings.json (hooks updated)");
@@ -728,6 +1060,36 @@ function cmdUpdate() {
     print("  [OK] .git/hooks/post-rewrite (attribution survives rebase)");
   }
 
+  // Remove sticky-note pre-commit and post-commit git hooks (replaced by data branch)
+  const gitDir2 = path.join(process.cwd(), ".git");
+  if (fs.existsSync(gitDir2)) {
+    const gitHooksDir2 = path.join(gitDir2, "hooks");
+    for (const hookName of ["pre-commit", "post-commit"]) {
+      const hookPath2 = path.join(gitHooksDir2, hookName);
+      if (!fs.existsSync(hookPath2)) continue;
+      const content2 = fs.readFileSync(hookPath2, "utf-8");
+      if (!content2.includes(STICKY_PRE_COMMIT_MARKER) && !content2.includes(STICKY_POST_COMMIT_MARKER)) continue;
+      let updated2 = content2;
+      const preStart2 = updated2.indexOf(STICKY_PRE_COMMIT_MARKER);
+      const preEnd2 = updated2.indexOf(STICKY_PRE_COMMIT_END);
+      if (preStart2 !== -1 && preEnd2 !== -1) {
+        updated2 = updated2.slice(0, preStart2) + updated2.slice(preEnd2 + STICKY_PRE_COMMIT_END.length);
+      }
+      const postStart2 = updated2.indexOf(STICKY_POST_COMMIT_MARKER);
+      const postEnd2 = updated2.indexOf(STICKY_POST_COMMIT_END);
+      if (postStart2 !== -1 && postEnd2 !== -1) {
+        updated2 = updated2.slice(0, postStart2) + updated2.slice(postEnd2 + STICKY_POST_COMMIT_END.length);
+      }
+      if (updated2.replace(/^#!.*\n/, "").trim() === "") {
+        fs.unlinkSync(hookPath2);
+        print("  [OK] Removed .git/hooks/" + hookName + " (no longer needed)");
+      } else {
+        fs.writeFileSync(hookPath2, updated2, "utf-8");
+        print("  [OK] Removed sticky-note blocks from .git/hooks/" + hookName);
+      }
+    }
+  }
+
   // Update hook_version in config
   const configPath = path.join(stickyDir, "sticky-note-config.json");
   if (fs.existsSync(configPath)) {
@@ -744,6 +1106,44 @@ function cmdUpdate() {
 
   // Upgrade .gitattributes from merge=union to custom driver
   const gitattrsPath = path.join(process.cwd(), ".gitattributes");
+
+  // Fix overly broad .claude/ gitignore that blocks hook sharing
+  const gitignorePath = path.join(process.cwd(), ".gitignore");
+  if (fs.existsSync(gitignorePath)) {
+    let gitignoreContent = fs.readFileSync(gitignorePath, "utf-8");
+    const lines = gitignoreContent.split(/\r?\n/);
+    const filtered = lines.filter((line) => {
+      const trimmed = line.trim();
+      return trimmed !== ".claude/" && trimmed !== ".claude";
+    });
+    if (filtered.length !== lines.length) {
+      fs.writeFileSync(gitignorePath, filtered.join("\n"));
+      print("  [OK] .gitignore: removed broad .claude/ ignore (hooks will be shared via git)");
+
+      // Ensure targeted ignores are present
+      const ignoreAdditions = fs
+        .readFileSync(path.join(TEMPLATES_DIR, "gitignore-additions.txt"), "utf-8")
+        .trim()
+        .split(/\r?\n/)
+        .filter((l) => l.trim() && !l.startsWith("#"));
+      const updatedContent = fs.readFileSync(gitignorePath, "utf-8");
+      const missing = ignoreAdditions.filter((e) => !updatedContent.includes(e.trim()));
+      if (missing.length > 0) {
+        fs.appendFileSync(gitignorePath, "\n# Sticky Note\n" + missing.join("\n") + "\n");
+      }
+
+      // Force-add previously ignored hook files so git starts tracking them
+      try {
+        execFileSync("git", ["add", "--force", ".claude/hooks/", ".claude/settings.json"], {
+          cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
+        });
+        print("  [OK] git add --force .claude/hooks/ .claude/settings.json");
+      } catch (err) {
+        debugLog("git add --force .claude/ failed: " + (err.message || err));
+      }
+    }
+  }
+
   if (fs.existsSync(gitattrsPath)) {
     let gitattrsContent = fs.readFileSync(gitattrsPath, "utf-8");
     const oldRule = ".sticky-note/sticky-note.json merge=union";
@@ -757,10 +1157,11 @@ function cmdUpdate() {
 
   // Ensure git merge driver config is set
   try {
+    const mergeRoot = process.cwd().replace(/\\/g, "/");
     execFileSync("git", ["config", "merge.sticky-note.name", "Sticky Note thread merge"], {
       cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
     });
-    execFileSync("git", ["config", "merge.sticky-note.driver", "node .sticky-note/merge-driver.js %O %A %B"], {
+    execFileSync("git", ["config", "merge.sticky-note.driver", `node "${mergeRoot}/.sticky-note/merge-driver.js" %O %A %B`], {
       cwd: process.cwd(), stdio: ["pipe", "pipe", "pipe"],
     });
     print("  [OK] git merge driver configured (merge.sticky-note)");
@@ -825,6 +1226,33 @@ function cmdStatus() {
     `    ${fs.existsSync(hooksJsonPath) ? "[OK]" : "[ERR]"} .github/hooks/hooks.json`
   );
 
+  // Issue #11 guard: warn about absolute hook paths in shared config files.
+  for (const [label, p] of [
+    [".claude/settings.json", settingsPath],
+    [".github/hooks/hooks.json", hooksJsonPath],
+  ]) {
+    if (!fs.existsSync(p)) continue;
+    const data = readJsonSafe(p, {});
+    const stale = findStaleHookPaths(data);
+    if (stale.length > 0) {
+      print(`    ⚠️  ${label} has absolute hook paths — hooks will fail for teammates.`);
+      print("        Run `npx sticky-note init` to rewrite with relative paths.");
+    }
+  }
+
+  // Issue #12 guard: warn if installed CLI is below the project's min_version.
+  const configPathForVersionCheck = path.join(stickyDir, "sticky-note-config.json");
+  if (fs.existsSync(configPathForVersionCheck)) {
+    const cfg = readJsonSafe(configPathForVersionCheck, {});
+    if (cfg.min_version && compareSemver(VERSION, cfg.min_version) < 0) {
+      print(
+        `    ⚠️  Installed sticky-note-cli v${VERSION} is below the project's ` +
+        `min_version v${cfg.min_version}.`
+      );
+      print("        Run `npm i -D sticky-note-cli@latest` to update.");
+    }
+  }
+
   // Sticky Note data — V2 format
   const memoryPath = path.join(stickyDir, "sticky-note.json");
   const configPath = path.join(stickyDir, "sticky-note-config.json");
@@ -833,7 +1261,7 @@ function cmdStatus() {
   if (fs.existsSync(memoryPath)) {
     try {
       const memory = JSON.parse(fs.readFileSync(memoryPath, "utf-8"));
-      const threads = memory.threads || [];
+      const threads = (memory.threads || []).filter(Boolean);
       const schemaVersion = memory.version || "2";
 
       const openThreads = threads.filter((t) => t.status === "open").length;
@@ -907,7 +1335,7 @@ function cmdStatus() {
       const lastSeen = info.last_seen || "";
       if (lastSeen) {
         const ts = new Date(lastSeen).getTime();
-        if (!isNaN(ts) && now - ts < 15 * 60 * 1000) {
+        if (!isNaN(ts) && now - ts < 60 * 60 * 1000) {
           activeUsers.push(path.basename(f, ".json"));
         }
       }
@@ -1048,7 +1476,7 @@ function cmdThreads() {
   }
 
   const memory = readJsonSafe(memoryPath, { threads: [] });
-  const threads = memory.threads || [];
+  const threads = (memory.threads || []).filter(Boolean);
 
   // Filter: show open, stuck, closed (not expired)
   const live = threads.filter((t) => ["open", "stuck", "closed", "stale"].includes(t.status));
@@ -1106,7 +1534,7 @@ function cmdResume() {
   // resume --list: show resumable threads
   if (args.includes("--list") || args.length === 0) {
     const memory = readJsonSafe(memoryPath, { threads: [] });
-    const threads = memory.threads || [];
+    const threads = (memory.threads || []).filter(Boolean);
     const resumable = threads.filter((t) =>
       ["closed", "stuck", "open", "stale"].includes(t.status)
     );
@@ -1147,9 +1575,7 @@ function cmdResume() {
   // resume <thread-id>: set the resume signal
   const threadId = args[0];
   const memory = readJsonSafe(memoryPath, { threads: [] });
-  const threads = memory.threads || [];
-
-  // Support partial ID matching (first 8 chars)
+  const threads = (memory.threads || []).filter(Boolean);
   const match = threads.find((t) =>
     t.id === threadId || t.id.startsWith(threadId)
   );
@@ -1245,7 +1671,7 @@ function cmdReset() {
   const force = args.includes("--force");
 
   const memory = readJsonSafe(memoryPath, { version: "2", threads: [] });
-  const threadCount = (memory.threads || []).length;
+  const threadCount = (memory.threads || []).filter(Boolean).length;
 
   if (threadCount === 0) {
     print("  Nothing to reset -- 0 threads.");
@@ -1423,7 +1849,7 @@ function cmdWho() {
       for (const [user, info] of Object.entries(data)) {
         const lastSeen = info.last_seen || "";
         const ts = lastSeen ? new Date(lastSeen).getTime() : 0;
-        const active = !isNaN(ts) && now - ts < 15 * 60 * 1000;
+        const active = !isNaN(ts) && now - ts < 60 * 60 * 1000;
         const ago = lastSeen ? _relativeTime(lastSeen) : "unknown";
         const files = (info.active_files || []).slice(0, 5).join(", ");
         const marker = active ? "[ACTIVE]" : "[IDLE]";
@@ -1449,7 +1875,7 @@ function cmdWho() {
     const info = readJsonSafe(path.join(presenceDir, f), {});
     const lastSeen = info.last_seen || "";
     const ts = lastSeen ? new Date(lastSeen).getTime() : 0;
-    const active = !isNaN(ts) && now - ts < 15 * 60 * 1000;
+    const active = !isNaN(ts) && now - ts < 60 * 60 * 1000;
     users.push({ user, info, lastSeen, active });
   }
 
@@ -1484,6 +1910,282 @@ function _relativeTime(tsStr) {
     return Math.floor(hours / 24) + "d ago";
   } catch (_) {
     return "unknown";
+  }
+}
+
+// ──────────────────────────────────────────────
+// OVERLAP command — detect file overlaps with open/stuck threads
+// ──────────────────────────────────────────────
+
+function cmdOverlap() {
+  const args = process.argv.slice(3);
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+
+  if (!fs.existsSync(memoryPath)) {
+    print("  [ERR] No sticky-note.json found. Run `npx sticky-note init` first.");
+    process.exit(1);
+  }
+
+  printBanner();
+
+  // Get files to check: either --files flag or git diff
+  let filesToCheck = new Set();
+  const filesIdx = args.indexOf("--files");
+  if (filesIdx !== -1 && args.length > filesIdx + 1) {
+    for (const f of args.slice(filesIdx + 1)) {
+      if (f.startsWith("--")) break;
+      filesToCheck.add(_normSep(f));
+    }
+  } else {
+    // Use git diff (uncommitted + recent commits)
+    try {
+      const uncommitted = execSync("git diff --name-only", {
+        encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
+      for (const f of uncommitted.split(/\r?\n/)) {
+        if (f.trim()) filesToCheck.add(_normSep(f.trim()));
+      }
+    } catch (_) {}
+    try {
+      const staged = execSync("git diff --name-only --cached", {
+        encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
+      for (const f of staged.split(/\r?\n/)) {
+        if (f.trim()) filesToCheck.add(_normSep(f.trim()));
+      }
+    } catch (_) {}
+    const diffTargets = ["HEAD~5", "HEAD~1"];
+    for (const target of diffTargets) {
+      try {
+        const result = execSync(`git diff --name-only ${target}`, {
+          encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+        }).trim();
+        for (const f of result.split(/\r?\n/)) {
+          if (f.trim()) filesToCheck.add(_normSep(f.trim()));
+        }
+        break;
+      } catch (_) {}
+    }
+  }
+
+  if (filesToCheck.size === 0) {
+    print("  No modified files detected. Use --files <file1> <file2> to check specific files.\n");
+    return;
+  }
+
+  const currentUserNames = _getCurrentUserNames();
+  const isMe = (user) => currentUserNames.has(user || "");
+  const memory = readJsonSafe(memoryPath, { threads: [] });
+  const threads = (memory.threads || []).filter(
+    (t) => t && (t.status === "open" || t.status === "stuck")
+  );
+
+  // Find overlaps
+  const overlaps = [];
+  for (const thread of threads) {
+    const threadFiles = (thread.files_touched || []).map(_normSep);
+    const threadFileSet = new Set(threadFiles);
+    const matching = [];
+    for (const f of filesToCheck) {
+      if (threadFileSet.has(f)) matching.push(f);
+    }
+    if (matching.length > 0) {
+      overlaps.push({ thread, matching });
+    }
+  }
+
+  print(`  Checking ${filesToCheck.size} file(s) against ${threads.length} open/stuck thread(s):\n`);
+
+  if (overlaps.length === 0) {
+    print("  ✅ No overlaps found. You're clear to work.\n");
+    return;
+  }
+
+  // Sort: other users first, then stuck before open, then by overlap count
+  overlaps.sort((a, b) => {
+    const aOther = !isMe(a.thread.user) ? 1 : 0;
+    const bOther = !isMe(b.thread.user) ? 1 : 0;
+    if (aOther !== bOther) return bOther - aOther;
+    if (a.thread.status !== b.thread.status) {
+      return a.thread.status === "stuck" ? -1 : 1;
+    }
+    return b.matching.length - a.matching.length;
+  });
+
+  for (const { thread, matching } of overlaps) {
+    const user = thread.user || thread.author || "unknown";
+    const icon = statusIcon(thread.status);
+    const isSelf = isMe(user);
+    const prefix = isSelf ? "  " : "  ⚠️ ";
+    const suffix = isSelf ? " (you)" : "";
+    const narrative = thread.narrative || thread.last_note || "";
+    const narrativeSnip = narrative.length > 80
+      ? narrative.substring(0, 80) + "…"
+      : narrative;
+    const branch = thread.branch ? ` on ${thread.branch}` : "";
+    const ago = thread.last_activity_at ? _relativeTime(thread.last_activity_at) : "";
+    const agoLabel = ago ? ` (${ago})` : "";
+
+    print(`${prefix}${icon} ${user}${suffix}${branch}${agoLabel}`);
+    if (narrativeSnip) {
+      print(`         "${narrativeSnip}"`);
+    }
+    print(`         overlapping: ${matching.join(", ")}`);
+    if (thread.failed_approaches && thread.failed_approaches.length > 0) {
+      print(`         ⚠️  ${thread.failed_approaches.length} failed approach(es)`);
+    }
+    const threadId = (thread.id || "").substring(0, 8);
+    if (!isSelf && threadId) {
+      print(`         → npx sticky-note resume ${threadId}`);
+    }
+    print("");
+  }
+
+  const otherUserOverlaps = overlaps.filter(
+    (o) => !isMe(o.thread.user)
+  );
+  if (otherUserOverlaps.length > 0) {
+    print(`  ⚠️  ${otherUserOverlaps.length} thread(s) from other users overlap with your files.`);
+    print("  Consider coordinating before diving in.\n");
+  }
+}
+
+function _normSep(p) {
+  return typeof p === "string" ? p.replace(/\\/g, "/") : p;
+}
+
+function _getGitUserName() {
+  try {
+    return execSync("git config user.name", {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+  } catch (_) {
+    return process.env.USER || process.env.USERNAME || "unknown";
+  }
+}
+
+function _getCurrentUserNames() {
+  const names = new Set();
+  const envUser = process.env.USER || process.env.USERNAME || "";
+  if (envUser) names.add(envUser);
+  try {
+    const gitName = execSync("git config user.name", {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    if (gitName) names.add(gitName);
+  } catch (_) {}
+  try {
+    const gitEmail = execSync("git config user.email", {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    if (gitEmail) names.add(gitEmail);
+  } catch (_) {}
+  return names;
+}
+
+// ──────────────────────────────────────────────
+// CLAIM command — declare intent to work on files
+// ──────────────────────────────────────────────
+
+function cmdClaim() {
+  const args = process.argv.slice(3);
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+
+  if (!fs.existsSync(memoryPath)) {
+    print("  [ERR] No sticky-note.json found. Run `npx sticky-note init` first.");
+    process.exit(1);
+  }
+
+  // Parse: npx sticky-note claim <file1> [file2...] "description"
+  // or: npx sticky-note claim --clear
+  if (args.includes("--clear")) {
+    const memory = readJsonSafe(memoryPath, { threads: [], claims: [] });
+    const userNames = _getCurrentUserNames();
+    const before = (memory.claims || []).length;
+    memory.claims = (memory.claims || []).filter((c) => !userNames.has(c.user));
+    const removed = before - memory.claims.length;
+    fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2));
+    print(`  [OK] Cleared ${removed} claim(s).`);
+    return;
+  }
+
+  if (args.includes("--list")) {
+    const memory = readJsonSafe(memoryPath, { threads: [], claims: [] });
+    const claims = memory.claims || [];
+    if (claims.length === 0) {
+      print("  No active claims.");
+      return;
+    }
+    printBanner();
+    print("  Active Claims:\n");
+    for (const c of claims) {
+      const ago = c.claimed_at ? _relativeTime(c.claimed_at) : "";
+      const agoLabel = ago ? ` (${ago})` : "";
+      print(`  📌 ${c.user}${agoLabel}: ${c.files.join(", ")}`);
+      if (c.description) print(`      "${c.description}"`);
+    }
+    print("");
+    return;
+  }
+
+  if (args.length === 0) {
+    print("  Usage: npx sticky-note claim <file1> [file2...] \"description\"");
+    print("         npx sticky-note claim --list");
+    print("         npx sticky-note claim --clear");
+    return;
+  }
+
+  // Parse files and description (last quoted arg or last arg is description)
+  const files = [];
+  let description = "";
+  for (const a of args) {
+    if (a.startsWith("--")) continue;
+    // If it looks like a file path (has a dot or slash), treat as file
+    if (a.includes("/") || a.includes("\\") || a.includes(".")) {
+      files.push(_normSep(a));
+    } else {
+      // Treat as part of description
+      description += (description ? " " : "") + a;
+    }
+  }
+
+  if (files.length === 0) {
+    print("  [ERR] No files specified. Usage: npx sticky-note claim <file> \"description\"");
+    return;
+  }
+
+  const currentUser = process.env.USER || process.env.USERNAME || _getGitUserName();
+  const userNames = _getCurrentUserNames();
+  const memory = readJsonSafe(memoryPath, { threads: [], claims: [] });
+  if (!memory.claims) memory.claims = [];
+
+  // Remove existing claims from this user for these files
+  memory.claims = memory.claims.filter(
+    (c) => !userNames.has(c.user) || !c.files.some((f) => files.includes(f))
+  );
+
+  memory.claims.push({
+    user: currentUser,
+    files,
+    description,
+    claimed_at: new Date().toISOString(),
+    branch: _getCurrentBranch(),
+  });
+
+  fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2));
+  print(`  ✅ Claimed ${files.join(", ")}${description ? ` — "${description}"` : ""}`);
+  print(`  Others will see this at session start. Commit + push to share.`);
+}
+
+function _getCurrentBranch() {
+  try {
+    return execSync("git rev-parse --abbrev-ref HEAD", {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+  } catch (_) {
+    return "";
   }
 }
 
@@ -1625,7 +2327,7 @@ function cmdResumeThread() {
   }
 
   const memory = readJsonSafe(memoryPath, { threads: [] });
-  const threads = (memory.threads || []).filter((t) => t.status !== "expired");
+  const threads = (memory.threads || []).filter((t) => t && t.status !== "expired");
 
   // Load attribution engine for search
   let attribution;
@@ -1985,7 +2687,7 @@ function cmdGc() {
   const memory = readJsonSafe(memoryPath, { version: "2", threads: [] });
   const config = readJsonSafe(configPath, { stale_days: 14 });
   const staleDays = config.stale_days ?? 14;
-  const threads = memory.threads || [];
+  const threads = (memory.threads || []).filter(Boolean);
   const now = new Date();
 
   let tombstoned = 0;
@@ -2102,16 +2804,10 @@ function cmdDeployBackend() {
 }
 
 // ──────────────────────────────────────────────
-// MIGRATE command (V3)
+// MIGRATE --to cloud command (V3 cloud migration)
 // ──────────────────────────────────────────────
 
-async function cmdMigrate() {
-  const args = process.argv.slice(3);
-  if (!args.includes("--to") || !args.includes("cloud")) {
-    print("  Usage: npx sticky-note migrate --to cloud");
-    print("  Migrates local V2 data to cloud backend.\n");
-    process.exit(1);
-  }
+async function cmdMigrateToCloud() {
 
   printBanner();
   print("  Migrate V2 -> V3 Cloud\n");
@@ -2254,10 +2950,14 @@ async function cmdMigrate() {
 }
 
 // ──────────────────────────────────────────────
-// MCP-SERVER command (V3)
+// MCP-SERVER command — launch the stdio MCP server
+// (delegates to bin/mcp-server.js; cloud or local determined there)
 // ──────────────────────────────────────────────
 
-async function cmdMcpServer() {
+// V3 cloud-aware MCP server is kept in bin/mcp-server.js.
+// This stub was the inline V3 implementation; replaced by the cleaner
+// delegating version from main. Kept as _cmdMcpServerInline for reference.
+async function _cmdMcpServerInline() {
   // MCP server runs over stdio using JSON-RPC 2.0
   const stickyUrl = process.env.STICKY_URL || "";
   const stickyApiKey = process.env.STICKY_API_KEY || "";
@@ -2485,6 +3185,975 @@ async function cmdMcpServer() {
 }
 
 // ──────────────────────────────────────────────
+// sync — commit and optionally push .sticky-note/ files
+// ──────────────────────────────────────────────
+
+function cmdSync() {
+  const args = process.argv.slice(3);
+  const doPush = args.includes("--push");
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+  if (!fs.existsSync(stickyDir)) {
+    print("  [ERR] No .sticky-note/ directory found. Run 'npx sticky-note init' first.");
+    process.exit(1);
+  }
+
+  printBanner();
+  print("  Syncing .sticky-note/ files...\n");
+
+  try {
+    const status = execSync(
+      'git status --porcelain -- ".sticky-note/sticky-note.json" ".sticky-note/audit/" ".sticky-note/presence/"',
+      { encoding: "utf-8", cwd: process.cwd() }
+    ).trim();
+    if (!status) {
+      print("  [OK] Nothing to sync — .sticky-note/ files are clean.");
+      print("");
+      return;
+    }
+
+    // Write recursion guard
+    const guardPath = path.join(stickyDir, ".sticky-syncing");
+    fs.writeFileSync(guardPath, process.pid.toString(), "utf-8");
+
+    try {
+      execFileSync("git", [
+        "add", "--", ".sticky-note/sticky-note.json",
+        ".sticky-note/audit/", ".sticky-note/presence/"
+      ], { cwd: process.cwd(), timeout: 10000, stdio: ["pipe", "pipe", "pipe"] });
+
+      execFileSync("git", [
+        "commit", "--no-verify", "-m", "chore(sticky-note): sync thread data"
+      ], { cwd: process.cwd(), timeout: 15000, stdio: ["pipe", "pipe", "pipe"] });
+      print("  ✅ Committed .sticky-note/ changes.");
+
+      if (doPush) {
+        execFileSync("git", ["push"], {
+          cwd: process.cwd(), timeout: 30000, stdio: ["pipe", "pipe", "pipe"],
+        });
+        print("  ✅ Pushed to remote.");
+      }
+    } finally {
+      try { fs.unlinkSync(guardPath); } catch (_) {}
+    }
+  } catch (err) {
+    print("  ⚠️  Sync failed: " + (err.message || err));
+  }
+  print("");
+}
+
+// ──────────────────────────────────────────────
+// PULL command — auto-sync + git pull
+// ──────────────────────────────────────────────
+
+function cmdPull() {
+  const args = process.argv.slice(3);
+  const stickyDir = path.join(process.cwd(), ".sticky-note");
+
+  // Step 1: Sync .sticky-note/ changes if any
+  if (fs.existsSync(stickyDir)) {
+    try {
+      const status = execSync(
+        'git status --porcelain -- ".sticky-note/sticky-note.json" ".sticky-note/audit/" ".sticky-note/presence/"',
+        { encoding: "utf-8", cwd: process.cwd() }
+      ).trim();
+      if (status) {
+        const guardPath = path.join(stickyDir, ".sticky-syncing");
+        fs.writeFileSync(guardPath, process.pid.toString(), "utf-8");
+        try {
+          execFileSync("git", [
+            "add", "--", ".sticky-note/sticky-note.json",
+            ".sticky-note/audit/", ".sticky-note/presence/"
+          ], { cwd: process.cwd(), timeout: 10000, stdio: ["pipe", "pipe", "pipe"] });
+          execFileSync("git", [
+            "commit", "--no-verify", "-m", "chore(sticky-note): sync thread data"
+          ], { cwd: process.cwd(), timeout: 15000, stdio: ["pipe", "pipe", "pipe"] });
+          print("  ✅ Auto-synced .sticky-note/ before pull");
+        } finally {
+          try { fs.unlinkSync(guardPath); } catch (_) {}
+        }
+      }
+    } catch (_) {
+      // Non-fatal — proceed with pull even if sync fails
+    }
+  }
+
+  // Step 2: Run git pull with any extra args
+  try {
+    execFileSync("git", ["pull", ...args], { stdio: "inherit", cwd: process.cwd() });
+  } catch (err) {
+    process.exit(err.status || 1);
+  }
+}
+
+// MCP-SERVER command — launch the stdio MCP server
+function cmdMcpServer() {
+  const mcpServerPath = path.join(__dirname, "mcp-server.js");
+  if (!fs.existsSync(mcpServerPath)) {
+    print("  [ERR] mcp-server.js not found");
+    process.exit(1);
+  }
+  // Forward to the MCP server script, passing remaining args + --project
+  const args = ["--project", process.cwd(), ...process.argv.slice(3)];
+  const { execFileSync } = require("child_process");
+  try {
+    execFileSync(process.execPath, [mcpServerPath, ...args], {
+      stdio: "inherit",
+    });
+  } catch (err) {
+    if (err.status) process.exit(err.status);
+  }
+}
+
+// ──────────────────────────────────────────────
+// bootstrap — interactive MCP server provisioning with secret resolution
+// ──────────────────────────────────────────────
+
+async function cmdBootstrap() {
+  const cwd = process.cwd();
+  const manifestPath = path.join(cwd, ".sticky-note", "environment", "manifest.json");
+  const mcpJsonPath = path.join(cwd, ".mcp.json");
+  const dotEnvPath = path.join(cwd, ".env");
+  const dotEnvExamplePath = path.join(cwd, ".env.example");
+
+  printBanner();
+  print("  🔧 Bootstrap — MCP Server Provisioning\n");
+
+  // 1. Read manifest
+  if (!fs.existsSync(manifestPath)) {
+    print("  No environment manifest found. Run `npx sticky-note init` first.");
+    return;
+  }
+
+  const manifest = readJsonSafe(manifestPath, null);
+  if (!manifest) {
+    print("  [ERR] Failed to parse manifest.json");
+    return;
+  }
+
+  const mcpServers = manifest.mcp_servers || {};
+  const envVarsMeta = manifest.env_vars || {};
+  const serverEntries = Object.entries(mcpServers);
+
+  if (serverEntries.length === 0) {
+    print("  No MCP servers defined in manifest. Nothing to provision.");
+    return;
+  }
+
+  // 2. Find all ${ENV_VAR} placeholders across server configs
+  const placeholders = new Set();
+  for (const [, config] of serverEntries) {
+    const envEntries = config.env || {};
+    for (const val of Object.values(envEntries)) {
+      if (typeof val === "string" && val.startsWith("${") && val.endsWith("}")) {
+        placeholders.add(val.slice(2, -1));
+      }
+    }
+  }
+
+  // 3. Parse .env file
+  function parseDotEnv(filePath) {
+    const vars = {};
+    try {
+      const content = fs.readFileSync(filePath, "utf-8");
+      for (const line of content.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const eqIdx = trimmed.indexOf("=");
+        if (eqIdx === -1) continue;
+        const key = trimmed.slice(0, eqIdx).trim();
+        let value = trimmed.slice(eqIdx + 1).trim();
+        // Strip surrounding quotes
+        if ((value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+        vars[key] = value;
+      }
+    } catch {
+      // .env doesn't exist — that's fine
+    }
+    return vars;
+  }
+
+  const dotEnvVars = parseDotEnv(dotEnvPath);
+
+  // 4. Resolve each placeholder
+  const resolved = {};
+  const promptedVars = {};
+
+  if (placeholders.size > 0) {
+    print(`  Found ${placeholders.size} environment variable(s) to resolve:\n`);
+
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    for (const varName of placeholders) {
+      const meta = envVarsMeta[varName] || {};
+      const desc = meta.description || varName;
+      const docsUrl = meta.docs_url || null;
+
+      // Priority: process.env → .env file → interactive prompt
+      if (process.env[varName]) {
+        resolved[varName] = process.env[varName];
+        print(`  ✅ ${varName}: found in shell environment`);
+      } else if (dotEnvVars[varName]) {
+        resolved[varName] = dotEnvVars[varName];
+        print(`  ✅ ${varName}: found in .env file`);
+      } else {
+        // Interactive prompt
+        if (docsUrl) {
+          print(`  📖 ${desc}`);
+          print(`     Docs: ${docsUrl}`);
+        }
+        const value = await ask(rl, `Enter value for ${varName}`, "");
+        if (value) {
+          resolved[varName] = value;
+          promptedVars[varName] = value;
+          print(`  ✅ ${varName}: set via prompt`);
+        } else {
+          print(`  ⚠️  ${varName}: skipped (no value provided)`);
+        }
+      }
+    }
+
+    // 5. Offer to save prompted values to .env
+    if (Object.keys(promptedVars).length > 0) {
+      print("");
+      const saveChoice = await ask(rl, "Save missing values to .env?", "yes");
+      if (saveChoice.toLowerCase() === "yes" || saveChoice.toLowerCase() === "y") {
+        let envContent = "";
+        try {
+          envContent = fs.readFileSync(dotEnvPath, "utf-8");
+          if (!envContent.endsWith("\n")) envContent += "\n";
+        } catch {
+          // .env doesn't exist yet
+        }
+        for (const [key, val] of Object.entries(promptedVars)) {
+          envContent += `${key}=${val}\n`;
+        }
+        fs.writeFileSync(dotEnvPath, envContent, "utf-8");
+        print(`  ✅ Saved ${Object.keys(promptedVars).length} variable(s) to .env`);
+      }
+    }
+
+    rl.close();
+  }
+
+  // 6. Provision MCP servers to .mcp.json
+  let mcpJson = { mcpServers: {} };
+  try {
+    mcpJson = JSON.parse(fs.readFileSync(mcpJsonPath, "utf-8"));
+    mcpJson.mcpServers = mcpJson.mcpServers || {};
+  } catch {
+    // .mcp.json doesn't exist or is invalid — start fresh
+  }
+
+  let provisioned = 0;
+  let skipped = 0;
+
+  for (const [name, config] of serverEntries) {
+    // Build the server entry with resolved env vars
+    const serverEntry = {
+      type: config.type || "stdio",
+      command: config.command,
+      args: config.args || [],
+    };
+
+    if (config.env) {
+      // Keep ${VAR} placeholders in .mcp.json — never write resolved secrets
+      // to committed files. Both Claude Code and Copilot CLI resolve env vars
+      // from the process environment at MCP server spawn time.
+      const safeEnv = {};
+      for (const [envKey, envVal] of Object.entries(config.env)) {
+        safeEnv[envKey] = envVal; // preserves "${GITHUB_TOKEN}" as-is
+      }
+      serverEntry.env = safeEnv;
+    }
+
+    mcpJson.mcpServers[name] = serverEntry;
+    provisioned++;
+  }
+
+  fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2) + "\n");
+
+  // 6b. Also provision to Copilot CLI's ~/.copilot/mcp-config.json
+  // This file is local-only (not committed), so resolved secrets are safe here.
+  let copilotProvisioned = 0;
+  for (const [name, config] of serverEntries) {
+    if (mcpJson.mcpServers[name]) {
+      const copilotEntry = { ...mcpJson.mcpServers[name] };
+      // Resolve ${VAR} placeholders for local-only config
+      if (copilotEntry.env) {
+        const resolvedEnv = {};
+        for (const [envKey, envVal] of Object.entries(copilotEntry.env)) {
+          if (typeof envVal === "string" && envVal.startsWith("${") && envVal.endsWith("}")) {
+            const varName = envVal.slice(2, -1);
+            resolvedEnv[envKey] = resolved[varName] || envVal;
+          } else {
+            resolvedEnv[envKey] = envVal;
+          }
+        }
+        copilotEntry.env = resolvedEnv;
+      }
+      if (ensureMcpInCopilotCliConfig(name, copilotEntry)) {
+        copilotProvisioned++;
+      }
+    }
+  }
+
+  // 7. Generate .env.example from manifest env_vars
+  if (Object.keys(envVarsMeta).length > 0) {
+    const lines = [
+      "# Environment variables for this project",
+      "# Generated by sticky-note bootstrap",
+      "#",
+      "# Copy this file to .env and fill in your values.",
+      "",
+    ];
+    for (const [varName, meta] of Object.entries(envVarsMeta)) {
+      if (meta.description) lines.push(`# ${meta.description}`);
+      if (meta.docs_url) lines.push(`# Docs: ${meta.docs_url}`);
+      if (meta.required === false) {
+        lines.push(`# ${varName}=`);
+      } else {
+        lines.push(`${varName}=`);
+      }
+      lines.push("");
+    }
+    fs.writeFileSync(dotEnvExamplePath, lines.join("\n"), "utf-8");
+    print(`  ✅ Generated .env.example`);
+  }
+
+  // 8. Print summary
+  print("");
+  print("  ── Summary ──");
+  print(`  Provisioned: ${provisioned} server(s)`);
+  if (copilotProvisioned > 0) print(`  Copilot CLI: ${copilotProvisioned} server(s) added to ~/.copilot/mcp-config.json`);
+  if (skipped > 0) print(`  Skipped:     ${skipped} server(s) (missing secrets)`);
+  print(`  Config:      ${mcpJsonPath}`);
+  print("");
+}
+
+// ──────────────────────────────────────────────
+// env — environment management subcommands
+// ──────────────────────────────────────────────
+
+async function cmdEnv() {
+  const args = process.argv.slice(3);
+  const subcommand = args[0];
+
+  switch (subcommand) {
+    case "status":
+      cmdEnvStatus();
+      break;
+    case "add-server":
+      await cmdEnvAddServer();
+      break;
+    case "add-plugin":
+      await cmdEnvAddPlugin();
+      break;
+    default:
+      printBanner();
+      print("  Usage: npx sticky-note env <subcommand>\n");
+      print("  Subcommands:");
+      print("    status       Show what's provisioned vs missing vs needs-secrets");
+      print("    add-server   Interactively add an MCP server to the manifest");
+      print("    add-plugin   Interactively add a plugin to the manifest");
+      print("");
+      break;
+  }
+}
+
+function cmdEnvStatus() {
+  const cwd = process.cwd();
+  const envDir = path.join(cwd, ".sticky-note", "environment");
+  const manifestPath = path.join(envDir, "manifest.json");
+  const mcpJsonPath = path.join(cwd, ".mcp.json");
+
+  printBanner();
+  print("  📊 Environment Status\n");
+
+  if (!fs.existsSync(manifestPath)) {
+    print("  No environment manifest found. Run `npx sticky-note init` first.");
+    print("");
+    return;
+  }
+
+  const manifest = readJsonSafe(manifestPath, {});
+  const mcpConfig = readJsonSafe(mcpJsonPath, { mcpServers: {} });
+  const registeredServers = Object.keys(mcpConfig.mcpServers || {});
+
+  // MCP servers status
+  const mcpServers = manifest.mcp_servers || {};
+  const serverNames = Object.keys(mcpServers);
+
+  // Also check Copilot CLI config
+  const copilotMcpPath = getCopilotCliMcpConfigPath();
+  let copilotServers = {};
+  if (copilotMcpPath && fs.existsSync(copilotMcpPath)) {
+    copilotServers = readJsonSafe(copilotMcpPath, { mcpServers: {} }).mcpServers || {};
+  }
+
+  if (serverNames.length === 0) {
+    print("  MCP Servers: (none defined)");
+  } else {
+    print("  MCP Servers:");
+    for (const name of serverNames) {
+      const config = mcpServers[name];
+      const isProvisioned = registeredServers.includes(name);
+      const inCopilotCli = !!copilotServers[name];
+
+      if (isProvisioned && inCopilotCli) {
+        print(`    ✅ ${name} — provisioned (Claude Code + Copilot CLI)`);
+      } else if (isProvisioned) {
+        print(`    ✅ ${name} — provisioned (.mcp.json only)`);
+      } else if (inCopilotCli) {
+        print(`    ✅ ${name} — provisioned (Copilot CLI only)`);
+      } else {
+        // Check if it needs secrets
+        const envEntries = config.env || {};
+        const needsSecrets = Object.values(envEntries).some(
+          (val) => typeof val === "string" && val.startsWith("${") && val.endsWith("}")
+        );
+        if (needsSecrets) {
+          print(`    🔑 ${name} — needs secrets (run \`npx sticky-note bootstrap\`)`);
+        } else {
+          print(`    ❌ ${name} — not provisioned`);
+        }
+      }
+    }
+  }
+
+  // Skills, Agents, Commands counts
+  const skillsDir = path.join(envDir, "skills");
+  const agentsDir = path.join(envDir, "agents");
+  const commandsDir = path.join(envDir, "commands");
+
+  function countMdFiles(dir) {
+    try {
+      return fs.readdirSync(dir).filter((f) => f.endsWith(".md")).length;
+    } catch {
+      return 0;
+    }
+  }
+
+  const skillsCount = countMdFiles(skillsDir);
+  const agentsCount = countMdFiles(agentsDir);
+  const commandsCount = countMdFiles(commandsDir);
+
+  print("");
+  print("  Resources:");
+  print(`    Skills:   ${skillsCount}`);
+  print(`    Agents:   ${agentsCount}`);
+  print(`    Commands: ${commandsCount}`);
+
+  // Env vars status
+  const envVars = manifest.env_vars || {};
+  const envVarNames = Object.keys(envVars);
+
+  if (envVarNames.length > 0) {
+    print("");
+    print("  Environment Variables:");
+
+    // Parse .env file for checking
+    const dotEnvPath = path.join(cwd, ".env");
+    const dotEnvVars = {};
+    try {
+      const content = fs.readFileSync(dotEnvPath, "utf-8");
+      for (const line of content.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const eqIdx = trimmed.indexOf("=");
+        if (eqIdx === -1) continue;
+        dotEnvVars[trimmed.slice(0, eqIdx).trim()] = true;
+      }
+    } catch {
+      // no .env
+    }
+
+    for (const varName of envVarNames) {
+      const meta = envVars[varName];
+      const inEnv = !!process.env[varName];
+      const inDotEnv = !!dotEnvVars[varName];
+      const reqLabel = meta.required === false ? " (optional)" : "";
+
+      if (inEnv) {
+        print(`    ✅ ${varName} — set in environment${reqLabel}`);
+      } else if (inDotEnv) {
+        print(`    ✅ ${varName} — set in .env${reqLabel}`);
+      } else {
+        print(`    ❌ ${varName} — not found${reqLabel}`);
+      }
+    }
+  }
+
+  print("");
+}
+
+async function cmdEnvAddServer() {
+  const cwd = process.cwd();
+  const manifestPath = path.join(cwd, ".sticky-note", "environment", "manifest.json");
+
+  printBanner();
+  print("  ➕ Add MCP Server to Manifest\n");
+
+  if (!fs.existsSync(manifestPath)) {
+    print("  No environment manifest found. Run `npx sticky-note init` first.");
+    return;
+  }
+
+  const manifest = readJsonSafe(manifestPath, null);
+  if (!manifest) {
+    print("  [ERR] Failed to parse manifest.json");
+    return;
+  }
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const name = await ask(rl, "Server name (e.g. github, context7)", "");
+  if (!name) {
+    print("  [ERR] Server name is required.");
+    rl.close();
+    return;
+  }
+
+  const command = await ask(rl, "Command (e.g. npx, node)", "npx");
+  const argsRaw = await ask(rl, "Args (comma-separated)", "");
+  const description = await ask(rl, "Description", "");
+  const requiredRaw = await ask(rl, "Required?", "yes");
+  const required = requiredRaw.toLowerCase() === "yes" || requiredRaw.toLowerCase() === "y";
+
+  const args = argsRaw
+    ? argsRaw.split(",").map((a) => a.trim()).filter(Boolean)
+    : [];
+
+  const serverConfig = {
+    type: "stdio",
+    command,
+    args,
+    description,
+    required,
+  };
+
+  // Ask about env vars
+  const needsEnv = await ask(rl, "Does this server need environment variables?", "no");
+  if (needsEnv.toLowerCase() === "yes" || needsEnv.toLowerCase() === "y") {
+    serverConfig.env = {};
+    let addMore = true;
+    while (addMore) {
+      const envName = await ask(rl, "  Env var name (e.g. GITHUB_TOKEN)", "");
+      if (!envName) break;
+
+      const envDesc = await ask(rl, "  Description", "");
+      const envDocs = await ask(rl, "  Docs URL (optional)", "");
+      const envReqRaw = await ask(rl, "  Required?", "yes");
+      const envRequired = envReqRaw.toLowerCase() === "yes" || envReqRaw.toLowerCase() === "y";
+
+      // Add placeholder to server env
+      serverConfig.env[envName] = `\${${envName}}`;
+
+      // Add to env_vars metadata
+      manifest.env_vars = manifest.env_vars || {};
+      manifest.env_vars[envName] = {
+        description: envDesc || envName,
+        required: envRequired,
+      };
+      if (envDocs) manifest.env_vars[envName].docs_url = envDocs;
+
+      const moreRaw = await ask(rl, "  Add another env var?", "no");
+      addMore = moreRaw.toLowerCase() === "yes" || moreRaw.toLowerCase() === "y";
+    }
+  }
+
+  rl.close();
+
+  // Write to manifest
+  manifest.mcp_servers = manifest.mcp_servers || {};
+  manifest.mcp_servers[name] = serverConfig;
+
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+
+  print("");
+  print(`  ✅ Added server "${name}" to manifest.json`);
+  print(`  Run \`npx sticky-note bootstrap\` to provision it.`);
+  print("");
+}
+
+async function cmdEnvAddPlugin() {
+  const cwd = process.cwd();
+  const manifestPath = path.join(cwd, ".sticky-note", "environment", "manifest.json");
+
+  printBanner();
+  print("  ➕ Add Plugin to Manifest\n");
+
+  if (!fs.existsSync(manifestPath)) {
+    print("  No environment manifest found. Run `npx sticky-note init` first.");
+    return;
+  }
+
+  const manifest = readJsonSafe(manifestPath, null);
+  if (!manifest) {
+    print("  [ERR] Failed to parse manifest.json");
+    return;
+  }
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const name = await ask(rl, "Plugin name (e.g. docker, eslint-helper)", "");
+  if (!name) {
+    print("  [ERR] Plugin name is required.");
+    rl.close();
+    return;
+  }
+
+  const source = await ask(rl, "Source (e.g. registry:docker-copilot-ext, github:user/repo)", "");
+  if (!source) {
+    print("  [ERR] Plugin source is required.");
+    rl.close();
+    return;
+  }
+
+  const description = await ask(rl, "Description", "");
+  const requiredRaw = await ask(rl, "Required?", "no");
+  const required = requiredRaw.toLowerCase() === "yes" || requiredRaw.toLowerCase() === "y";
+
+  rl.close();
+
+  manifest.plugins = manifest.plugins || {};
+  manifest.plugins[name] = {
+    source,
+    description,
+    required,
+  };
+
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+
+  print("");
+  print(`  ✅ Added plugin "${name}" to manifest.json`);
+  print("");
+}
+
+// ──────────────────────────────────────────────
+// run-hook: locate and execute a hook from any directory
+// ──────────────────────────────────────────────
+
+function cmdRunHook() {
+  const { spawnSync } = require("child_process");
+  const hookName = process.argv[3]; // e.g. "session-start"
+
+  if (!hookName) {
+    process.stderr.write(
+      "[sticky-note] run-hook: missing hook name\n" +
+      "  Usage: npx sticky-note run-hook <name>\n" +
+      "  Names: session-start, session-end, inject-context, pre-tool-use,\n" +
+      "         track-work, on-stop, on-error\n"
+    );
+    // Emit empty output so Claude Code doesn't choke on missing stdout JSON
+    process.stdout.write(JSON.stringify({ output: "" }) + "\n");
+    process.exit(0);
+  }
+
+  // Walk up from cwd to find .claude/hooks/<name>.js
+  const hookFile = hookName.endsWith(".js") ? hookName : `${hookName}.js`;
+  let dir = process.cwd();
+  let hookPath = null;
+  for (let i = 0; i < 20; i++) {
+    const candidate = path.join(dir, ".claude", "hooks", hookFile);
+    if (fs.existsSync(candidate)) {
+      hookPath = candidate;
+      break;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) break; // filesystem root
+    dir = parent;
+  }
+
+  if (!hookPath) {
+    // Hook not installed — exit silently (non-fatal)
+    process.stdout.write(JSON.stringify({ output: "" }) + "\n");
+    process.exit(0);
+  }
+
+  // Spawn the hook with stdin/stdout/stderr inherited so Claude Code's pipe
+  // flows through to the hook process unchanged.
+  const result = spawnSync(process.execPath, [hookPath], {
+    stdio: "inherit",
+    env: process.env,
+  });
+  process.exit(result.status != null ? result.status : 0);
+}
+
+// ──────────────────────────────────────────────
+// MIGRATE command (dispatcher)
+// Default: migrate to git data branch (from main)
+// --to cloud: migrate local data to Cloudflare KV (from V3)
+// ──────────────────────────────────────────────
+
+async function cmdMigrate() {
+  const args = process.argv.slice(3);
+  if (args.includes("--to") && args.includes("cloud")) {
+    return cmdMigrateToCloud();
+  }
+  return _cmdMigrateDataBranch();
+}
+
+/**
+ * One-time migration from .sticky-note/ (feature-branch storage) to
+ * .git/sticky-note/ (data-branch storage).
+ *
+ * Idempotent — safe to run multiple times.
+ */
+async function _cmdMigrateDataBranch() {
+  printBanner();
+
+  if (!isGitRepo()) {
+    print("  [ERR] Not a git repository.");
+    process.exit(1);
+  }
+
+  const cwd = process.cwd();
+  const oldDir = path.join(cwd, ".sticky-note");
+
+  // Locate .git directory using plumbing (works from subdirectories)
+  let gitDir;
+  try {
+    gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+      cwd,
+    }).trim();
+  } catch (err) {
+    print("  [ERR] Could not locate .git directory: " + err.message);
+    process.exit(1);
+  }
+
+  const newDir = path.join(gitDir, "sticky-note");
+  print("  📂 Source: " + oldDir);
+  print("  📂 Target: " + newDir);
+  print("");
+
+  // Step 1: Copy files from .sticky-note/ to .git/sticky-note/
+  mkdirSafe(newDir);
+  mkdirSafe(path.join(newDir, "audit"));
+  mkdirSafe(path.join(newDir, "presence"));
+
+  let copiedFiles = 0;
+  const srcMemory = path.join(oldDir, "sticky-note.json");
+  const dstMemory = path.join(newDir, "sticky-note.json");
+  if (fs.existsSync(srcMemory)) {
+    fs.copyFileSync(srcMemory, dstMemory);
+    copiedFiles++;
+    print("  [OK] Copied sticky-note.json");
+  } else if (!fs.existsSync(dstMemory)) {
+    // No existing data — create empty memory
+    fs.writeFileSync(
+      dstMemory,
+      JSON.stringify({ version: "2", project: "", threads: [] }, null, 2) + "\n"
+    );
+    print("  [OK] Created empty sticky-note.json (no .sticky-note/ found)");
+  }
+
+  const oldAuditDir = path.join(oldDir, "audit");
+  if (fs.existsSync(oldAuditDir)) {
+    for (const file of fs.readdirSync(oldAuditDir)) {
+      if (file.endsWith(".jsonl")) {
+        const dst = path.join(newDir, "audit", file);
+        if (!fs.existsSync(dst)) {
+          fs.copyFileSync(path.join(oldAuditDir, file), dst);
+          copiedFiles++;
+        }
+      }
+    }
+  }
+
+  const oldPresenceDir = path.join(oldDir, "presence");
+  if (fs.existsSync(oldPresenceDir)) {
+    for (const file of fs.readdirSync(oldPresenceDir)) {
+      if (file.endsWith(".json")) {
+        const dst = path.join(newDir, "presence", file);
+        if (!fs.existsSync(dst)) {
+          fs.copyFileSync(path.join(oldPresenceDir, file), dst);
+          copiedFiles++;
+        }
+      }
+    }
+  }
+  if (copiedFiles > 0) print("  [OK] Copied " + copiedFiles + " file(s) to .git/sticky-note/");
+
+  // Step 2: Commit files to sticky-note/data branch using plumbing
+  print("");
+  print("  📌 Committing to sticky-note/data branch...");
+  try {
+    // Inline the plumbing here (data-branch.js lives in hooks, not in CLI path)
+    _commitFilesToDataBranch(newDir);
+    print("  [OK] sticky-note/data branch created/updated");
+  } catch (err) {
+    print("  [WARN] Could not commit to data branch: " + err.message);
+  }
+
+  // Step 3: Add .sticky-note/ to .gitignore
+  print("");
+  const gitignorePath = path.join(cwd, ".gitignore");
+  const MARKER = "# sticky-note: data branch migration";
+  const IGNORE_LINE = ".sticky-note/";
+  let gitignoreUpdated = false;
+  if (fs.existsSync(gitignorePath)) {
+    const existing = fs.readFileSync(gitignorePath, "utf-8");
+    const gitignoreLines = existing.split(/\r?\n/).map(l => l.trim());
+    if (!gitignoreLines.includes(IGNORE_LINE)) {
+      fs.appendFileSync(gitignorePath, "\n" + MARKER + "\n" + IGNORE_LINE + "\n");
+      gitignoreUpdated = true;
+    }
+  } else {
+    fs.writeFileSync(gitignorePath, MARKER + "\n" + IGNORE_LINE + "\n");
+    gitignoreUpdated = true;
+  }
+  if (gitignoreUpdated) {
+    print("  [OK] Added .sticky-note/ to .gitignore");
+  } else {
+    print("  [OK] .gitignore already contains .sticky-note/");
+  }
+
+  // Step 4: Remove sticky-note pre-commit and post-commit hooks
+  print("");
+  const gitHooksDir = path.join(gitDir, "hooks");
+  for (const hookName of ["pre-commit", "post-commit"]) {
+    const hookPath = path.join(gitHooksDir, hookName);
+    if (!fs.existsSync(hookPath)) continue;
+    const content = fs.readFileSync(hookPath, "utf-8");
+    if (content.includes(STICKY_PRE_COMMIT_MARKER) || content.includes(STICKY_POST_COMMIT_MARKER)) {
+      // Remove sticky-note blocks
+      let updated = content;
+      // Remove pre-commit block
+      const preStart = updated.indexOf(STICKY_PRE_COMMIT_MARKER);
+      const preEnd = updated.indexOf(STICKY_PRE_COMMIT_END);
+      if (preStart !== -1 && preEnd !== -1) {
+        updated = updated.slice(0, preStart) + updated.slice(preEnd + STICKY_PRE_COMMIT_END.length);
+      }
+      // Remove post-commit block
+      const postStart = updated.indexOf(STICKY_POST_COMMIT_MARKER);
+      const postEnd = updated.indexOf(STICKY_POST_COMMIT_END);
+      if (postStart !== -1 && postEnd !== -1) {
+        updated = updated.slice(0, postStart) + updated.slice(postEnd + STICKY_POST_COMMIT_END.length);
+      }
+      // If only the shebang remains, delete the file
+      if (updated.replace(/^#!.*\n/, "").trim() === "") {
+        fs.unlinkSync(hookPath);
+        print("  [OK] Removed .git/hooks/" + hookName + " (was sticky-note only)");
+      } else {
+        fs.writeFileSync(hookPath, updated, "utf-8");
+        print("  [OK] Removed sticky-note blocks from .git/hooks/" + hookName);
+      }
+    }
+  }
+
+  // Step 5: Push data branch if remote exists
+  print("");
+  try {
+    const remote = execFileSync("git", ["remote"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+      cwd,
+    }).trim().split("\n")[0];
+    if (remote) {
+      print("  🔄 Pushing sticky-note/data to " + remote + "...");
+      execFileSync("git", ["push", remote, "refs/heads/sticky-note/data:refs/heads/sticky-note/data"], {
+        timeout: 30000, stdio: ["pipe", "pipe", "pipe"],
+        cwd,
+      });
+      print("  [OK] Pushed sticky-note/data");
+    } else {
+      print("  ⏭️  No remote configured — skipping push");
+    }
+  } catch (err) {
+    print("  [WARN] Push failed: " + err.message);
+    print("  [INFO] Your data is safe locally. Run `npx sticky-note migrate` again to retry.");
+  }
+
+  print("");
+  print("  ✅ Migration complete!");
+  print("");
+  print("  Next steps:");
+  print("  1. Commit the .gitignore change:  git add .gitignore && git commit -m 'chore: gitignore sticky-note data dir'");
+  print("  2. Each teammate runs:             npx sticky-note init");
+  print("");
+}
+
+/**
+ * Inline git plumbing to commit files from a local dir to sticky-note/data.
+ * Extracted from data-branch.js for use in CLI context (no hooks dir on PATH).
+ */
+function _commitFilesToDataBranch(srcDir) {
+  const os = require("os");
+  const crypto = require("crypto");
+  const branchRef = "refs/heads/sticky-note/data";
+  const tmpIndex = path.join(
+    os.tmpdir(),
+    "sticky-idx-" + process.pid + "-" + crypto.randomBytes(4).toString("hex")
+  );
+
+  try {
+    let parentSha = null;
+    try {
+      parentSha = execFileSync("git", ["rev-parse", "--verify", branchRef], {
+        encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
+    } catch (_) {}
+
+    const indexEnv = { ...process.env, GIT_INDEX_FILE: tmpIndex };
+    if (parentSha) {
+      execFileSync("git", ["read-tree", parentSha], {
+        timeout: 5000, stdio: ["pipe", "pipe", "pipe"], env: indexEnv,
+      });
+    }
+
+    // Walk srcDir and commit all files
+    function walkAndAdd(dir, prefix) {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        const relPath = prefix ? prefix + "/" + entry.name : entry.name;
+        if (entry.isDirectory()) {
+          walkAndAdd(full, relPath);
+        } else if (entry.isFile() && !entry.name.startsWith(".sticky-")) {
+          const content = fs.readFileSync(full);
+          const blobSha = execFileSync("git", ["hash-object", "-w", "--stdin"], {
+            input: content, encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+          }).trim();
+          execFileSync(
+            "git",
+            ["update-index", "--add", "--cacheinfo", "100644," + blobSha + "," + relPath],
+            { timeout: 5000, stdio: ["pipe", "pipe", "pipe"], env: indexEnv }
+          );
+        }
+      }
+    }
+    walkAndAdd(srcDir, "");
+
+    const treeSha = execFileSync("git", ["write-tree"], {
+      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"], env: indexEnv,
+    }).trim();
+
+    const commitArgs = ["commit-tree", treeSha, "-m", "chore(sticky-note): migrate to data branch"];
+    if (parentSha) commitArgs.push("-p", parentSha);
+    const commitSha = execFileSync("git", commitArgs, {
+      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+
+    execFileSync("git", ["update-ref", branchRef, commitSha], {
+      timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+    });
+  } finally {
+    try { fs.unlinkSync(tmpIndex); } catch (_) {}
+  }
+}
+
+// ──────────────────────────────────────────────
 // Main
 // ──────────────────────────────────────────────
 
@@ -2535,11 +4204,32 @@ async function main() {
     case "deploy-backend":
       cmdDeployBackend();
       break;
-    case "migrate":
-      await cmdMigrate();
+    case "overlap":
+      cmdOverlap();
+      break;
+    case "claim":
+      cmdClaim();
+      break;
+    case "sync":
+      cmdSync();
+      break;
+    case "pull":
+      cmdPull();
+      break;
+    case "bootstrap":
+      await cmdBootstrap();
+      break;
+    case "env":
+      await cmdEnv();
       break;
     case "mcp-server":
-      await cmdMcpServer();
+      cmdMcpServer();
+      break;
+    case "run-hook":
+      cmdRunHook();
+      break;
+    case "migrate":
+      await cmdMigrate();
       break;
     case "--version":
     case "-v":
@@ -2564,11 +4254,18 @@ async function main() {
       print("    switch             Safe branch switching (auto-stashes .sticky-note/)");
       print("    gc                 Manual tombstone sweep for expired threads");
       print("    reset              Wipe all threads and start fresh (--force, --keep-audit)");
-      print("    get-line-attribution  File-to-thread attribution with line ranges");
-      print("    checkpoint         Set work-topic checkpoint for attribution");
+      print("    get-line-attribution  File→thread attribution with line ranges (--file, --lines)");
+      print("    checkpoint         Set work-topic checkpoint for attribution (--topic, --show, --clear)");
       print("    deploy-backend     Provision Cloudflare KV backend (V3)");
-      print("    migrate            Migrate V2 local data to cloud (--to cloud)");
-      print("    mcp-server         Start MCP server (stdio transport)");
+      print("    migrate            Migrate to git data branch (default) or cloud (--to cloud)");
+      print("    overlap            Detect file overlaps with open/stuck threads");
+      print("    claim              Claim ownership of files you're working on (--list, --clear)");
+      print("    sync               Commit .sticky-note/ changes to git (--push to also push)");
+      print("    pull               Auto-sync .sticky-note/ then git pull (alias: git spull)");
+      print("    bootstrap          Provision MCP servers with secrets from manifest");
+      print("    env                Environment management (status, add-server, add-plugin)");
+      print("    mcp-server         Launch the sticky-note MCP server (stdio JSON-RPC)");
+      print("    run-hook <name>    Run a hook from any subdirectory (finds .claude/hooks/ up the tree)");
       print("");
       print("  Options:");
       print("    --version  Show version");

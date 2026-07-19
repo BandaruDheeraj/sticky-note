@@ -1,0 +1,7 @@
+{
+  "name": "sticky-note-team",
+  "version": "1.0.0",
+  "description": "Team skills, agents, and commands provisioned by sticky-note",
+  "type": "module",
+  "main": "extension.mjs"
+}

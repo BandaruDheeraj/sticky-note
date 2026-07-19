@@ -1,4 +1,10 @@
 
+# Sticky Note - data moved to sticky-note/data branch (.git/sticky-note/ cache)
+.sticky-note/
+
+# Secrets — never commit
+.env
+
 # Sticky Note - local overrides
 .claude/settings.local.json
 
@@ -10,10 +16,16 @@ __pycache__/
 .sticky-note/hook-debug.log
 .sticky-note/.sticky-debug.jsonl
 
+# Sticky Note - lock and backup files
+.sticky-note/.sticky-backups/
+.sticky-note/sticky-note.json.lock
+.sticky-note/sticky-note.json.tmp.*
+
 # Sticky Note - transient session/resume signals
 .sticky-note/.sticky-resume
 .sticky-note/.sticky-session
 .sticky-note/.sticky-head
+.sticky-note/.sticky-banner-shown
 
 # Sticky Note - legacy single files (migrated to per-user dirs)
 .sticky-note/sticky-note-audit.jsonl

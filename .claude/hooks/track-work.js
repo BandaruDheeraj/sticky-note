@@ -37,12 +37,16 @@ try {
 
 const {
   getConfigPath,
+  getMemoryPath,
   getUserPresencePath,
   loadJson,
   saveJson,
+  saveMemoryMerged,
   appendAuditLine,
   getUser,
+  getBranch,
   getSessionId,
+  normalizeSep,
 } = utils;
 
 const WRITE_TOOLS = new Set([
@@ -287,18 +291,49 @@ function main() {
     writeEditNote(sessionId, user, filePath, lineRanges, checkpoint);
   }
 
-  const serverName = autoDetectMcp(toolName);
-  if (serverName) {
-    const configPath = getConfigPath();
-    const config = loadJson(configPath, { stale_days: 14, mcp_servers: [] });
-    const mcpServers = config.mcp_servers || [];
-    const knownNames = new Set(
-      mcpServers.map((s) => (typeof s === "object" ? s.name : s))
-    );
-    if (!knownNames.has(serverName)) {
-      mcpServers.push({ name: serverName, source: "auto-detected" });
-      config.mcp_servers = mcpServers;
-      saveJson(configPath, config);
+  if (toolName && toolName.startsWith("mcp__")) {
+    const serverName = autoDetectMcp(toolName);
+    if (serverName) {
+      const configPath = getConfigPath();
+      const config = loadJson(configPath, { stale_days: 14, mcp_servers: [] });
+      const mcpServers = config.mcp_servers || [];
+      const knownNames = new Set(
+        mcpServers.map((s) => (typeof s === "object" ? s.name : s))
+      );
+      if (!knownNames.has(serverName)) {
+        mcpServers.push({ name: serverName, source: "auto-detected" });
+        config.mcp_servers = mcpServers;
+        saveJson(configPath, config);
+      }
+    }
+  }
+
+  // ── Progressive thread update ────────────────────────────
+  // Update the session's open thread with files_touched and branch changes
+  // so data survives even if SessionEnd never fires (Ctrl+C, crash).
+  if (filePath) {
+    try {
+      const memoryPath = getMemoryPath();
+      const memory = loadJson(memoryPath, { version: "2", project: "", threads: [] });
+      const threads = (memory.threads || []).filter(Boolean);
+      const sessionThread = threads.find((t) => t.session_id === sessionId);
+      if (sessionThread) {
+        const normalized = normalizeSep(filePath);
+        const touched = sessionThread.files_touched || [];
+        if (!touched.includes(normalized)) {
+          touched.push(normalized);
+          sessionThread.files_touched = touched;
+        }
+        // Update branch if it changed mid-session
+        const currentBranch = getBranch();
+        if (currentBranch && currentBranch !== sessionThread.branch) {
+          sessionThread.branch = currentBranch;
+        }
+        sessionThread.last_activity_at = now;
+        saveMemoryMerged(memoryPath, memory);
+      }
+    } catch (_) {
+      // Best-effort — don't break the hook if thread update fails
     }
   }
 
@@ -316,6 +351,7 @@ function main() {
 
 try {
   main();
-} catch (_) {
+} catch (err) {
+  try { utils.logHookError("track-work", err); } catch (_) {}
   safeExit();
 }

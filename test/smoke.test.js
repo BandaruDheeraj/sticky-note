@@ -237,6 +237,451 @@ try {
     );
   });
 
+  // ── Sync & auto-commit tests ──
+
+  // Commit sticky-note files first so we have a clean baseline
+  try {
+    execSync('git add -A && git commit -m "setup sticky-note files"', { cwd: tmpDir, stdio: "pipe" });
+  } catch (_) { /* may already be committed */ }
+
+  run("sync command works with clean tree", () => {
+    const out = cli(["sync"]);
+    assert.ok(out.includes("Nothing to sync") || out.includes("clean"), "Should report nothing to sync");
+  });
+
+  run("sync command commits dirty .sticky-note/ files", () => {
+    // Dirty the sticky-note.json
+    const snPath = path.join(tmpDir, ".sticky-note", "sticky-note.json");
+    const data = JSON.parse(fs.readFileSync(snPath, "utf-8"));
+    data.project = "sync-test";
+    fs.writeFileSync(snPath, JSON.stringify(data, null, 2) + "\n");
+
+    const out = cli(["sync"]);
+    assert.ok(out.includes("Committed") || out.includes("✅"), "Should commit changes");
+
+    // Verify git log has the sync commit
+    const log = execSync("git log --oneline -1", { cwd: tmpDir, encoding: "utf-8" });
+    assert.ok(log.includes("sticky-note"), "Last commit should be sticky-note sync");
+  });
+
+  run("post-commit hook template exists", () => {
+    const hookPath = path.join(TEMPLATES, "hooks", "post-commit");
+    assert.ok(fs.existsSync(hookPath), "post-commit template should exist");
+    const content = fs.readFileSync(hookPath, "utf-8");
+    assert.ok(content.includes("sticky-syncing"), "Should have recursion guard");
+    assert.ok(content.includes("sticky-note"), "Should reference sticky-note");
+  });
+
+  run("config template has auto_sync options", () => {
+    const configTemplate = JSON.parse(
+      fs.readFileSync(path.join(TEMPLATES, "sticky-note-config.json"), "utf-8")
+    );
+    assert.strictEqual(configTemplate.auto_sync, true, "auto_sync should default to true");
+    assert.strictEqual(configTemplate.auto_push, false, "auto_push should default to false");
+  });
+
+  run("syncStickyNote utility exists in sticky-utils", () => {
+    const utilsPath = path.join(TEMPLATES, "hooks", "sticky-utils.js");
+    const utils = require(utilsPath);
+    assert.ok(typeof utils.syncStickyNote === "function", "syncStickyNote should be exported");
+  });
+
+  run("bootstrap runs without error (no manifest)", () => {
+    const out = cli(["bootstrap"]);
+    assert.ok(out.length > 0, "Should produce output");
+  });
+
+  run("env status runs without error", () => {
+    const out = cli(["env", "status"]);
+    assert.ok(out.length > 0, "Should produce output");
+  });
+
+  run("environment directory template exists", () => {
+    const manifestPath = path.join(TEMPLATES, "environment", "manifest.json");
+    assert.ok(fs.existsSync(manifestPath), "templates/environment/manifest.json should exist");
+    const data = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+    assert.ok(data.version, "Manifest should have version field");
+  });
+
+  run("provisioning creates .env-provision-hash", () => {
+    // Set up a minimal environment dir for provisioning
+    const envDir = path.join(tmpDir, ".sticky-note", "environment");
+    fs.mkdirSync(envDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(envDir, "manifest.json"),
+      JSON.stringify({ version: "1", mcp_servers: {} }, null, 2) + "\n"
+    );
+
+    // Run session-start hook (it calls ensureEnvironmentProvisioned internally)
+    const hookPath = path.join(TEMPLATES, "hooks", "session-start.js");
+    try {
+      execFileSync("node", [hookPath, "--copilot-cli"], {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+        cwd: tmpDir,
+        timeout: 15000,
+        env: { ...process.env, STICKY_CWD: tmpDir },
+      });
+    } catch (_) { /* hook may exit non-zero, that's ok */ }
+
+    const hashFile = path.join(tmpDir, ".sticky-note", ".env-provision-hash");
+    assert.ok(fs.existsSync(hashFile), ".env-provision-hash should be created after provisioning");
+  });
+
+  run("help text includes bootstrap and env commands", () => {
+    const out = cli(["--help"]);
+    assert.ok(out.includes("bootstrap"), "Help should mention bootstrap command");
+    assert.ok(out.includes("env"), "Help should mention env command");
+    assert.ok(out.includes("add-plugin"), "Help should mention add-plugin in env description");
+  });
+
+  run("provisioning creates extension.mjs and package.json for Copilot CLI", () => {
+    const envDir = path.join(tmpDir, ".sticky-note", "environment");
+    fs.mkdirSync(envDir, { recursive: true });
+    fs.mkdirSync(path.join(envDir, "skills"), { recursive: true });
+    fs.writeFileSync(
+      path.join(envDir, "manifest.json"),
+      JSON.stringify({ version: "1", mcp_servers: {} }, null, 2) + "\n"
+    );
+    fs.writeFileSync(
+      path.join(envDir, "skills", "test-skill.md"),
+      "# Test Skill\nA test skill for smoke testing.\n"
+    );
+
+    const hookPath = path.join(TEMPLATES, "hooks", "session-start.js");
+    try {
+      execFileSync("node", [hookPath, "--copilot-cli"], {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+        cwd: tmpDir,
+        timeout: 15000,
+        env: { ...process.env, STICKY_CWD: tmpDir },
+      });
+    } catch (_) { /* hook may exit non-zero */ }
+
+    const extDir = path.join(tmpDir, ".github", "extensions", "sticky-note-team");
+    assert.ok(fs.existsSync(path.join(extDir, "extension.mjs")), "extension.mjs should be created");
+    assert.ok(fs.existsSync(path.join(extDir, "package.json")), "package.json should be created");
+
+    const pkg = JSON.parse(fs.readFileSync(path.join(extDir, "package.json"), "utf-8"));
+    assert.strictEqual(pkg.name, "sticky-note-team", "package.json should have correct name");
+    assert.strictEqual(pkg.type, "module", "package.json should set type to module");
+  });
+
+  run("provisioning copies skills to both Claude and Copilot dirs", () => {
+    const claudeSkill = path.join(tmpDir, ".claude", "plugins", "sticky-note-team", "skills", "test-skill", "SKILL.md");
+    const copilotSkill = path.join(tmpDir, ".github", "extensions", "sticky-note-team", "skills", "test-skill.md");
+    assert.ok(fs.existsSync(claudeSkill), "Skill should be provisioned to Claude plugin dir");
+    assert.ok(fs.existsSync(copilotSkill), "Skill should be provisioned to Copilot extension dir");
+  });
+
+  run("provisioning merges permissions into settings.local.json", () => {
+    // Clean up from previous test, set up fresh
+    const envDir = path.join(tmpDir, ".sticky-note", "environment");
+    fs.writeFileSync(
+      path.join(envDir, "manifest.json"),
+      JSON.stringify({
+        version: "1",
+        mcp_servers: {},
+        permissions: ["Bash(npm test:*)", "mcp:context7"],
+      }, null, 2) + "\n"
+    );
+    // Clear provision hash to force re-provisioning
+    const hashFile = path.join(tmpDir, ".sticky-note", ".env-provision-hash");
+    if (fs.existsSync(hashFile)) fs.unlinkSync(hashFile);
+
+    const hookPath = path.join(TEMPLATES, "hooks", "session-start.js");
+    try {
+      execFileSync("node", [hookPath, "--copilot-cli"], {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+        cwd: tmpDir,
+        timeout: 15000,
+        env: { ...process.env, STICKY_CWD: tmpDir },
+      });
+    } catch (_) { /* hook may exit non-zero */ }
+
+    const settingsPath = path.join(tmpDir, ".claude", "settings.local.json");
+    if (fs.existsSync(settingsPath)) {
+      const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+      assert.ok(
+        Array.isArray(settings.allowedTools) && settings.allowedTools.includes("Bash(npm test:*)"),
+        "Permissions should be merged into settings.local.json"
+      );
+    }
+  });
+
+  run("pre-commit hook includes environment/ in auto-stage paths", () => {
+    const cliPath = path.join(__dirname, "..", "bin", "cli.js");
+    const cliSource = fs.readFileSync(cliPath, "utf-8");
+    assert.ok(
+      cliSource.includes('.sticky-note/environment"') || cliSource.includes(".sticky-note/environment/"),
+      "Pre-commit hook should auto-stage .sticky-note/environment/"
+    );
+  });
+
+  run("env add-plugin appears in env subcommand help", () => {
+    const cliPath = path.join(__dirname, "..", "bin", "cli.js");
+    const cliSource = fs.readFileSync(cliPath, "utf-8");
+    assert.ok(cliSource.includes("add-plugin"), "env subcommand should include add-plugin case");
+  });
+
+  run("copilot-instructions.md mentions environment sync", () => {
+    const instrPath = path.join(TEMPLATES, "copilot-instructions.md");
+    const content = fs.readFileSync(instrPath, "utf-8");
+    assert.ok(content.includes("environment sync"), "copilot-instructions.md should mention environment sync");
+    assert.ok(content.includes("get_environment_status"), "copilot-instructions.md should mention get_environment_status tool");
+  });
+
+  run("_stickyDir() points to .git/sticky-note/", () => {
+    // Require sticky-utils from the installed hooks dir (set up by setupStickyNote)
+    const utils = require(path.join(tmpDir, ".claude", "hooks", "sticky-utils.js"));
+    const memPath = utils.getMemoryPath();
+    const expected = path.join(tmpDir, ".git", "sticky-note", "sticky-note.json");
+    assert.strictEqual(
+      path.normalize(memPath),
+      path.normalize(expected),
+      `Expected ${expected}, got ${memPath}`
+    );
+  });
+
+  // ── data-branch tests ──
+
+  run("data-branch: commitFilesToBranch round-trips content", () => {
+    const { commitFilesToBranch, readFileFromBranch } = require(
+      path.join(tmpDir, ".claude", "hooks", "data-branch.js")
+    );
+    const content = JSON.stringify({ version: "2", project: "", threads: [{ id: "abc123" }] }, null, 2) + "\n";
+    commitFilesToBranch("sticky-note/data", { "sticky-note.json": content });
+    const read = readFileFromBranch("refs/heads/sticky-note/data", "sticky-note.json");
+    assert.strictEqual(read, content, "round-trip content mismatch");
+  });
+
+  run("data-branch: commitFilesToBranch creates second commit on same branch", () => {
+    const { commitFilesToBranch, readFileFromBranch } = require(
+      path.join(tmpDir, ".claude", "hooks", "data-branch.js")
+    );
+    const v1 = '{"version":"2","threads":[]}\n';
+    const v2 = '{"version":"2","threads":[{"id":"xyz"}]}\n';
+    commitFilesToBranch("sticky-note/data", { "sticky-note.json": v1 });
+    commitFilesToBranch("sticky-note/data", { "sticky-note.json": v2 });
+    const read = readFileFromBranch("refs/heads/sticky-note/data", "sticky-note.json");
+    assert.strictEqual(read, v2, "second commit should overwrite first");
+  });
+
+  run("data-branch: mergeThreadArrays preserves threads from both sides", () => {
+    const { mergeThreadArrays } = require(
+      path.join(tmpDir, ".claude", "hooks", "data-branch.js")
+    );
+    const local = [{ id: "a", status: "open", last_activity_at: "2026-01-01T00:00:00Z" }];
+    const remote = [{ id: "b", status: "closed", last_activity_at: "2026-01-02T00:00:00Z" }];
+    const merged = mergeThreadArrays(local, remote);
+    assert.strictEqual(merged.length, 2, "should have 2 threads");
+    assert.ok(merged.find(t => t.id === "a"), "local thread preserved");
+    assert.ok(merged.find(t => t.id === "b"), "remote thread preserved");
+  });
+
+  run("data-branch: mergeThreadArrays takes more-recent copy for same id", () => {
+    const { mergeThreadArrays } = require(
+      path.join(tmpDir, ".claude", "hooks", "data-branch.js")
+    );
+    const older = { id: "a", status: "open", last_activity_at: "2026-01-01T00:00:00Z", last_note: "old" };
+    const newer = { id: "a", status: "closed", last_activity_at: "2026-01-02T00:00:00Z", last_note: "new" };
+    const merged = mergeThreadArrays([older], [newer]);
+    assert.strictEqual(merged.length, 1);
+    assert.strictEqual(merged[0].last_note, "new", "newer version should win");
+  });
+
+  run("session-start: merges remote data branch threads on boot", () => {
+    const { commitFilesToBranch } = require(
+      path.join(tmpDir, ".claude", "hooks", "data-branch.js")
+    );
+
+    // Simulate a remote teammate's thread on the data branch
+    const remoteThread = {
+      id: "remote-thread-1",
+      user: "alice",
+      status: "open",
+      branch: "feature/remote",
+      created_at: "2026-01-01T10:00:00Z",
+      last_activity_at: "2026-01-01T10:00:00Z",
+      files_touched: ["src/api.ts"],
+      narrative: "remote work",
+    };
+    const remoteMemory = { version: "2", project: "", threads: [remoteThread] };
+    commitFilesToBranch("sticky-note/data", {
+      "sticky-note.json": JSON.stringify(remoteMemory, null, 2) + "\n",
+    });
+
+    // Run session-start (it reads the data branch on start)
+    execFileSync(
+      process.execPath,
+      [path.join(tmpDir, ".claude", "hooks", "session-start.js")],
+      {
+        encoding: "utf-8",
+        timeout: 15000,
+        cwd: tmpDir,
+        env: { ...process.env, HOME: tmpDir, USERPROFILE: tmpDir },
+        input: '{"hook_event_name":"SessionStart","session_id":"test-session-fetch"}',
+        stdio: ["pipe", "pipe", "pipe"],
+      }
+    );
+
+    // After session-start, local memory should contain the remote thread
+    const utils = require(path.join(tmpDir, ".claude", "hooks", "sticky-utils.js"));
+    const memory = utils.loadJson(utils.getMemoryPath(), { threads: [] });
+    const found = (memory.threads || []).find((t) => t.id === "remote-thread-1");
+    assert.ok(found, "remote thread should be merged into local memory after session-start");
+  });
+
+  run("session-end: commits local data to sticky-note/data branch", () => {
+    const { execFileSync: exec2 } = require("child_process");
+    const utils = require(path.join(tmpDir, ".claude", "hooks", "sticky-utils.js"));
+
+    // Write a known thread to local memory
+    const thread = {
+      id: "session-end-test-thread",
+      user: "dheer",
+      status: "open",
+      branch: "main",
+      created_at: new Date().toISOString(),
+      last_activity_at: new Date().toISOString(),
+      files_touched: [],
+      narrative: "test session end commit",
+    };
+    const memory = { version: "2", project: "", threads: [thread] };
+    const memPath = utils.getMemoryPath();
+    fs.mkdirSync(path.dirname(memPath), { recursive: true });
+    fs.writeFileSync(memPath, JSON.stringify(memory, null, 2) + "\n", "utf-8");
+
+    // Create an empty transcript file so session-end doesn't have to handle missing file
+    const transcriptPath = path.join(tmpDir, "transcript.jsonl");
+    if (!fs.existsSync(transcriptPath)) {
+      fs.writeFileSync(transcriptPath, "", "utf-8");
+    }
+
+    // Run session-end
+    exec2(
+      process.execPath,
+      [path.join(tmpDir, ".claude", "hooks", "session-end.js")],
+      {
+        encoding: "utf-8", timeout: 15000,
+        cwd: tmpDir,
+        env: { ...process.env, HOME: tmpDir, USERPROFILE: tmpDir },
+        input: JSON.stringify({
+          hook_event_name: "SessionEnd",
+          session_id: "test-session-end",
+          transcript_path: transcriptPath,
+        }),
+        stdio: ["pipe", "pipe", "pipe"],
+      }
+    );
+
+    // Verify sticky-note/data branch contains the thread
+    const { readFileFromBranch } = require(path.join(tmpDir, ".claude", "hooks", "data-branch.js"));
+    const branchContent = readFileFromBranch("refs/heads/sticky-note/data", "sticky-note.json");
+    assert.ok(branchContent, "data branch should have sticky-note.json after session-end");
+    const branchMemory = JSON.parse(branchContent);
+    const found = (branchMemory.threads || []).find(t => t.id === "session-end-test-thread");
+    assert.ok(found, "data branch should contain the session thread");
+  });
+
+  run("migrate: copies .sticky-note/ to .git/sticky-note/ and creates data branch", () => {
+    const { execFileSync: exec2 } = require("child_process");
+
+    // Create old-style .sticky-note/ structure
+    const stickyDir = path.join(tmpDir, ".sticky-note");
+    fs.mkdirSync(stickyDir, { recursive: true });
+    const oldThread = {
+      id: "migrate-thread-1", user: "dheer", status: "closed",
+      branch: "main", created_at: "2026-01-01T00:00:00Z",
+      last_activity_at: "2026-01-01T01:00:00Z", files_touched: [],
+    };
+    fs.writeFileSync(
+      path.join(stickyDir, "sticky-note.json"),
+      JSON.stringify({ version: "2", project: "", threads: [oldThread] }, null, 2) + "\n"
+    );
+
+    // Run migrate
+    exec2(process.execPath, [CLI, "migrate"], {
+      encoding: "utf-8", timeout: 15000,
+      cwd: tmpDir,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    // Verify .git/sticky-note/sticky-note.json exists with old thread
+    const utils = require(path.join(tmpDir, ".claude", "hooks", "sticky-utils.js"));
+    const memory = utils.loadJson(utils.getMemoryPath(), { threads: [] });
+    assert.ok(
+      (memory.threads || []).find(t => t.id === "migrate-thread-1"),
+      "migrated thread should appear in .git/sticky-note/sticky-note.json"
+    );
+
+    // Verify sticky-note/data branch was created
+    const { readFileFromBranch } = require(path.join(tmpDir, ".claude", "hooks", "data-branch.js"));
+    const branchContent = readFileFromBranch("refs/heads/sticky-note/data", "sticky-note.json");
+    assert.ok(branchContent, "sticky-note/data branch should exist after migrate");
+
+    // Verify .sticky-note/ is in .gitignore
+    const gitignore = fs.readFileSync(path.join(tmpDir, ".gitignore"), "utf-8");
+    assert.ok(gitignore.includes(".sticky-note/"), ".gitignore should include .sticky-note/");
+  });
+
+  run("migrate: gitignore check uses line-exact match, not substring (regression test)", () => {
+    const { execFileSync: exec2 } = require("child_process");
+
+    // Create a .gitignore that already has .sticky-note/.sticky-session and .sticky-note/.sticky-resume
+    // (simulating a repo that ran `init`)
+    const gitignorePath = path.join(tmpDir, ".gitignore");
+    fs.writeFileSync(
+      gitignorePath,
+      ".sticky-note/.sticky-session\n.sticky-note/.sticky-resume\n"
+    );
+
+    // Set up .sticky-note/sticky-note.json with a thread
+    const stickyDir = path.join(tmpDir, ".sticky-note");
+    fs.mkdirSync(stickyDir, { recursive: true });
+    const thread = {
+      id: "regression-test-thread",
+      user: "dheer",
+      status: "open",
+      branch: "main",
+      created_at: "2026-01-01T00:00:00Z",
+      last_activity_at: "2026-01-01T01:00:00Z",
+      files_touched: [],
+    };
+    fs.writeFileSync(
+      path.join(stickyDir, "sticky-note.json"),
+      JSON.stringify({ version: "2", project: "", threads: [thread] }, null, 2) + "\n"
+    );
+
+    // Run migrate
+    exec2(process.execPath, [CLI, "migrate"], {
+      encoding: "utf-8",
+      timeout: 15000,
+      cwd: tmpDir,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    // Verify that .gitignore now contains the blanket .sticky-note/ rule as its own line
+    const gitignore = fs.readFileSync(gitignorePath, "utf-8");
+    const lines = gitignore.split("\n").map(l => l.trim());
+    assert.ok(
+      lines.includes(".sticky-note/"),
+      ".gitignore should contain .sticky-note/ as its own line (line-exact match)"
+    );
+
+    // Also verify that the old specific entries are still there (not removed)
+    assert.ok(
+      gitignore.includes(".sticky-note/.sticky-session"),
+      ".gitignore should still contain .sticky-note/.sticky-session"
+    );
+    assert.ok(
+      gitignore.includes(".sticky-note/.sticky-resume"),
+      ".gitignore should still contain .sticky-note/.sticky-resume"
+    );
+  });
+
 } finally {
   cleanup();
 }

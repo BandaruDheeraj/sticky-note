@@ -1,10 +1,12 @@
 {
   "name": "sticky-note-cli",
-  "version": "2.5.3",
+  "version": "3.0.0",
   "description": "Human-to-human handoff for AI coding assistants. Git-backed shared memory for Claude Code and Copilot CLI.",
   "license": "MIT",
   "bin": {
-    "sticky-note": "./bin/cli.js"
+    "sticky-note": "./bin/cli.js",
+    "sticky-note-cli": "./bin/cli.js",
+    "sticky-note-mcp": "./bin/mcp-server.js"
   },
   "keywords": [
     "ai",
@@ -30,5 +32,8 @@
   },
   "scripts": {
     "test": "node test/smoke.test.js"
+  },
+  "devDependencies": {
+    "sticky-note-cli": "^2.9.1"
   }
 }

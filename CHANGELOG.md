@@ -40,8 +40,8 @@
 ### New: CLI Commands
 - `deploy-backend` — provision Cloudflare KV namespace, deploy Worker, write
   `.env.sticky`.
-- `migrate --to cloud` — lift all V2 local data (threads, audit, presence) to
-  the cloud backend.
+- `migrate` — migrate to git data branch (default) or `--to cloud` to lift V2
+  local data to the cloud backend.
 - `mcp-server` — start MCP server over stdio.
 - `init --v3` — V3 setup flow with cloud backend configuration prompts.
 - `status` — now includes cloud backend reachability check.
@@ -64,6 +64,105 @@
 ### License
 - Client (hooks, CLI, templates): MIT (unchanged).
 - Cloud backend (`sticky-server/`): AGPL-3.0.
+
+## V2.7.0
+
+### New: Team Environment Sync ("Vibe Coding Container")
+- **Auto-provisioning engine** in session-start hook: copies skills, agents,
+  commands to tool-specific directories; writes secret-free MCP servers to
+  `.mcp.json`; merges permissions into `.claude/settings.local.json`
+- **Hash-based change detection**: provisioning only runs when environment
+  directory contents change (SHA-256 hash stored in `.env-provision-hash`)
+- **`.sticky-note/environment/` directory**: manifest.json for MCP servers
+  and permissions; `skills/`, `agents/`, `commands/` for .md files
+- **`npx sticky-note bootstrap`**: interactive secrets provisioning for MCP
+  servers with `${ENV_VAR}` placeholders. Resolves via shell env → .env →
+  interactive prompt. Generates `.env.example`.
+- **`npx sticky-note env status`**: shows provisioned/missing/needs-secrets
+  per MCP server, resource counts, env var resolution status
+- **`npx sticky-note env add-server`**: interactive command to add MCP
+  servers to the team environment manifest
+- **Dual-target provisioning**: skills copied to both
+  `.claude/plugins/sticky-note-team/` (Claude Code) and
+  `.github/extensions/sticky-note-team/` (Copilot CLI)
+- **Auto-generated plugin.json**: Claude Code plugin metadata created
+  automatically from provisioned skills
+- **Backward compatibility**: old `mcp_servers[]`/`skills[]` in
+  `sticky-note-config.json` auto-migrated to new environment format
+- **MCP `get_environment_status()` tool**: reads manifest and reports
+  what's provisioned vs missing vs needs-secrets to the AI
+
+## V2.6.16
+
+### Fix: MCP server connection (npx command)
+- `npx -y sticky-note-cli mcp-server` failed with "could not determine
+  executable to run" because the package name doesn't match the bin entry.
+  Fixed to `npx -y -p sticky-note-cli sticky-note mcp-server`.
+- Updated `.mcp.json`, session-start hook auto-registration, README, and
+  plan docs with the corrected command.
+
+### New: Styled overlap banners
+- AI-rendered banner uses `━` bar borders, structured layout with
+  `🔴 STUCK` / `🟡 OPEN` status indicators, user, branch, files,
+  narrative, and resume command.
+- stderr banner uses ANSI colors: yellow borders, red/green status,
+  cyan branch names, dim narrative, pipe (`┃`) left border.
+- Consistent format across all channels: pre-tool-use deny,
+  inject-context, session-start, and instruction templates.
+
+### Fix: Copilot CLI not calling MCP tools
+- `.github/copilot-instructions.md` was missing the MCP Server section
+  entirely — the AI never knew the tools existed.
+- Restructured instructions so MCP tools are the **first section** with
+  mandatory language. Manual file reads demoted to fallback.
+- Updated both the active copy and the template.
+
+## V2.6.13
+
+### Fix: Teammate hook sharing (zero-config onboarding)
+- `init` and `update` now detect overly broad `.claude/` gitignore entries
+  and replace them with targeted `.claude/settings.local.json` ignore.
+- `init` runs `git add --force .claude/hooks/ .claude/settings.json` so
+  hook scripts are committed even if previously ignored.
+- `update` does the same gitignore cleanup and force-add.
+- Teammates now get working hooks on `git pull` — no `init` required.
+
+## V2.6.0–2.6.12 (main)
+
+### New: Overlap Detection
+- `npx sticky-note overlap` detects file overlaps with other users'
+  open/stuck threads.
+- `npx sticky-note claim` declares file ownership (`--list`, `--clear`).
+- `session-start.js` warns about overlaps at session start.
+- Overlap warnings injected via three channels: `additionalContext`,
+  stderr banner, and `preToolUse` deny (Copilot CLI only).
+
+### New: preToolUse Deny as User-Visible Message Channel
+- Copilot CLI's `additionalContext` is absorbed silently by the model.
+  The only reliable way to surface urgent messages to users is via
+  `preToolUse` deny with `permissionDecisionReason`.
+- Deny fires once per session, keyed by `COPILOT_LOADER_PID` to
+  isolate concurrent sessions (stored in `.overlap-warned` JSON).
+- Twelve iterations (v2.6.1–v2.6.12) to discover and stabilize this
+  pattern.
+
+### New: Auto-Close Inactive Copilot CLI Threads
+- Copilot CLI has no session-end signal, so threads stay open
+  indefinitely. `session-start.js` now auto-closes `copilot-cli`
+  threads after configurable inactivity (default 24h).
+- New config: `copilot_cli_auto_close_hours` in
+  `sticky-note-config.json`.
+
+### Fixed
+- Ghost injection: `session-start.js` was marking threads injected in
+  Copilot CLI even though `sessionStart` output was dropped. Now skips
+  `markThreadInjected` for Copilot CLI so `inject-context.js` can
+  deliver them.
+- Cross-session injection poisoning: `.sticky-injected` dedup now
+  checks `session_id` before skipping, preventing one session's
+  injections from suppressing another's.
+- Concurrent session isolation: overlap dedup keyed by PID instead of
+  shared session ID.
 
 ---
 

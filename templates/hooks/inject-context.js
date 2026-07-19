@@ -39,9 +39,19 @@ function _safeExit() {
 let utils;
 try {
   utils = require("./sticky-utils.js");
-} catch (_) {
+} catch (err) {
+  try {
+    process.stderr.write(
+      `[STICKY-NOTE] UserPromptSubmit hook error: failed to load sticky-utils.js — ${err.message}\n` +
+      `[STICKY-NOTE]   hint: re-run \`npx sticky-note init\` to restore .claude/hooks/.\n`
+    );
+  } catch (_) { /* ignore */ }
   _safeExit();
 }
+
+// Issue #13: also self-heal from this hook (Copilot CLI doesn't fire
+// SessionStart, so inject-context may be the first hook to run successfully).
+try { utils.selfHealHookPaths && utils.selfHealHookPaths(); } catch (_) { /* non-fatal */ }
 
 let gitNotes;
 try {
@@ -119,6 +129,109 @@ function extractKeywords(prompt) {
     }
   }
   return keywords;
+}
+
+// ── Overlap detection (for Copilot CLI where session-start output is ignored) ──
+
+function detectAndFormatOverlaps(threads, currentUser) {
+  const modifiedFiles = getRecentlyModifiedFiles();
+  if (modifiedFiles.size === 0) return "";
+
+  const activeThreads = (threads || []).filter(
+    (t) => t.status === "open" || t.status === "stuck"
+  );
+
+  const warnings = [];
+  for (const thread of activeThreads) {
+    const threadUser = thread.user || thread.author || "";
+    if (threadUser === currentUser) continue;
+    const threadFiles = (thread.files_touched || []).map(normalizeSep);
+    const overlap = threadFiles.filter((f) => modifiedFiles.has(f));
+    if (overlap.length === 0) continue;
+    warnings.push({ thread, overlap });
+  }
+
+  if (warnings.length === 0) return "";
+
+  warnings.sort((a, b) => {
+    if (a.thread.status !== b.thread.status) {
+      return a.thread.status === "stuck" ? -1 : 1;
+    }
+    return b.overlap.length - a.overlap.length;
+  });
+
+  const bar = "━".repeat(52);
+  const lines = [
+    "## [STICKY-NOTE] ⚠️ OVERLAP DETECTED\n",
+    "**You MUST display the banner below as the FIRST thing in your response.**\n",
+    "```",
+    `⚠️ ━━━ OVERLAP DETECTED ${bar.substring(0, 28)}`,
+  ];
+  for (const { thread, overlap } of warnings) {
+    const user = thread.user || thread.author || "unknown";
+    const statusEmoji = thread.status === "stuck" ? "🔴" : "🟡";
+    const statusLabel = thread.status === "stuck" ? "STUCK" : "OPEN";
+    const narrative = thread.narrative || thread.last_note || "";
+    const narrativeSnip = narrative.length > 100
+      ? narrative.substring(0, 100) + "…"
+      : narrative;
+    const branch = thread.branch ? ` · ${thread.branch}` : "";
+    const threadId = (thread.id || "").substring(0, 8);
+
+    lines.push("");
+    lines.push(`  ${statusEmoji} ${user} (${statusLabel})${branch}`);
+    lines.push(`     Files: ${overlap.join(", ")}`);
+    if (narrativeSnip) lines.push(`     "${narrativeSnip}"`);
+    const failed = thread.failed_approaches || [];
+    if (failed.length > 0) {
+      lines.push(`     ⚠️ ${failed.length} failed approach(es):`);
+      for (const fa of failed.slice(0, 2)) {
+        lines.push(`       • ${(fa.description || "").substring(0, 80)}`);
+      }
+    }
+    lines.push(`     → Resume: npx sticky-note resume ${threadId}`);
+  }
+  lines.push("");
+  lines.push(bar);
+  lines.push("```");
+  lines.push(
+    "\n**Consider coordinating with these teammates before starting work.**\n"
+  );
+
+  // Write a styled banner to stderr so the user sees it in their terminal
+  const R = "\x1b[0m";
+  const Y = "\x1b[33m";
+  const BY = "\x1b[1;33m";
+  const BR = "\x1b[1;31m";
+  const BG = "\x1b[1;32m";
+  const B = "\x1b[1m";
+  const C = "\x1b[36m";
+  const D = "\x1b[2m";
+  const stderrLines = [
+    "",
+    `${Y}${bar}${R}`,
+    `${BY}  ⚠️  OVERLAP DETECTED${R}`,
+    `${Y}${bar}${R}`,
+  ];
+  for (const { thread, overlap } of warnings) {
+    const user = thread.user || thread.author || "unknown";
+    const statusColor = thread.status === "stuck" ? BR : BG;
+    const statusLabel = thread.status === "stuck" ? "STUCK" : "OPEN";
+    const narrative = thread.narrative || thread.last_note || "";
+    const narrativeSnip = narrative.length > 80
+      ? narrative.substring(0, 80) + "…"
+      : narrative;
+    const branchStr = thread.branch ? ` ${D}·${R} ${C}${thread.branch}${R}` : "";
+    stderrLines.push(`${Y}  ┃${R}  ${statusColor}[${statusLabel}]${R} ${B}${user}${R}${branchStr}`);
+    stderrLines.push(`${Y}  ┃${R}    Files: ${overlap.join(", ")}`);
+    if (narrativeSnip) stderrLines.push(`${Y}  ┃${R}    ${D}"${narrativeSnip}"${R}`);
+    const threadId = (thread.id || "").substring(0, 8);
+    stderrLines.push(`${Y}  ┃${R}    → Resume: ${C}npx sticky-note resume ${threadId}${R}`);
+  }
+  stderrLines.push(`${Y}${bar}${R}`, "");
+  process.stderr.write(stderrLines.join("\n") + "\n");
+
+  return lines.join("\n");
 }
 
 // ── Scoring ───────────────────────────────────────────────
@@ -338,7 +451,7 @@ async function main() {
     const cloudThreads = await cloudReadThreads();
     if (cloudThreads) memory.threads = cloudThreads;
   }
-  const threads = memory.threads || [];
+  const threads = (memory.threads || []).filter(Boolean);
 
   const live = threads.filter(
     (t) => t.status === "open" || t.status === "stuck" || t.status === "closed"
@@ -392,7 +505,7 @@ async function main() {
   const scored = [];
   for (const t of live) {
     // V2.5: Skip threads already injected this session by PreToolUse or session-start
-    if (isThreadInjected(t.id)) continue;
+    if (isThreadInjected(t.id, sessionId)) continue;
 
     let s = scoreThread(t, recentlyModified, currentBranch, currentUser, keywords);
     if (resumeThreadId && t.id === resumeThreadId) {
@@ -462,6 +575,13 @@ async function main() {
   const scoringBlock = debugLines.join("\n");
 
   if (scored.length === 0) {
+    // Even with no scored threads, check for overlaps
+    const overlapWarning = detectAndFormatOverlaps(threads, currentUser);
+    if (overlapWarning) {
+      _auditInject("no_scored_threads", 0);
+      _emit(overlapWarning);
+      return;
+    }
     _auditInject("no_scored_threads", 0);
     _emit("");
     return;
@@ -510,7 +630,15 @@ async function main() {
   outputLines.unshift(header);
 
   let output = outputLines.join("\n").trim();
-  output += scoringBlock;
+  if (process.env.STICKY_DEBUG) {
+    output += scoringBlock;
+  }
+
+  // Prepend overlap warning if other users' threads touch the same files
+  const overlapWarning = detectAndFormatOverlaps(threads, currentUser);
+  if (overlapWarning) {
+    output = overlapWarning + "\n" + output;
+  }
 
   _auditInject(
     "injected",
@@ -528,6 +656,9 @@ async function main() {
 
 if (require.main === module) {
   main().catch((exc) => {
+    try {
+      utils.reportHookError("UserPromptSubmit", exc);
+    } catch (_) { /* ignore */ }
     try {
       appendAuditLine({
         type: "inject_result",

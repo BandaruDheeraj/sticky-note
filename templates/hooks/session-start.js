@@ -11,21 +11,103 @@
 const crypto = require("crypto");
 const path = require("path");
 
+function _isCopilotCli() {
+  return process.argv.includes("--copilot-cli") || !!process.env.COPILOT_CLI;
+}
+
+function _emit(text) {
+  if (text === undefined) text = "";
+  if (_isCopilotCli()) {
+    process.stdout.write(JSON.stringify({ additionalContext: text }) + "\n");
+  } else {
+    process.stdout.write(JSON.stringify({ output: text }) + "\n");
+  }
+}
+
 function _safeExit() {
   try {
-    process.stdout.write(JSON.stringify({ output: "" }) + "\n");
+    _emit("");
   } catch (_) {
     process.stdout.write('{"output":""}\n');
   }
   process.exit(0);
 }
 
+// Issue #12: warn (non-blocking) when the running CLI is below the project's
+// configured min_version. Returns "" when nothing to say. Also writes a
+// stderr banner so the user sees it directly even if the hook output is
+// swallowed by the host tool.
+function _parseSemver(v) {
+  if (typeof v !== "string") return null;
+  const m = v.trim().replace(/^v/, "").match(/^(\d+)\.(\d+)(?:\.(\d+))?/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3] || 0)];
+}
+function _cmpSemver(a, b) {
+  const pa = _parseSemver(a), pb = _parseSemver(b);
+  if (!pa || !pb) return 0;
+  for (let i = 0; i < 3; i++) {
+    if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1;
+  }
+  return 0;
+}
+function _installedCliVersion() {
+  // Try the package.json shipped alongside this hook script's CLI.
+  try {
+    const candidates = [
+      path.join(__dirname, "..", "..", "package.json"),
+      path.join(__dirname, "..", "..", "..", "sticky-note-cli", "package.json"),
+    ];
+    for (const p of candidates) {
+      try {
+        const pkg = JSON.parse(require("fs").readFileSync(p, "utf-8"));
+        if (pkg && pkg.name === "sticky-note-cli" && pkg.version) return pkg.version;
+      } catch (_) { /* try next */ }
+    }
+  } catch (_) { /* ignore */ }
+  return null;
+}
+function formatVersionWarning(config) {
+  try {
+    const min = config && config.min_version;
+    if (!min) return "";
+    const installed = _installedCliVersion();
+    if (!installed) return "";
+    if (_cmpSemver(installed, min) >= 0) return "";
+    const msg =
+      `[STICKY-NOTE] ⚠️ Installed sticky-note-cli v${installed} is below ` +
+      `this project's min_version v${min}. Run \`npm i -D sticky-note-cli@latest\` ` +
+      `to update — features and schema may differ until you do.`;
+    try { process.stderr.write(msg + "\n"); } catch (_) { /* non-fatal */ }
+    return msg;
+  } catch (_) {
+    return "";
+  }
+}
+
 let utils;
 try {
   utils = require("./sticky-utils.js");
-} catch (_) {
+} catch (err) {
+  try {
+    process.stderr.write(
+      `[STICKY-NOTE] session-start hook error: failed to load sticky-utils.js — ${err.message}\n` +
+      `[STICKY-NOTE]   hint: re-run \`npx sticky-note init\` to restore .claude/hooks/.\n`
+    );
+  } catch (_) { /* ignore */ }
   _safeExit();
 }
+
+// Issue #13: self-heal stale absolute hook paths in .claude/settings.json
+// before doing anything else, so the next session loads cleanly even if some
+// other hook (e.g. on-stop, inject-context) was pointing at a path that no
+// longer exists. Failures here are non-fatal — we still want the rest of
+// session-start to run.
+try { utils.selfHealHookPaths && utils.selfHealHookPaths(); } catch (_) { /* non-fatal */ }
+
+// Non-fatal: data-branch sync is disabled if the module is missing.
+let dataBranch = null;
+try { dataBranch = require("./data-branch.js"); } catch (_) {}
 
 const {
   getMemoryPath,
@@ -37,6 +119,7 @@ const {
   saveMemoryMerged,
   appendAuditLine,
   getUser,
+  getBranch,
   getSessionId,
   getResumeThreadId,
   findThreadById,
@@ -52,6 +135,8 @@ const {
   cloudReadPresence,
   cloudReadConfig,
   cloudAppendAudit,
+  normalizeSep,
+  detectLostThreads,
 } = utils;
 
 // ── Stale-thread ageing ───────────────────────────────────
@@ -59,7 +144,7 @@ const {
 function ageStaleThreads(memory, staleDays) {
   const now = Date.now();
   let changed = false;
-  for (const thread of memory.threads || []) {
+  for (const thread of (memory.threads || []).filter(Boolean)) {
     if (thread.status !== "open" && thread.status !== "stuck") continue;
     const tsField =
       thread.last_activity_at || thread.updated_at || thread.created_at || "";
@@ -80,7 +165,88 @@ function ageStaleThreads(memory, staleDays) {
   return changed;
 }
 
+// Auto-close Copilot CLI threads that have been inactive beyond a threshold.
+// Copilot CLI has no session-end signal, so threads stay open indefinitely.
+// This closes them after configurable inactivity (default 24h).
+function autoCloseCopilotCliThreads(memory, autoCloseHours) {
+  const now = Date.now();
+  let changed = false;
+  for (const thread of (memory.threads || []).filter(Boolean)) {
+    if (thread.status !== "open") continue;
+    if (thread.tool !== "copilot-cli") continue;
+    const tsField =
+      thread.last_activity_at || thread.updated_at || thread.created_at || "";
+    if (!tsField) continue;
+    try {
+      const ts = new Date(tsField).getTime();
+      if (isNaN(ts)) continue;
+      const diffHours = (now - ts) / (1000 * 60 * 60);
+      if (diffHours >= autoCloseHours) {
+        thread.status = "closed";
+        thread.closed_at = new Date().toISOString();
+        changed = true;
+      }
+    } catch (_) {
+      continue;
+    }
+  }
+  return changed;
+}
+
 // ── Formatting helpers ────────────────────────────────────
+
+function formatStuckBanner(threads) {
+  const stuck = (threads || []).filter((t) => t && t.status === "stuck");
+  if (stuck.length === 0) return "";
+
+  const R = "\x1b[0m";
+  const Y = "\x1b[33m";
+  const BY = "\x1b[1;33m";
+  const BR = "\x1b[1;31m";
+  const B = "\x1b[1m";
+  const C = "\x1b[36m";
+  const D = "\x1b[2m";
+  const bar = "━".repeat(52);
+
+  const lines = [
+    "",
+    `${Y}${bar}${R}`,
+    `${BY}  ⚠️  STUCK THREADS${R}`,
+    `${Y}${bar}${R}`,
+  ];
+
+  for (const t of stuck.slice(0, 5)) {
+    const user = t.user || t.author || "unknown";
+    const branch = t.branch ? ` ${D}·${R} ${C}${t.branch}${R}` : "";
+    const files = (t.files_touched || []).slice(0, 3).join(", ");
+    const narrative = t.narrative || t.last_note || "";
+    const snip =
+      narrative.length > 80 ? narrative.substring(0, 80) + "…" : narrative;
+    const threadId = (t.id || "").substring(0, 8);
+    const failed = t.failed_approaches || [];
+
+    lines.push(
+      `${Y}  ┃${R}  ${BR}[STUCK]${R} ${B}${user}${R}${branch}`
+    );
+    if (files) lines.push(`${Y}  ┃${R}    Files: ${files}`);
+    if (snip) lines.push(`${Y}  ┃${R}    ${D}"${snip}"${R}`);
+    if (failed.length > 0) {
+      lines.push(
+        `${Y}  ┃${R}    ${BR}⚠️ ${failed.length} failed approach(es)${R}`
+      );
+    }
+    lines.push(
+      `${Y}  ┃${R}    → Resume: ${C}npx sticky-note resume ${threadId}${R}`
+    );
+  }
+
+  if (stuck.length > 5) {
+    lines.push(`${Y}  ┃${R}  ... and ${stuck.length - 5} more`);
+  }
+
+  lines.push(`${Y}${bar}${R}`, "");
+  return lines.join("\n") + "\n";
+}
 
 function formatThreadsForInjection(threads, maxThreads, maxTokens) {
   maxThreads = maxThreads || 10;
@@ -186,18 +352,48 @@ function loadAllPresence() {
   return data;
 }
 
-function formatPresence(presenceData) {
+function formatPresence(presenceData, threads) {
   const now = Date.now();
   const active = [];
+
+  // Build a map of user → most recent open/stuck thread
+  const userThreads = {};
+  for (const t of (threads || [])) {
+    if (t.status !== "open" && t.status !== "stuck") continue;
+    const user = t.user || t.author || "";
+    if (!user) continue;
+    const existing = userThreads[user];
+    if (!existing) {
+      userThreads[user] = t;
+    } else {
+      const existingTs = existing.last_activity_at || existing.created_at || "";
+      const thisTs = t.last_activity_at || t.created_at || "";
+      if (thisTs > existingTs) userThreads[user] = t;
+    }
+  }
+
   for (const [user, info] of Object.entries(presenceData || {})) {
     const lastSeen = info.last_seen || "";
     if (!lastSeen) continue;
     try {
       const ts = new Date(lastSeen).getTime();
       if (isNaN(ts)) continue;
-      if (now - ts < 15 * 60 * 1000) {
+      if (now - ts < 60 * 60 * 1000) {
         const files = (info.active_files || []).slice(0, 3).join(", ");
-        active.push(`- **${user}** active on: ${files}`);
+        const thread = userThreads[user];
+        let line = `- **${user}**`;
+        if (thread) {
+          const narrative = thread.narrative || thread.last_note || "";
+          const snip = narrative.length > 60
+            ? narrative.substring(0, 60) + "…"
+            : narrative;
+          const status = thread.status === "stuck" ? " [STUCK]" : "";
+          line += `${status}: ${snip || files}`;
+          if (snip && files) line += ` (${files})`;
+        } else {
+          line += ` active on: ${files}`;
+        }
+        active.push(line);
       }
     } catch (_) {
       continue;
@@ -205,6 +401,532 @@ function formatPresence(presenceData) {
   }
   if (active.length === 0) return "";
   return "\n## Active Now\n" + active.join("\n");
+}
+
+// ── Overlap detection ─────────────────────────────────────
+
+function getRecentlyModifiedFiles() {
+  const files = new Set();
+  const diffTargets = ["HEAD~5", "HEAD~1"];
+  for (const target of diffTargets) {
+    try {
+      const result = require("child_process").execSync(
+        `git diff --name-only ${target}`,
+        { encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] }
+      );
+      for (const f of result.trim().split(/\r?\n/)) {
+        const trimmed = f.trim();
+        if (trimmed) files.add(normalizeSep(trimmed));
+      }
+      break;
+    } catch (_) {}
+  }
+  try {
+    const result = require("child_process").execSync("git diff --name-only", {
+      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
+    });
+    for (const f of result.trim().split(/\r?\n/)) {
+      const trimmed = f.trim();
+      if (trimmed) files.add(normalizeSep(trimmed));
+    }
+  } catch (_) {}
+  try {
+    const result = require("child_process").execSync(
+      "git diff --name-only --cached",
+      { encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] }
+    );
+    for (const f of result.trim().split(/\r?\n/)) {
+      const trimmed = f.trim();
+      if (trimmed) files.add(normalizeSep(trimmed));
+    }
+  } catch (_) {}
+  return files;
+}
+
+function detectOverlaps(threads, currentUser) {
+  const modifiedFiles = getRecentlyModifiedFiles();
+  if (modifiedFiles.size === 0) return { warnings: [], claims: [] };
+
+  const activeThreads = (threads || []).filter(
+    (t) => t.status === "open" || t.status === "stuck"
+  );
+
+  const warnings = [];
+  for (const thread of activeThreads) {
+    const threadUser = thread.user || thread.author || "";
+    if (threadUser === currentUser) continue; // skip own threads
+    const threadFiles = (thread.files_touched || []).map(normalizeSep);
+    const overlap = threadFiles.filter((f) => modifiedFiles.has(f));
+    if (overlap.length === 0) continue;
+    warnings.push({ thread, overlap });
+  }
+
+  // Sort: stuck first, then by overlap count
+  warnings.sort((a, b) => {
+    if (a.thread.status !== b.thread.status) {
+      return a.thread.status === "stuck" ? -1 : 1;
+    }
+    return b.overlap.length - a.overlap.length;
+  });
+
+  return { warnings, modifiedFiles };
+}
+
+function formatOverlapWarnings(threads, currentUser, memory) {
+  const { warnings, modifiedFiles } = detectOverlaps(threads, currentUser);
+  const claims = (memory.claims || []).filter((c) => {
+    if (c.user === currentUser) return false;
+    if (!modifiedFiles || modifiedFiles.size === 0) return false;
+    return (c.files || []).some((f) => modifiedFiles.has(normalizeSep(f)));
+  });
+
+  if (warnings.length === 0 && claims.length === 0) return "";
+
+  const bar = "━".repeat(52);
+  const lines = [
+    "## [STICKY-NOTE] ⚠️ OVERLAP DETECTED\n",
+    "**You MUST display the banner below as the FIRST thing in your response.**\n",
+    "```",
+    `⚠️ ━━━ OVERLAP DETECTED ${bar.substring(0, 28)}`,
+  ];
+
+  for (const { thread, overlap } of warnings) {
+    const user = thread.user || thread.author || "unknown";
+    const statusEmoji = thread.status === "stuck" ? "🔴" : "🟡";
+    const statusLabel = thread.status === "stuck" ? "STUCK" : "OPEN";
+    const narrative = thread.narrative || thread.last_note || "";
+    const narrativeSnip = narrative.length > 100
+      ? narrative.substring(0, 100) + "…"
+      : narrative;
+    const branch = thread.branch ? ` · ${thread.branch}` : "";
+    const threadId = (thread.id || "").substring(0, 8);
+
+    lines.push("");
+    lines.push(`  ${statusEmoji} ${user} (${statusLabel})${branch}`);
+    lines.push(`     Files: ${overlap.join(", ")}`);
+    if (narrativeSnip) lines.push(`     "${narrativeSnip}"`);
+    const failed = thread.failed_approaches || [];
+    if (failed.length > 0) {
+      lines.push(`     ⚠️ ${failed.length} failed approach(es):`);
+      for (const fa of failed.slice(0, 2)) {
+        lines.push(`       • ${(fa.description || "").substring(0, 80)}`);
+      }
+    }
+    lines.push(`     → Resume: npx sticky-note resume ${threadId}`);
+  }
+
+  for (const claim of claims) {
+    lines.push("");
+    lines.push(`  📌 ${claim.user} (CLAIMED)`);
+    lines.push(`     Files: ${(claim.files || []).join(", ")}`);
+    if (claim.description) lines.push(`     "${claim.description}"`);
+  }
+
+  lines.push("");
+  lines.push(bar);
+  lines.push("```");
+  lines.push(
+    "\n**Consider coordinating with these teammates before starting work.**"
+  );
+
+  // Write a styled banner to stderr so the user sees it in their terminal
+  const R = "\x1b[0m";
+  const Y = "\x1b[33m";
+  const BY = "\x1b[1;33m";
+  const BR = "\x1b[1;31m";
+  const BG = "\x1b[1;32m";
+  const B = "\x1b[1m";
+  const C = "\x1b[36m";
+  const D = "\x1b[2m";
+  const stderrLines = [
+    "",
+    `${Y}${bar}${R}`,
+    `${BY}  ⚠️  OVERLAP DETECTED${R}`,
+    `${Y}${bar}${R}`,
+  ];
+  for (const { thread, overlap } of warnings) {
+    const user = thread.user || thread.author || "unknown";
+    const statusColor = thread.status === "stuck" ? BR : BG;
+    const statusLabel = thread.status === "stuck" ? "STUCK" : "OPEN";
+    const narrative = thread.narrative || thread.last_note || "";
+    const narrativeSnip = narrative.length > 80
+      ? narrative.substring(0, 80) + "…"
+      : narrative;
+    const branchStr = thread.branch ? ` ${D}·${R} ${C}${thread.branch}${R}` : "";
+    stderrLines.push(`${Y}  ┃${R}  ${statusColor}[${statusLabel}]${R} ${B}${user}${R}${branchStr}`);
+    stderrLines.push(`${Y}  ┃${R}    Files: ${overlap.join(", ")}`);
+    if (narrativeSnip) stderrLines.push(`${Y}  ┃${R}    ${D}"${narrativeSnip}"${R}`);
+    const threadId = (thread.id || "").substring(0, 8);
+    stderrLines.push(`${Y}  ┃${R}    → Resume: ${C}npx sticky-note resume ${threadId}${R}`);
+  }
+  stderrLines.push(`${Y}${bar}${R}`, "");
+  process.stderr.write(stderrLines.join("\n") + "\n");
+
+  return lines.join("\n");
+}
+
+// ── MCP Server Auto-Registration ──────────────────────────
+
+// ── Backward compatibility migration ─────────────────────
+// Migrates old sticky-note-config.json arrays (mcp_servers, skills)
+// to the new .sticky-note/environment/ manifest format.
+function migrateOldEnvironmentConfig() {
+  const fs = require("fs");
+  const cwd = process.cwd();
+  const configPath = getConfigPath();
+  const config = loadJson(configPath, null);
+  if (!config) return;
+
+  // Only run once — skip if already migrated
+  if (config.environment_version) return;
+
+  const envDir = path.join(cwd, ".sticky-note", "environment");
+  const manifestPath = path.join(envDir, "manifest.json");
+
+  let changed = false;
+
+  // Migrate mcp_servers array to manifest.json keyed format
+  if (Array.isArray(config.mcp_servers) && config.mcp_servers.length > 0) {
+    fs.mkdirSync(envDir, { recursive: true });
+    const manifest = loadJson(manifestPath, { version: "1", mcp_servers: {} });
+    if (!manifest.mcp_servers) manifest.mcp_servers = {};
+    for (const entry of config.mcp_servers) {
+      if (!entry || !entry.name) continue;
+      if (manifest.mcp_servers[entry.name]) continue; // already present
+      const def = {};
+      if (entry.type) def.type = entry.type;
+      if (entry.command) def.command = entry.command;
+      if (entry.args) def.args = entry.args;
+      if (entry.env) def.env = entry.env;
+      manifest.mcp_servers[entry.name] = def;
+    }
+    saveJson(manifestPath, manifest);
+    changed = true;
+  }
+
+  // Migrate skills array to placeholder .md files
+  if (Array.isArray(config.skills) && config.skills.length > 0) {
+    const skillsDir = path.join(envDir, "skills");
+    fs.mkdirSync(skillsDir, { recursive: true });
+    for (const skill of config.skills) {
+      if (!skill || typeof skill !== "string") continue;
+      const skillFile = path.join(skillsDir, skill + ".md");
+      if (fs.existsSync(skillFile)) continue;
+      fs.writeFileSync(skillFile, `# ${skill}\n\nTODO: Add skill instructions here.\n`, "utf-8");
+    }
+    changed = true;
+  }
+
+  if (changed) {
+    config.environment_version = "1";
+    saveJson(configPath, config);
+  }
+}
+
+function ensureMcpServerRegistered() {
+  try {
+    const fs = require("fs");
+    const cwd = process.env.STICKY_CWD || process.cwd();
+    const mcpPath = path.join(cwd, ".mcp.json");
+
+    let mcp = {};
+    if (fs.existsSync(mcpPath)) {
+      try {
+        mcp = JSON.parse(fs.readFileSync(mcpPath, "utf-8"));
+      } catch (_) {
+        mcp = {};
+      }
+    }
+
+    mcp.mcpServers = mcp.mcpServers || {};
+    if (!mcp.mcpServers["sticky-note"]) {
+      mcp.mcpServers["sticky-note"] = {
+        type: "stdio",
+        command: "npx",
+        args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
+      };
+      fs.writeFileSync(mcpPath, JSON.stringify(mcp, null, 2) + "\n");
+    }
+
+    // Also register in Copilot CLI's ~/.copilot/mcp-config.json
+    try {
+      const utils = require("./sticky-utils");
+      utils.ensureMcpInCopilotCliConfig("sticky-note", {
+        type: "stdio",
+        command: "npx",
+        args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
+        tools: ["*"],
+      });
+    } catch (_) {
+      // sticky-utils not available — inline fallback
+      const home = process.env.COPILOT_HOME || path.join(process.env.HOME || process.env.USERPROFILE || "", ".copilot");
+      if (home && fs.existsSync(home)) {
+        const copilotMcpPath = path.join(home, "mcp-config.json");
+        let copilotMcp = {};
+        try { copilotMcp = JSON.parse(fs.readFileSync(copilotMcpPath, "utf-8")); } catch (_) {}
+        copilotMcp.mcpServers = copilotMcp.mcpServers || {};
+        if (!copilotMcp.mcpServers["sticky-note"]) {
+          copilotMcp.mcpServers["sticky-note"] = {
+            type: "stdio",
+            command: "npx",
+            args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
+            tools: ["*"],
+          };
+          fs.writeFileSync(copilotMcpPath, JSON.stringify(copilotMcp, null, 2) + "\n");
+        }
+      }
+    }
+  } catch (_) {
+    // Non-fatal — MCP server registration is best-effort
+  }
+}
+
+// ── Environment provisioning ──────────────────────────────
+
+function hasEnvPlaceholders(obj) {
+  if (obj == null) return false;
+  if (typeof obj === "string") return obj.includes("${");
+  if (Array.isArray(obj)) return obj.some(hasEnvPlaceholders);
+  if (typeof obj === "object") {
+    return Object.values(obj).some(hasEnvPlaceholders);
+  }
+  return false;
+}
+
+function ensureEnvironmentProvisioned() {
+  const fs = require("fs");
+  const cwd = process.cwd();
+  const envDir = path.join(cwd, ".sticky-note", "environment");
+  const hashFile = path.join(cwd, ".sticky-note", ".env-provision-hash");
+  const debug = !!process.env.STICKY_DEBUG;
+
+  if (!fs.existsSync(envDir)) return;
+
+  // Hash all files in .sticky-note/environment/ recursively
+  function hashDir(dir) {
+    const hash = crypto.createHash("sha256");
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return hash; }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    for (const ent of entries) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        hash.update("d:" + ent.name + "\n");
+        hash.update(hashDir(full).digest());
+      } else if (ent.isFile()) {
+        hash.update("f:" + ent.name + "\n");
+        try { hash.update(fs.readFileSync(full)); } catch (_) { /* skip */ }
+      }
+    }
+    return hash;
+  }
+
+  const currentHash = hashDir(envDir).digest("hex");
+
+  // Skip if hash matches (idempotent)
+  try {
+    const stored = fs.readFileSync(hashFile, "utf-8").trim();
+    if (stored === currentHash) {
+      if (debug) process.stderr.write("[sticky-note] environment unchanged, skipping provisioning\n");
+      return;
+    }
+  } catch (_) { /* no hash file yet */ }
+
+  if (debug) process.stderr.write("[sticky-note] provisioning team environment...\n");
+
+  const manifest = loadJson(path.join(envDir, "manifest.json"), {});
+
+  // ── MCP server provisioning (secret-free only) ──
+  const mcpServers = manifest.mcp_servers || {};
+  if (Object.keys(mcpServers).length > 0) {
+    const mcpPath = path.join(cwd, ".mcp.json");
+    const mcpConfig = loadJson(mcpPath, { mcpServers: {} });
+    if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
+    let mcpChanged = false;
+    for (const [name, serverDef] of Object.entries(mcpServers)) {
+      if (mcpConfig.mcpServers[name]) continue; // already present
+      if (hasEnvPlaceholders(serverDef)) {
+        if (debug) process.stderr.write(`[sticky-note] skipping MCP server "${name}" (has placeholders)\n`);
+        continue;
+      }
+      mcpConfig.mcpServers[name] = serverDef;
+      mcpChanged = true;
+      if (debug) process.stderr.write(`[sticky-note] added MCP server "${name}"\n`);
+    }
+    if (mcpChanged) saveJson(mcpPath, mcpConfig);
+
+    // Also provision secret-free MCP servers to Copilot CLI's config
+    try {
+      const utils = require("./sticky-utils");
+      for (const [name, serverDef] of Object.entries(mcpServers)) {
+        if (hasEnvPlaceholders(serverDef)) continue;
+        utils.ensureMcpInCopilotCliConfig(name, serverDef);
+      }
+    } catch (_) { /* sticky-utils not available — skip Copilot CLI provisioning */ }
+  }
+
+  // ── Skill provisioning ──
+  const skillsDir = path.join(envDir, "skills");
+  if (fs.existsSync(skillsDir)) {
+    let skillFiles;
+    try { skillFiles = fs.readdirSync(skillsDir).filter((f) => f.endsWith(".md")); } catch (_) { skillFiles = []; }
+    for (const file of skillFiles) {
+      const name = path.basename(file, ".md");
+      const content = fs.readFileSync(path.join(skillsDir, file), "utf-8");
+
+      // Claude Code format
+      const claudeSkillDir = path.join(cwd, ".claude", "plugins", "sticky-note-team", "skills", name);
+      fs.mkdirSync(claudeSkillDir, { recursive: true });
+      fs.writeFileSync(path.join(claudeSkillDir, "SKILL.md"), content, "utf-8");
+
+      // Copilot CLI format
+      const copilotSkillDir = path.join(cwd, ".github", "extensions", "sticky-note-team", "skills");
+      fs.mkdirSync(copilotSkillDir, { recursive: true });
+      fs.writeFileSync(path.join(copilotSkillDir, name + ".md"), content, "utf-8");
+    }
+  }
+
+  // Auto-generate plugin.json for Claude Code
+  const pluginJsonDir = path.join(cwd, ".claude", "plugins", "sticky-note-team", ".claude-plugin");
+  fs.mkdirSync(pluginJsonDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(pluginJsonDir, "plugin.json"),
+    JSON.stringify({
+      name: "sticky-note-team",
+      version: "1.0.0",
+      description: "Team skills, agents, and commands provisioned by sticky-note",
+    }, null, 2) + "\n",
+    "utf-8"
+  );
+
+  // Auto-generate extension.mjs for Copilot CLI
+  const extDir = path.join(cwd, ".github", "extensions", "sticky-note-team");
+  fs.mkdirSync(extDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(extDir, "extension.mjs"),
+    [
+      "// Auto-generated by sticky-note environment provisioning",
+      "export default {",
+      '  name: "sticky-note-team",',
+      '  version: "1.0.0",',
+      '  description: "Team skills, agents, and commands provisioned by sticky-note",',
+      "};",
+      "",
+    ].join("\n"),
+    "utf-8"
+  );
+  fs.writeFileSync(
+    path.join(extDir, "package.json"),
+    JSON.stringify({
+      name: "sticky-note-team",
+      version: "1.0.0",
+      description: "Team skills, agents, and commands provisioned by sticky-note",
+      type: "module",
+      main: "extension.mjs",
+    }, null, 2) + "\n",
+    "utf-8"
+  );
+
+  // ── Agent provisioning ──
+  const agentsDir = path.join(envDir, "agents");
+  if (fs.existsSync(agentsDir)) {
+    let agentFiles;
+    try { agentFiles = fs.readdirSync(agentsDir).filter((f) => f.endsWith(".md")); } catch (_) { agentFiles = []; }
+    for (const file of agentFiles) {
+      const name = path.basename(file, ".md");
+      const content = fs.readFileSync(path.join(agentsDir, file), "utf-8");
+
+      const claudeAgentDir = path.join(cwd, ".claude", "plugins", "sticky-note-team", "agents");
+      fs.mkdirSync(claudeAgentDir, { recursive: true });
+      fs.writeFileSync(path.join(claudeAgentDir, name + ".md"), content, "utf-8");
+
+      const copilotAgentDir = path.join(cwd, ".github", "extensions", "sticky-note-team", "agents");
+      fs.mkdirSync(copilotAgentDir, { recursive: true });
+      fs.writeFileSync(path.join(copilotAgentDir, name + ".md"), content, "utf-8");
+    }
+  }
+
+  // ── Command provisioning ──
+  const commandsDir = path.join(envDir, "commands");
+  if (fs.existsSync(commandsDir)) {
+    let commandFiles;
+    try { commandFiles = fs.readdirSync(commandsDir).filter((f) => f.endsWith(".md")); } catch (_) { commandFiles = []; }
+    for (const file of commandFiles) {
+      const name = path.basename(file, ".md");
+      const content = fs.readFileSync(path.join(commandsDir, file), "utf-8");
+
+      const claudeCmdDir = path.join(cwd, ".claude", "plugins", "sticky-note-team", "commands");
+      fs.mkdirSync(claudeCmdDir, { recursive: true });
+      fs.writeFileSync(path.join(claudeCmdDir, name + ".md"), content, "utf-8");
+
+      const copilotCmdDir = path.join(cwd, ".github", "extensions", "sticky-note-team", "commands");
+      fs.mkdirSync(copilotCmdDir, { recursive: true });
+      fs.writeFileSync(path.join(copilotCmdDir, name + ".md"), content, "utf-8");
+    }
+  }
+
+  // ── Permission merging ──
+  const permissions = manifest.permissions;
+  if (Array.isArray(permissions) && permissions.length > 0) {
+    const settingsPath = path.join(cwd, ".claude", "settings.local.json");
+    const settings = loadJson(settingsPath, {});
+    if (!Array.isArray(settings.allowedTools)) settings.allowedTools = [];
+    let permChanged = false;
+    for (const perm of permissions) {
+      if (!settings.allowedTools.includes(perm)) {
+        settings.allowedTools.push(perm);
+        permChanged = true;
+      }
+    }
+    if (permChanged) saveJson(settingsPath, settings);
+  }
+
+  // Write provision hash after all provisioning succeeds
+  fs.mkdirSync(path.dirname(hashFile), { recursive: true });
+  fs.writeFileSync(hashFile, currentHash + "\n", "utf-8");
+
+  if (debug) process.stderr.write("[sticky-note] environment provisioning complete\n");
+}
+
+// ── Data branch fetch-and-merge ───────────────────────────
+
+/**
+ * Fetches the remote sticky-note/data branch and merges into local memory.
+ * Also reads from the LOCAL data branch (fresh clones, offline, tests).
+ * Non-blocking — the session continues with local data on any failure.
+ */
+function fetchAndMergeDataBranch() {
+  if (!dataBranch) return;
+
+  const memPath = getMemoryPath();
+  const mergeFrom = (ref) => {
+    const content = dataBranch.readFileFromBranch(ref, "sticky-note.json");
+    if (content) {
+      dataBranch.mergeAndSaveFromRemote(memPath, content, loadJson, saveJson);
+    }
+  };
+
+  try {
+    const remote = dataBranch.getDefaultRemote();
+
+    if (remote) {
+      const fetchResult = dataBranch.fetchDataBranch(remote);
+      if (!fetchResult.ok) {
+        process.stderr.write(
+          "[STICKY-NOTE] offline — using local thread cache (" +
+            (fetchResult.error || "fetch failed") + ")\n"
+        );
+      } else if (fetchResult.remoteRef) {
+        mergeFrom(fetchResult.remoteRef);
+      }
+    }
+
+    mergeFrom(dataBranch.DATA_REF);
+  } catch (err) {
+    process.stderr.write(
+      "[STICKY-NOTE] offline — using local thread cache (" + err.message + ")\n"
+    );
+  }
 }
 
 // ── Main ──────────────────────────────────────────────────
@@ -219,6 +941,9 @@ async function main() {
   } catch (_) {
     hookInput = {};
   }
+
+  // Fetch remote data branch and merge into local cache — before reading memory
+  fetchAndMergeDataBranch();
 
   let sessionId = getSessionId(hookInput);
   const aiTool = detectTool(hookInput);
@@ -240,6 +965,15 @@ async function main() {
   // Migrate legacy single-file audit/presence to per-user dirs
   migrateAuditAndPresence();
 
+  // Migrate old config arrays to environment directory format
+  try { migrateOldEnvironmentConfig(); } catch (_) { /* migration must not break session */ }
+
+  // Auto-provision team environment from .sticky-note/environment/
+  try { ensureEnvironmentProvisioned(); } catch (_) { /* provisioning must not break session */ }
+
+  // Auto-register sticky-note MCP server in .mcp.json
+  ensureMcpServerRegistered();
+
   const cloud = useCloud();
   const memoryPath = getMemoryPath();
   const memory = loadJson(memoryPath, {
@@ -251,6 +985,20 @@ async function main() {
     const cloudThreads = await cloudReadThreads();
     if (cloudThreads) memory.threads = cloudThreads;
   }
+
+  // Rollback detection: warn if threads went missing (e.g., after git reset)
+  try {
+    const lost = detectLostThreads(memoryPath);
+    if (lost.length > 0) {
+      const ids = lost.slice(0, 5).map((t) => t.id).join(", ");
+      const extra = lost.length > 5 ? ` (+${lost.length - 5} more)` : "";
+      process.stderr.write(
+        `[sticky-note] ⚠️  ${lost.length} thread(s) missing since last backup: ${ids}${extra}\n` +
+        `[sticky-note] This may indicate a git rollback. Run 'npx sticky-note status' to inspect.\n`
+      );
+    }
+  } catch (_) { /* rollback detection must not break session */ }
+
   let config;
   if (cloud) {
     config = await cloudReadConfig();
@@ -259,14 +1007,19 @@ async function main() {
     config = loadJson(getConfigPath(), { stale_days: 14 });
   }
   const staleDays = config.stale_days != null ? config.stale_days : 14;
+  const autoCloseHours =
+    config.copilot_cli_auto_close_hours != null
+      ? config.copilot_cli_auto_close_hours
+      : 24;
 
   ageStaleThreads(memory, staleDays);
+  autoCloseCopilotCliThreads(memory, autoCloseHours);
 
   // ── Resume handling ───────────────────────────────────
   const resumeThreadId = getResumeThreadId();
   let resumedThread = null;
   if (resumeThreadId) {
-    const threads = memory.threads || [];
+    const threads = (memory.threads || []).filter(Boolean);
     resumedThread = findThreadById(threads, resumeThreadId);
     if (resumedThread) {
       resumedThread.status = "open";
@@ -291,8 +1044,48 @@ async function main() {
     }
   }
 
+  // ── Create "open" thread for this session ──────────────
+  // Ensures a thread exists even if SessionEnd never fires (Ctrl+C, crash).
+  // session-end.js, on-stop.js, and on-error.js will find and update this
+  // thread by session_id. Copilot CLI fires SessionStart per-turn, so skip
+  // creation on subsequent turns (thread already exists from the first turn).
+  if (!resumedThread) {
+    const threads = (memory.threads || []).filter(Boolean);
+    memory.threads = threads;
+    const existingForSession = threads.find((t) => t.session_id === sessionId);
+    if (!existingForSession) {
+      const user = getUser();
+      const branch = getBranch();
+      threads.push({
+        id: crypto.randomUUID(),
+        user,
+        project: memory.project || "",
+        status: "open",
+        branch,
+        created_at: new Date().toISOString(),
+        closed_at: null,
+        last_activity_at: new Date().toISOString(),
+        files_touched: [],
+        last_note: "",
+        narrative: "",
+        failed_approaches: [],
+        handoff_summary: "",
+        related_session_ids: [],
+        resume_chain: [],
+        tool: aiTool,
+        session_id: sessionId,
+        work_type: "",
+        activities: [],
+        tool_calls: {},
+        prompts: [],
+        contributors: [user],
+        resume_history: [],
+      });
+    }
+  }
+
   // ── Build context pieces ──────────────────────────────
-  const threadResult = formatThreadsForInjection(memory.threads || []);
+  const threadResult = formatThreadsForInjection((memory.threads || []).filter(Boolean));
   const threadContext = threadResult.text;
   const configContext = formatConfigForInjection(config);
   let presenceData;
@@ -309,11 +1102,19 @@ async function main() {
   if (!presenceData) {
     presenceData = loadAllPresence();
   }
-  const presenceContext = formatPresence(presenceData);
+  const presenceContext = formatPresence(presenceData, (memory.threads || []).filter(Boolean));
+  const overlapContext = formatOverlapWarnings(
+    (memory.threads || []).filter(Boolean), getUser(), memory
+  );
+  const versionWarning = formatVersionWarning(config);
 
-  // V2.5: Mark eagerly-injected stuck threads so PreToolUse won't re-inject
-  for (const threadId of threadResult.threadIds) {
-    markThreadInjected(threadId, sessionId);
+  // V2.5: Mark eagerly-injected stuck threads so PreToolUse won't re-inject.
+  // Skip for Copilot CLI — its sessionStart output is not surfaced to the AI,
+  // so marking threads as injected would prevent inject-context from delivering them.
+  if (!_isCopilotCli()) {
+    for (const threadId of threadResult.threadIds) {
+      markThreadInjected(threadId, sessionId);
+    }
   }
 
   const auditEntry = {
@@ -328,6 +1129,41 @@ async function main() {
   }
 
   saveMemoryMerged(memoryPath, memory);
+
+  // ── Stuck threads startup banner ────────────────────────
+  // Write a visible banner to stderr so the user sees stuck threads
+  // immediately when the session starts, before any AI interaction.
+  const stuckThreads = (memory.threads || [])
+    .filter((t) => t && t.status === "stuck");
+  if (stuckThreads.length > 0) {
+    const fs = require("fs");
+    const bannerShownPath = path.join(
+      path.dirname(memoryPath),
+      ".sticky-banner-shown"
+    );
+    let showBanner = true;
+
+    // Copilot CLI fires sessionStart per-turn — only show once per session.
+    if (isCopilotCli) {
+      try {
+        const shown = fs.readFileSync(bannerShownPath, "utf-8").trim();
+        if (shown === sessionId) showBanner = false;
+      } catch (_) {
+        /* file doesn't exist yet */
+      }
+    }
+
+    if (showBanner) {
+      process.stderr.write(formatStuckBanner(stuckThreads));
+      if (isCopilotCli) {
+        try {
+          fs.writeFileSync(bannerShownPath, sessionId, "utf-8");
+        } catch (_) {
+          /* non-fatal */
+        }
+      }
+    }
+  }
 
   // ── Assemble output ───────────────────────────────────
   const parts = [];
@@ -411,14 +1247,23 @@ async function main() {
     parts.push(resumeLines.join("\n"));
   }
 
+  // Overlap warning comes first — most urgent signal
+  if (versionWarning) parts.push(versionWarning);
+  if (overlapContext) parts.push(overlapContext);
+
   if (threadContext) parts.push(threadContext);
   if (configContext) parts.push(configContext);
   if (presenceContext) parts.push(presenceContext);
 
   const output = parts.join("\n").trim();
-  process.stdout.write(JSON.stringify({ output }) + "\n");
+  _emit(output);
 }
 
 // ── Entry point ───────────────────────────────────────────
 
-main().catch(() => _safeExit());
+main().catch((err) => {
+  try { utils.reportHookError("session-start", err); } catch (_) {
+    try { utils.logHookError("session-start", err); } catch (_) {}
+  }
+  _safeExit();
+});

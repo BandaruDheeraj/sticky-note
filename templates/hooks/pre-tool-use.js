@@ -64,6 +64,10 @@ const {
   useCloud,
   cloudAppendAudit,
   cloudReadPresence,
+  getMemoryPath,
+  loadJson,
+  normalizeSep,
+  syncStickyNote,
 } = utils;
 
 // ── File path extraction from tool input ──────────────────
@@ -134,9 +138,9 @@ function formatThreadForInjection(threadData, file) {
   return lines.join("\n");
 }
 
-// V3: Cloud-based conflict warning
+// V3: Cloud-based conflict warning (when STICKY_URL is set)
 async function _checkConflict(filePath) {
-  if (!filePath) return "";
+  if (!filePath || !useCloud()) return "";
   try {
     const presence = await cloudReadPresence();
     if (!presence) return "";
@@ -157,6 +161,7 @@ async function _checkConflict(filePath) {
   return "";
 }
 
+
 // ── Main ──────────────────────────────────────────────────
 
 async function main() {
@@ -172,6 +177,17 @@ async function main() {
 
   const sessionId = getSessionId(hookInput);
   const cloud = useCloud();
+
+  // ── Auto-sync before git pull/merge/rebase ──
+  // Prevents "local changes would be overwritten" errors for .sticky-note/ files
+  const toolName = (hookInput.tool_name || hookInput.toolName || "").toLowerCase();
+  if (toolName === "bash" || toolName === "shell" || toolName === "command") {
+    const toolInput = hookInput.tool_input || hookInput.input || hookInput.toolArgs || {};
+    const cmd = typeof toolInput === "string" ? toolInput : (toolInput.command || "");
+    if (/\bgit\s+(pull|merge|rebase|fetch)\b/.test(cmd)) {
+      try { syncStickyNote({}); } catch (_) {}
+    }
+  }
 
   // Extract file path from tool input
   const filePath = extractFilePath(hookInput);
@@ -200,7 +216,7 @@ async function main() {
 
   // Filter out already-injected threads
   const newThreads = fileAttr.threads.filter(
-    (t) => !isThreadInjected(t.thread ? t.thread.id : t.id)
+    (t) => !isThreadInjected(t.thread ? t.thread.id : t.id, sessionId)
   );
 
   if (newThreads.length === 0) {

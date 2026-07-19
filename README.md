@@ -18,6 +18,10 @@
 <br/>
 
 <p align="center">
+  <img src="docs/images/demo.gif" alt="Sticky Note demo" width="600" />
+</p>
+
+<p align="center">
   <img src="https://raw.githubusercontent.com/BandaruDheeraj/sticky-note/main/docs/images/architecture.svg" alt="Architecture diagram" width="800" />
 </p>
 
@@ -30,8 +34,12 @@
 
 ## The Problem
 
-I have seen many agent-to-agent to orchestration systems and frameworks, but I still like working with other people.
-Other people that ALSO use agents to develop. I couldn't get my agent to understand what my friends agents were doing.
+When multiple developers on a team use AI coding assistants, each assistant operates in its own bubble. Your agent doesn't know that your teammate's agent just spent 45 minutes debugging token rotation in the same file you're about to refactor. It doesn't know what they tried and abandoned. It doesn't know they're stuck.
+
+The result: duplicated effort, conflicting changes, and context that evaporates the moment a session ends.
+
+There are plenty of agent-to-agent orchestration frameworks out there, but that's not how most teams actually work. We work with other people — people who also happen to use agents. We needed a way for those agents to share context without changing how anyone works.
+
 So we built Sticky Note.
 
 ## The Solution
@@ -44,20 +52,37 @@ their next session by relevance.
 
 ## What's New in V3
 
-- **Cloud backend (optional)**: Cloudflare KV-backed storage for real-time handoff — no git push/pull required. Hooks auto-detect `STICKY_URL` and switch between cloud and local mode.
+- **Cloud backend (optional)**: Cloudflare KV-backed storage for real-time handoff — no git push/pull required. Hooks auto-detect `STICKY_URL` and switch between cloud and local mode. **Cloud is opt-in** — set `STICKY_URL` in `.env.sticky` to enable it; without it, the default git data-branch storage is used.
+- **Git data-branch storage (default)**: Thread data stored in `sticky-note/data` orphan branch — offline-first, no cloud required, syncs via normal `git push/pull`.
 - **Distributed presence**: Real-time heartbeat across all machines. See who's active *right now*, not at the time of your last pull. Conflict warnings when two developers edit the same file.
 - **HTTP audit API**: Query audit trail by project, file, user, tool, and date range via cloud endpoints. No more grepping JSONL files.
 - **MCP server**: 8 tools (`get_open_threads`, `get_stuck_threads`, `search_threads`, `get_session_context`, `write_thread`, `get_team_config`, `get_presence`, `get_audit_trail`) available via `npx sticky-note-cli mcp-server`.
 - **GitHub Action auto-install**: Zero-touch org rollout via `sticky-note-install.yml`. Org secrets provide cloud config, repos get hooks on first push.
 - **Codex cloud injection**: Codex wrapper reads thread context from cloud before session start — no longer blind to teammate activity.
-- **New CLI commands**: `deploy-backend`, `migrate --to cloud`, `mcp-server`, `init --v3`, `init --ci --no-prompts`
+- **New CLI commands**: `deploy-backend`, `migrate` (data-branch, default) / `migrate --to cloud` (opt-in), `mcp-server`, `init --v3`, `init --ci --no-prompts`
 - **Backward compatible**: Without `STICKY_URL`, everything works exactly like V2.5. Cloud is opt-in.
 
 See [V3 Migration Guide](docs/v3-migration-guide.md) and [Org Rollout Guide](docs/org-rollout.md).
 
 ---
 
-## What's New in V2.5
+## What's New in V2.7
+
+- **Team Environment Sync**: Share your complete AI dev environment through git. Skills, agents, commands, MCP servers, and permissions auto-provision when teammates start a session — zero manual setup
+- **`bootstrap` command**: Interactive secrets provisioning for MCP servers that need credentials. Generates `.env.example` for the team
+- **`env` commands**: `env status` shows provisioning state, `env add-server` adds MCP servers interactively
+- **Dual-target provisioning**: Skills deployed to both Claude Code plugins and Copilot CLI extensions automatically
+
+### What's New in V2.6
+
+- **MCP server**: 8-tool MCP server for reliable AI-to-sticky-note communication. Auto-registers in `.mcp.json` on first session. Works with Claude Code, Copilot CLI, and any MCP-compatible client
+- **Styled overlap banners**: Overlap warnings now use structured box-drawing format with 🔴/🟡 status indicators, ANSI-colored stderr output
+- **Overlap detection**: Warns when you're working on files another teammate has open/stuck threads on. Three delivery channels: MCP tool, injected context, and preToolUse deny
+- **File claiming**: `npx sticky-note-cli claim src/auth.ts "refactoring auth flow"` — declare intent to work on files
+- **Auto-close Copilot CLI threads**: Threads from Copilot CLI sessions auto-close after configurable inactivity (default 24h), since Copilot CLI has no session-end signal
+- **PID-keyed session isolation**: Concurrent Copilot CLI sessions get independent overlap dedup via `COPILOT_LOADER_PID`
+
+### What's New in V2.5
 
 - **Smart injection (two-tier)**: Stuck threads injected eagerly at session start; all other threads injected lazily when you first touch a file they authored — via built-in git blame attribution
 - **Thread resume (local)**: `npx sticky-note-cli resume-thread --query "auth fix" --user alice` — natural language thread discovery with text similarity + file attribution ranking
@@ -149,7 +174,7 @@ threads only — non-stuck threads are held for lazy injection.
 - **Stuck threads** — All stuck threads are injected eagerly (V2.5).
 - **Team config** — Conventions, MCP servers, and skills from
   `sticky-note-config.json`.
-- **Active presence** — Developers seen in the last 15 minutes and the
+- **Active presence** — Developers seen in the last hour and the
   files they're working on.
 
 The hook also clears the injected-this-session tracking set, snapshots
@@ -163,7 +188,7 @@ injects the top 3–5 (under token budget) as additional context.
 
 | Signal | Weight | Description |
 |--------|--------|-------------|
-| File overlap | 3 | Thread files match your recent git changes |
+| File overlap | 3 per file (max 5) | Thread files match your recent git changes |
 | Branch match | 2 | Thread is on your current branch |
 | Recency | 2 | Decays 0.2 per day from last activity |
 | Stuck status | +2 | Boost for threads marked stuck |
@@ -341,11 +366,18 @@ npx sticky-note-cli resume --clear # Cancel active resume
 npx sticky-note-cli resume-thread  # Smart resume: --query, --user, --file (V2.5)
 npx sticky-note-cli audit          # Query merged audit trail (all users)
 npx sticky-note-cli who            # Show active and recent team members
+npx sticky-note-cli overlap        # Detect file overlaps with teammates (V2.6)
+npx sticky-note-cli claim <files>  # Declare intent to work on files (V2.6)
 npx sticky-note-cli switch <branch> # Safe branch switch (auto-stashes data)
 npx sticky-note-cli gc             # Tombstone expired threads
 npx sticky-note-cli reset          # Wipe all threads (--force, --keep-audit)
 npx sticky-note-cli get-line-attribution # File→thread attribution with line ranges (V2.5)
 npx sticky-note-cli checkpoint         # Set work-topic checkpoint for attribution (V2.5)
+npx sticky-note-cli sync               # Commit .sticky-note/ changes (--push to also push)
+npx sticky-note-cli bootstrap         # Provision MCP servers that need secrets
+npx sticky-note-cli env status         # Show environment provisioning status
+npx sticky-note-cli env add-server     # Add MCP server to team environment
+npx sticky-note mcp-server             # Launch MCP server (stdio JSON-RPC)
 npx sticky-note-cli --version      # Show version
 npx sticky-note-cli --help         # Show help
 ```
@@ -369,16 +401,20 @@ Edit `.sticky-note/sticky-note-config.json`:
 ```json
 {
   "stale_days": 14,
+  "copilot_cli_auto_close_hours": 24,
+  "inject_token_budget": 1000,
   "mcp_servers": [],
   "skills": [],
   "conventions": ["Use TypeScript strict mode", "Test before commit"],
-  "hook_version": "2.5.0"
+  "hook_version": "2.6.12"
 }
 ```
 
 | Key            | Description                              | Default |
 |----------------|------------------------------------------|---------|
 | `stale_days`   | Days before threads expire + gc cleanup  | `14`    |
+| `copilot_cli_auto_close_hours` | Hours before idle Copilot CLI threads auto-close | `24` |
+| `inject_token_budget` | Max tokens for per-prompt thread injection | `1000` |
 | `mcp_servers`  | Shared MCP server references             | `[]`    |
 | `skills`       | Team skill definitions                   | `[]`    |
 | `conventions`  | Team coding conventions (injected)       | `[]`    |
@@ -402,6 +438,103 @@ Edit `.sticky-note/sticky-note-config.json`:
 | Codex       | `sticky-codex.sh` wrapper   | Post-session capture            |
 
 All tools call the same JavaScript hooks and share the same data files.
+
+> **Third-party tools** (Cursor, Windsurf, Zed, Cline) can use the MCP server
+> for full thread access without hooks. See below.
+
+---
+
+## MCP Server
+
+Sticky Note includes an MCP server that gives AI tools direct access to
+thread data, overlap detection, and environment status via standard
+[Model Context Protocol](https://modelcontextprotocol.io/).
+
+### Auto-registration
+
+The session-start hook automatically registers the MCP server in `.mcp.json`
+on the first session. No manual setup needed — it's available from the second
+session onward.
+
+### Manual registration
+
+Add to `.mcp.json` at your project root:
+
+```json
+{
+  "mcpServers": {
+    "sticky-note": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"]
+    }
+  }
+}
+```
+
+### Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_session_context(id)` | Full thread payload by ID |
+| `get_stuck_threads()` | All stuck threads with failed approaches |
+| `search_threads(query)` | Keyword search across threads |
+| `get_audit_trail(file, user, since, ...)` | Query per-user audit logs |
+| `get_presence()` | Active developers and their files |
+| `check_overlaps(files)` | Detect file conflicts before editing |
+| `get_environment_status()` | Environment sync status (provisioned vs missing) |
+| `get_thread_context_for_files(files)` | Thread attribution for files |
+
+### Why MCP?
+
+Hook output goes to the AI model's context window — the AI decides whether
+to surface it. MCP tool responses are part of the AI's active reasoning,
+so the data always gets processed. This makes the MCP server the most
+reliable channel for overlap warnings and environment notifications.
+
+---
+
+## Team Environment Sync
+
+Share your complete AI development environment with the team — MCP servers,
+skills, agents, commands, and permissions — through git, with zero manual setup.
+
+### How it works
+
+```
+Team lead: npx sticky-note init     → commits hooks + environment/
+Teammate:  git pull && start session → hook auto-provisions everything
+```
+
+The session-start hook is the provisioning engine. It copies skills to
+plugin directories, writes MCP servers to `.mcp.json`, and merges
+permissions — all automatically when a teammate starts their AI session.
+
+### Directory structure
+
+```
+.sticky-note/environment/
+├── manifest.json         # MCP servers, permissions, env vars
+├── skills/               # Team skill definitions (.md files)
+├── agents/               # Team agent definitions (.md files)
+└── commands/             # Team command definitions (.md files)
+```
+
+### Adding team resources
+
+**Skills/agents/commands:** Drop a `.md` file into the appropriate directory.
+It auto-provisions on next session and auto-commits with your next commit.
+
+**MCP servers:** `npx sticky-note env add-server` or edit `manifest.json`.
+
+### Secrets handling
+
+MCP servers that need secrets (e.g., `${GITHUB_TOKEN}`) are skipped by
+auto-provisioning. Run `npx sticky-note bootstrap` to provide credentials
+interactively — they're saved to `.env` (gitignored), never committed.
+
+The MCP server's `get_environment_status()` tool tells the AI what's missing
+so it can prompt the user.
 
 ---
 

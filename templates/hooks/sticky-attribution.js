@@ -165,7 +165,7 @@ function resolveViaHeuristic(sha, file) {
   const results = [];
   const normalizedFile = file ? normalizeSep(file) : null;
 
-  for (const thread of memory.threads || []) {
+  for (const thread of (memory.threads || []).filter(Boolean)) {
     if (thread.status === "expired") continue;
     if (!normalizedFile) continue;
 
@@ -230,7 +230,7 @@ function resolveThreads(attributionEntries) {
   const memory = utils.loadJson(utils.getMemoryPath(), { version: "2", threads: [] });
   const threads = [];
 
-  for (const thread of memory.threads || []) {
+  for (const thread of (memory.threads || []).filter(Boolean)) {
     if (thread.status === "expired") continue;
     if (sessionIds.has(thread.session_id) || sessionIds.has(thread.id)) {
       threads.push(thread);

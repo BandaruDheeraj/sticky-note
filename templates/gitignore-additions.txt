@@ -1,3 +1,6 @@
+# Sticky Note - data moved to sticky-note/data branch (.git/sticky-note/ cache)
+.sticky-note/
+
 # Sticky Note - local overrides
 .claude/settings.local.json
 
@@ -8,6 +11,7 @@
 .sticky-note/.sticky-injected
 .sticky-note/.sticky-active-resume
 .sticky-note/.sticky-checkpoint
+.sticky-note/.sticky-banner-shown
 
 # Sticky Note - debug log
 .sticky-note/hook-debug.log

@@ -159,6 +159,7 @@ Example format:
 - `.sticky-note/.sticky-head` — transient HEAD snapshot
 - `.sticky-note/.sticky-injected` — transient injection tracking (V2.5)
 - `.sticky-note/.sticky-active-resume` — transient active resume marker (V2.5)
+- `.sticky-note/.sticky-banner-shown` — transient startup banner dedup
 
 When a session ends or the user asks to commit, **always include
 `sticky-note.json` and the `audit/` and `presence/` directories**
@@ -185,6 +186,43 @@ This auto-stashes `.sticky-note/` data before switching and restores it
 after. A raw `git checkout` or `git switch` will fail if sticky-note
 files have uncommitted changes. The alias `git sw <branch>` also works
 if set up by `npx sticky-note init`.
+
+### ⚠️ Overlap warnings (CRITICAL — always surface these)
+
+Sticky-note hooks detect when your files overlap with other teammates'
+open or stuck threads. Overlap warnings arrive through TWO channels:
+
+1. **Injected context** — `[STICKY-NOTE] ⚠️ OVERLAP DETECTED` appears in
+   your hook output. This fires on every user prompt.
+2. **Tool call deny** — Your first tool call may be denied with a reason
+   containing "CRITICAL INSTRUCTION" and the overlap details.
+
+When you receive an overlap warning through EITHER channel, you **MUST**
+start your response with this exact banner format before doing ANYTHING else:
+
+```
+⚠️ ━━━ OVERLAP DETECTED ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  🔴 [user] (STUCK) · [branch]
+     Files: [file1], [file2], [file3]
+     "[narrative summary]"
+     → Resume: npx sticky-note resume [id]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+Use 🔴 for STUCK threads, 🟡 for OPEN threads. For multiple overlaps,
+add additional entries between the bars.
+
+Rules:
+- This banner MUST be the **very first thing** in your response
+- Do NOT bury it at the end or in a footnote
+- Do NOT rephrase it as "Also noted..." or "By the way..."
+- If a tool call was denied with overlap info, display the warning then proceed
+- Then continue with the user's actual request normally
+
+This pattern exists to prevent two teammates from wasting hours on the
+same problem. Treat it like a system alert, not optional context.
 
 ### `[STICKY-NOTE]` tags
 
