@@ -59,10 +59,10 @@ const {
   getSessionId,
   getUser,
   appendAuditLine,
+  appendAuditLineBoth,
   isThreadInjected,
   markThreadInjected,
   useCloud,
-  cloudAppendAudit,
   cloudReadPresence,
   getMemoryPath,
   loadJson,
@@ -138,11 +138,19 @@ function formatThreadForInjection(threadData, file) {
   return lines.join("\n");
 }
 
-// V3: Cloud-based conflict warning (when STICKY_URL is set)
+let _presenceCache = null;
+let _presenceCacheTs = 0;
+const PRESENCE_CACHE_TTL_MS = 60000;
+
 async function _checkConflict(filePath) {
   if (!filePath || !useCloud()) return "";
   try {
-    const presence = await cloudReadPresence();
+    const now = Date.now();
+    if (!_presenceCache || (now - _presenceCacheTs) > PRESENCE_CACHE_TTL_MS) {
+      _presenceCache = await cloudReadPresence();
+      _presenceCacheTs = now;
+    }
+    const presence = _presenceCache;
     if (!presence) return "";
     const currentUser = getUser();
     const conflicting = presence.filter(p => {
@@ -196,7 +204,6 @@ async function main() {
     return;
   }
 
-  // Run attribution engine: get threads for this file with line ranges
   let fileAttr;
   try {
     fileAttr = attribution.getFileAttribution(filePath);
@@ -252,15 +259,11 @@ async function main() {
         return (id || "").substring(0, 8);
       }),
     };
-    appendAuditLine(auditEntry);
-    if (cloud) {
-      cloudAppendAudit(auditEntry).catch(() => {});
-    }
+    appendAuditLineBoth(auditEntry, cloud);
   } catch (_) {
     // ignore
   }
 
-  // V3: Cloud-based conflict warning
   if (cloud) {
     const warning = await _checkConflict(filePath);
     if (warning) output += "\n\n" + warning;

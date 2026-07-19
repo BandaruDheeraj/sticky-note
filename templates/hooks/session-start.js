@@ -118,6 +118,7 @@ const {
   saveJson,
   saveMemoryMerged,
   appendAuditLine,
+  appendAuditLineBoth,
   getUser,
   getBranch,
   getSessionId,
@@ -134,7 +135,6 @@ const {
   cloudReadThreads,
   cloudReadPresence,
   cloudReadConfig,
-  cloudAppendAudit,
   normalizeSep,
   detectLostThreads,
 } = utils;
@@ -981,10 +981,12 @@ async function main() {
     project: "",
     threads: [],
   });
+
+  let cloudThreads = null, cloudConfig = null;
   if (cloud) {
-    const cloudThreads = await cloudReadThreads();
-    if (cloudThreads) memory.threads = cloudThreads;
+    [cloudThreads, cloudConfig] = await Promise.all([cloudReadThreads(), cloudReadConfig()]);
   }
+  if (cloudThreads) memory.threads = cloudThreads;
 
   // Rollback detection: warn if threads went missing (e.g., after git reset)
   try {
@@ -999,13 +1001,7 @@ async function main() {
     }
   } catch (_) { /* rollback detection must not break session */ }
 
-  let config;
-  if (cloud) {
-    config = await cloudReadConfig();
-  }
-  if (!config) {
-    config = loadJson(getConfigPath(), { stale_days: 14 });
-  }
+  const config = cloudConfig || loadJson(getConfigPath(), { stale_days: 14 });
   const staleDays = config.stale_days != null ? config.stale_days : 14;
   const autoCloseHours =
     config.copilot_cli_auto_close_hours != null
@@ -1123,10 +1119,7 @@ async function main() {
     ts: new Date().toISOString(),
     session_id: sessionId,
   };
-  appendAuditLine(auditEntry);
-  if (cloud) {
-    cloudAppendAudit(auditEntry).catch(() => {});
-  }
+  appendAuditLineBoth(auditEntry, cloud);
 
   saveMemoryMerged(memoryPath, memory);
 

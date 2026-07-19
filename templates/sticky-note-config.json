@@ -4,6 +4,8 @@
   "inject_token_budget": 1000,
   "auto_sync": true,
   "auto_push": false,
+  "capture_transcripts": true,
+  "redact_transcripts": true,
   "mcp_servers": [],
   "skills": [],
   "conventions": [],

@@ -33,6 +33,7 @@ cat .sticky-note/sticky-note.json
 | `resumed_by`       | Most recent user to resume this thread (V2.5) |
 | `resumed_at`       | ISO timestamp of most recent resume (V2.5) |
 | `resume_history`   | Full resume chain: user, timestamp, session (V2.5) |
+| `transcript_captured` | Whether a full verbatim session transcript exists for this thread (V3.1) |
 
 ### Status icons
 
@@ -106,6 +107,24 @@ The command outputs the thread's **full context** (narrative, files, failed
 approaches, prompts). Read and present this context to the user immediately —
 do NOT tell them to start a new session. The inject-context hook will also
 pick up the resumed thread on subsequent prompts.
+
+### Full transcript capture (V3.1)
+
+By default, each session's complete verbatim transcript is captured — not
+just the narrative summary — keyed by thread ID and stored alongside audit
+logs and presence data. Secrets are redacted before anything is written
+(best-effort pattern matching, not a guarantee).
+
+- A thread's `transcript_captured` field is `true` once at least one
+  session's transcript has been persisted.
+- Retrieve it with `npx sticky-note transcript <thread-id>` (add `--raw` for
+  the untouched JSONL) or the `get_full_transcript(id)` MCP tool.
+- A team can turn this off with `"capture_transcripts": false` in
+  `sticky-note-config.json` — e.g. for a repo where sessions routinely
+  touch especially sensitive material.
+- When a user asks "what did we actually discuss in that session" (as
+  opposed to "what was the summary"), prefer the transcript over
+  `narrative`/`prompts` — those are truncated summaries, not the full record.
 
 ### File attribution (V2.5)
 
@@ -244,6 +263,10 @@ You have access to a `sticky-note` MCP server. Use it:
 
 4. **For audit history**: Call `get_audit_trail(file)` to understand who
    changed a file and when.
+
+5. **For the full conversation, not just the summary**: Call
+   `get_full_transcript(id)` to get the verbatim session transcript(s) for
+   a thread, when `narrative` or `prompts` aren't enough detail.
 
 These tools are the primary way sticky-note communicates with you.
 Hook-injected context supplements but does not replace MCP tool calls.

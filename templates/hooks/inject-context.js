@@ -62,9 +62,9 @@ try {
 const {
   getMemoryPath, loadJson, saveJson, saveMemoryMerged, getUser, getBranch,
   getResumeThreadId, findThreadById, getSessionId,
-  appendAuditLine, detectTool, getConfigPath,
+  appendAuditLine, appendAuditLineBoth, detectTool, getConfigPath,
   isThreadInjected, markThreadInjected, normalizeSep,
-  useCloud, cloudReadThreads, cloudWriteThread, cloudAppendAudit,
+  useCloud, cloudReadThreads, cloudWriteThread,
 } = utils;
 
 // ── Git helpers ───────────────────────────────────────────
@@ -404,10 +404,7 @@ async function main() {
       };
       if (topScores) entry.top_scores = topScores;
       if (error) entry.error = String(error).substring(0, 200);
-      appendAuditLine(entry);
-      if (cloud) {
-        cloudAppendAudit(entry).catch(() => {});
-      }
+      appendAuditLineBoth(entry, cloud);
     } catch (_) {
       // ignore
     }
@@ -422,10 +419,7 @@ async function main() {
       session_id: sessionId,
       prompt: prompt.substring(0, 500),
     };
-    appendAuditLine(promptAudit);
-    if (cloud) {
-      cloudAppendAudit(promptAudit).catch(() => {});
-    }
+    appendAuditLineBoth(promptAudit, cloud);
   } catch (_) {
     // ignore
   }

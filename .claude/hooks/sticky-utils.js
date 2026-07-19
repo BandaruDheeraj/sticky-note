@@ -11,7 +11,6 @@ const { execFileSync } = require("child_process");
 
 // ── Cross-platform path normalization ──────────────────────
 
-// Normalize path separators to forward slashes for consistent storage/comparison.
 function normalizeSep(p) {
   return typeof p === "string" ? p.replace(/\\/g, "/") : p;
 }
@@ -251,14 +250,17 @@ function clearSessionFile() {
 
 // ── Git sync (auto-commit/push .sticky-note/ files) ──────
 
+let _cachedGitRepoRoot = null; // null = not yet computed; "" = computed but git failed
 function _gitRepoRoot() {
+  if (_cachedGitRepoRoot !== null) return _cachedGitRepoRoot || null;
   try {
-    return execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    _cachedGitRepoRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
       encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
     }).trim();
   } catch (_) {
-    return null;
+    _cachedGitRepoRoot = "";
   }
+  return _cachedGitRepoRoot || null;
 }
 
 /**
@@ -563,6 +565,17 @@ function appendAuditLine(entry) {
   const filePath = getUserAuditPath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.appendFileSync(filePath, JSON.stringify(entry) + "\n", "utf-8");
+}
+
+/**
+ * Write an audit entry both to the local JSONL file and (fire-and-forget)
+ * to the cloud backend when cloud mode is active.
+ */
+function appendAuditLineBoth(entry, cloud) {
+  try { appendAuditLine(entry); } catch (_) {}
+  if (cloud) {
+    cloudAppendAudit(entry).catch(() => {});
+  }
 }
 
 // ── Environment helpers ───────────────────────────────────
@@ -1091,6 +1104,7 @@ module.exports = {
   saveJson,
   saveMemoryMerged,
   appendAuditLine,
+  appendAuditLineBoth,
   getUser,
   detectTool,
   getSessionId,

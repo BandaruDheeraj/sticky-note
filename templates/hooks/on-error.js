@@ -19,7 +19,7 @@ function _safeExit() {
   process.exit(0);
 }
 
-let getMemoryPath, loadJson, saveJson, saveMemoryMerged, appendAuditLine, getUser, detectTool, getSessionId, useCloud, cloudReadThreads, cloudWriteThread, cloudAppendAudit;
+let getMemoryPath, loadJson, saveJson, saveMemoryMerged, appendAuditLine, appendAuditLineBoth, getUser, detectTool, getSessionId, useCloud, cloudReadThreads, cloudWriteThread;
 try {
   ({
     getMemoryPath,
@@ -27,13 +27,13 @@ try {
     saveJson,
     saveMemoryMerged,
     appendAuditLine,
+    appendAuditLineBoth,
     getUser,
     detectTool,
     getSessionId,
     useCloud,
     cloudReadThreads,
     cloudWriteThread,
-    cloudAppendAudit,
   } = require("./sticky-utils.js"));
 } catch (_) {
   _safeExit();
@@ -111,10 +111,7 @@ async function main() {
     error: errorMsg,
     tool: toolName,
   };
-  appendAuditLine(auditEntry);
-  if (cloud) {
-    cloudAppendAudit(auditEntry).catch(() => {});
-  }
+  appendAuditLineBoth(auditEntry, cloud);
 
   saveMemoryMerged(memoryPath, memory);
   if (cloud) {

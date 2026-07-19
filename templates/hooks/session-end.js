@@ -39,10 +39,14 @@ const {
   getPresenceDir,
   getUserPresencePath,
   getAllAuditPaths,
+  getTranscriptsDir,
+  getTranscriptPath,
+  redactSecrets,
   loadJson,
   saveJson,
   saveMemoryMerged,
   appendAuditLine,
+  appendAuditLineBoth,
   getUser,
   getBranch,
   detectTool,
@@ -66,7 +70,6 @@ const {
   useCloud,
   cloudReadThreads,
   cloudWriteThread,
-  cloudAppendAudit,
   cloudDeletePresence,
   syncStickyNote,
 } = utils;
@@ -371,6 +374,73 @@ function extractFailedApproaches(hookInput) {
   if (!transcriptPath || !fs.existsSync(transcriptPath)) return [];
   const entries = parseJsonlFile(transcriptPath);
   return extractFailedFromEntries(entries);
+}
+
+// ── Transcript capture ────────────────────────────────────
+// Persists the full verbatim session transcript (Claude Code's native
+// transcript_path JSONL file) into sticky-note/data storage, keyed by
+// thread ID rather than commit SHA — a thread's transcript belongs to the
+// whole session, which may span zero, one, or many commits. Appended as
+// one entry per contributing session so resumed threads accumulate their
+// full history rather than overwriting it.
+//
+// Opt-out: set "capture_transcripts": false in sticky-note-config.json.
+// Secrets are redacted (best-effort — see redactSecrets in sticky-utils.js)
+// before anything is written to disk or committed.
+
+function captureTranscript(hookInput, threadId, sessionId, aiTool, user, now, config) {
+  if (!threadId) return false;
+  if (config.capture_transcripts === false) return false;
+
+  const transcriptPath = hookInput.transcript_path || "";
+  if (!transcriptPath || !fs.existsSync(transcriptPath)) return false;
+
+  let raw;
+  try {
+    raw = fs.readFileSync(transcriptPath, "utf-8");
+  } catch (_) {
+    return false;
+  }
+  if (!raw || !raw.trim()) return false;
+
+  const redact = config.redact_transcripts !== false;
+  const transcript = redact ? redactSecrets(raw) : raw;
+
+  const entry = {
+    session_id: sessionId,
+    tool: aiTool,
+    user,
+    captured_at: now,
+    redacted: redact,
+    transcript,
+  };
+
+  try {
+    const dir = getTranscriptsDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const filePath = getTranscriptPath(threadId);
+
+    // Avoid duplicating the same session's transcript on repeated
+    // session-end fires (e.g. Copilot CLI's per-turn SessionEnd).
+    let existingLines = [];
+    if (fs.existsSync(filePath)) {
+      existingLines = fs.readFileSync(filePath, "utf-8")
+        .split(/\r?\n/)
+        .filter((l) => l.trim());
+    }
+    const filtered = existingLines.filter((line) => {
+      try {
+        return JSON.parse(line).session_id !== sessionId;
+      } catch (_) {
+        return true;
+      }
+    });
+    filtered.push(JSON.stringify(entry));
+    fs.writeFileSync(filePath, filtered.join("\n") + "\n", "utf-8");
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 // ── Last note extraction ──────────────────────────────────
@@ -751,6 +821,7 @@ function commitAndPushDataBranch() {
 
     _collectDirFiles(getAuditDir(), ".jsonl", "audit/", fileMap);
     _collectDirFiles(getPresenceDir(), ".json", "presence/", fileMap);
+    _collectDirFiles(getTranscriptsDir(), ".jsonl", "transcripts/", fileMap);
 
     if (Object.keys(fileMap).length === 0) return;
 
@@ -806,9 +877,30 @@ async function main() {
   let filesTouched = extractFilesTouched(hookInput);
   const auditData = extractSessionFromAudit(sessionId);
   const sessionAnalysis = analyzeSessionActivities(hookInput, auditData);
-  const narrative = extractNarrative(hookInput);
-  const failed = extractFailedApproaches(hookInput);
-  const lastNote = extractLastNote(hookInput, narrative, sessionAnalysis, auditData);
+  let narrative = extractNarrative(hookInput);
+  let failed = extractFailedApproaches(hookInput);
+  let lastNote = extractLastNote(hookInput, narrative, sessionAnalysis, auditData);
+
+  // Redact secrets from these summary fields too — they're pulled from the
+  // same raw transcript as the full-transcript capture below, and land in
+  // sticky-note.json, which syncs to the whole team the same way the
+  // transcript store does. Without this, redact_transcripts would protect
+  // the verbatim copy while leaving the same secret sitting in plain sight
+  // in narrative/last_note/prompts.
+  if (config.redact_transcripts !== false) {
+    narrative = redactSecrets(narrative);
+    lastNote = redactSecrets(lastNote);
+    failed = failed.map((f) => {
+      if (typeof f === "string") return redactSecrets(f);
+      if (f && typeof f === "object") {
+        const copy = { ...f };
+        if (typeof copy.description === "string") copy.description = redactSecrets(copy.description);
+        if (typeof copy.error === "string") copy.error = redactSecrets(copy.error);
+        return copy;
+      }
+      return f;
+    });
+  }
 
   // Merge audit-discovered files
   const auditFiles = auditData.files || [];
@@ -888,7 +980,10 @@ async function main() {
   // Prompts from audit
   const prompts = auditData.prompts || [];
   const storedPrompts = prompts.length
-    ? prompts.slice(0, 20).map((p) => p.substring(0, 300))
+    ? prompts.slice(0, 20).map((p) => {
+        const trimmed = p.substring(0, 300);
+        return config.redact_transcripts !== false ? redactSecrets(trimmed) : trimmed;
+      })
     : [];
 
   if (existing) {
@@ -924,7 +1019,7 @@ async function main() {
     }
   } else {
     // Create new thread
-    threads.push({
+    existing = {
       id: crypto.randomUUID(),
       user,
       project: memory.project || "",
@@ -949,8 +1044,16 @@ async function main() {
       // V2.5 fields
       contributors: [user],
       resume_history: [],
-    });
+    };
+    threads.push(existing);
   }
+
+  // Persist the full verbatim transcript for this session, keyed by
+  // thread ID. Opt-out via capture_transcripts: false in team config.
+  const transcriptCaptured = captureTranscript(
+    hookInput, existing.id, sessionId, aiTool, user, now, config
+  );
+  if (transcriptCaptured) existing.transcript_captured = true;
 
   // V2.5: Capture commit SHAs for attribution engine
   const commitShas = getSessionCommitShas();
@@ -970,10 +1073,7 @@ async function main() {
   if (commitShas.length > 0) {
     auditEntry.commit_shas = commitShas;
   }
-  appendAuditLine(auditEntry);
-  if (cloud) {
-    cloudAppendAudit(auditEntry).catch(() => {});
-  }
+  appendAuditLineBoth(auditEntry, cloud);
 
   // V2.5: Also write individual commit_sha audit entries for bridge lookup
   for (const sha of commitShas) {
@@ -984,10 +1084,7 @@ async function main() {
       session_id: sessionId,
       commit_sha: sha,
     };
-    appendAuditLine(commitEntry);
-    if (cloud) {
-      cloudAppendAudit(commitEntry).catch(() => {});
-    }
+    appendAuditLineBoth(commitEntry, cloud);
   }
   // Only clear transient files for true session end (Claude Code).
   // Copilot CLI fires per-turn; clearing would break state across turns.

@@ -43,11 +43,11 @@ const {
   saveJson,
   saveMemoryMerged,
   appendAuditLine,
+  appendAuditLineBoth,
   getUser,
   getBranch,
   getSessionId,
   useCloud,
-  cloudAppendAudit,
   cloudWritePresence,
   normalizeSep,
 } = utils;
@@ -286,10 +286,7 @@ function main() {
   if (checkpoint) {
     entry.checkpoint_topic = checkpoint.topic;
   }
-  appendAuditLine(entry);
-  if (cloud) {
-    cloudAppendAudit(entry).catch(() => {});
-  }
+  appendAuditLineBoth(entry, cloud);
 
   updatePresence(user, filePath);
   if (cloud) {

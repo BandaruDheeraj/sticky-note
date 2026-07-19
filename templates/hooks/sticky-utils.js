@@ -11,7 +11,6 @@ const { execFileSync } = require("child_process");
 
 // ── Cross-platform path normalization ──────────────────────
 
-// Normalize path separators to forward slashes for consistent storage/comparison.
 function normalizeSep(p) {
   return typeof p === "string" ? p.replace(/\\/g, "/") : p;
 }
@@ -34,6 +33,48 @@ const RETRY_PATTERNS = new RegExp(
 );
 
 const FILE_PATH_PATTERN = /[\w./\\-]+\.\w{1,10}/g;
+
+// ── Secret redaction (best-effort, applied before transcripts are persisted) ──
+// This is a pattern-matching floor, not a guarantee — it catches common,
+// recognizably-shaped secrets (cloud provider keys, tokens, private key
+// blocks, labeled key=value pairs) before a transcript is written to
+// sticky-note/data and pushed to the team's remote. It will not catch novel
+// or oddly-formatted secrets. Teams handling especially sensitive sessions
+// should still set `capture_transcripts: false` for those repos.
+const REDACTION_PATTERNS = [
+  // AWS access key IDs
+  { name: "aws_access_key", re: /\bAKIA[0-9A-Z]{16}\b/g, replacement: "[REDACTED:aws_access_key]" },
+  // GitHub tokens (ghp_, gho_, ghu_, ghs_, ghr_)
+  { name: "github_token", re: /\bgh[pousr]_[A-Za-z0-9]{36,255}\b/g, replacement: "[REDACTED:github_token]" },
+  // Slack tokens
+  { name: "slack_token", re: /\bxox[baprs]-[A-Za-z0-9-]{10,72}\b/g, replacement: "[REDACTED:slack_token]" },
+  // PEM-style private key blocks
+  { name: "private_key_block", re: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, replacement: "[REDACTED:private_key_block]" },
+  // Bearer tokens in headers/output
+  { name: "bearer_token", re: /\bBearer\s+[A-Za-z0-9\-_.~+/]+=*/gi, replacement: "Bearer [REDACTED:token]" },
+  // JWTs (three base64url segments)
+  { name: "jwt", re: /\bey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, replacement: "[REDACTED:jwt]" },
+  // Labeled secrets: api_key=..., token: "...", password=... etc. Keeps the
+  // label so the transcript still reads sensibly, redacts only the value.
+  //
+  // Deliberately no trailing ["']? here: transcripts are stored as raw JSONL
+  // text, so a value sitting right before a JSON string's closing quote is
+  // common ("...token: abc123"}) — an earlier version of this pattern also
+  // matched that closing quote and dropped it in the replacement, corrupting
+  // the line's JSON so it failed to parse back. The value class below
+  // ([^\s"'\n]{6,}) already excludes quotes, so it naturally stops just
+  // before one and the quote is left untouched in the output.
+  { name: "labeled_secret", re: /((?:api|secret|access)[_-]?key|token|password|passwd|pwd)(\s*[:=]\s*)["']?[^\s"'\n]{6,}/gi, replacement: "$1$2[REDACTED]" },
+];
+
+function redactSecrets(text) {
+  if (!text || typeof text !== "string") return text;
+  let out = text;
+  for (const pattern of REDACTION_PATTERNS) {
+    out = out.replace(pattern.re, pattern.replacement);
+  }
+  return out;
+}
 
 // ── Path helpers ──────────────────────────────────────────
 
@@ -171,6 +212,7 @@ const _paths = {
   config: "sticky-note-config.json",
   auditDir: "audit",
   presenceDir: "presence",
+  transcriptsDir: "transcripts",
   // Legacy single-file paths (for migration only)
   legacyAudit: "sticky-note-audit.jsonl",
   legacyPresence: ".sticky-presence.json",
@@ -186,6 +228,18 @@ function getAuditDir() { return _p("auditDir"); }
 function getPresenceDir() { return _p("presenceDir"); }
 function getLegacyAuditPath() { return _p("legacyAudit"); }
 function getLegacyPresencePath() { return _p("legacyPresence"); }
+
+// ── Transcript storage (session-level, keyed by thread ID) ────
+// Transcripts live alongside audit/presence in the sticky-note/data
+// storage layer — one JSONL file per thread, one line per contributing
+// session. Not commit-anchored (git notes) because a thread's transcript
+// belongs to the whole session, not to any single commit it produced.
+
+function getTranscriptsDir() { return _p("transcriptsDir"); }
+
+function getTranscriptPath(threadId) {
+  return path.join(getTranscriptsDir(), threadId + ".jsonl");
+}
 
 function getUserAuditPath(user) {
   if (!user) user = getUser();
@@ -251,14 +305,17 @@ function clearSessionFile() {
 
 // ── Git sync (auto-commit/push .sticky-note/ files) ──────
 
+let _cachedGitRepoRoot = null; // null = not yet computed; "" = computed but git failed
 function _gitRepoRoot() {
+  if (_cachedGitRepoRoot !== null) return _cachedGitRepoRoot || null;
   try {
-    return execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    _cachedGitRepoRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
       encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
     }).trim();
   } catch (_) {
-    return null;
+    _cachedGitRepoRoot = "";
   }
+  return _cachedGitRepoRoot || null;
 }
 
 /**
@@ -563,6 +620,17 @@ function appendAuditLine(entry) {
   const filePath = getUserAuditPath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.appendFileSync(filePath, JSON.stringify(entry) + "\n", "utf-8");
+}
+
+/**
+ * Write an audit entry both to the local JSONL file and (fire-and-forget)
+ * to the cloud backend when cloud mode is active.
+ */
+function appendAuditLineBoth(entry, cloud) {
+  try { appendAuditLine(entry); } catch (_) {}
+  if (cloud) {
+    cloudAppendAudit(entry).catch(() => {});
+  }
 }
 
 // ── Environment helpers ───────────────────────────────────
@@ -1056,13 +1124,15 @@ function ensureMcpInCopilotCliConfig(serverName, serverConfig) {
 
 // ── Exports ───────────────────────────────────────────────
 
-// Declared here so module.exports can reference it before the cloud section below
-let _cloudWarned = false;
-
 module.exports = {
   ERROR_PATTERNS,
   RETRY_PATTERNS,
   FILE_PATH_PATTERN,
+  // Transcript capture
+  REDACTION_PATTERNS,
+  redactSecrets,
+  getTranscriptsDir,
+  getTranscriptPath,
   logHookError,
   reportHookError,
   selfHealHookPaths,
@@ -1094,6 +1164,7 @@ module.exports = {
   saveJson,
   saveMemoryMerged,
   appendAuditLine,
+  appendAuditLineBoth,
   getUser,
   detectTool,
   getSessionId,
@@ -1142,7 +1213,6 @@ module.exports = {
   cloudDeletePresence,
   cloudReadConfig,
   cloudWriteConfig,
-  _cloudWarned,
   // V2.7: auto-sync
   syncStickyNote,
   // V2.9: Copilot CLI MCP config
@@ -1158,34 +1228,30 @@ module.exports = {
 
 // ── V3: Cloud transport layer ─────────────────────────────
 
-// Reads .env.sticky from the repo root for STICKY_URL and STICKY_API_KEY.
-// Falls back to environment variables.
-
 function _loadEnvStickyFile() {
   try {
-    const repoRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
-      encoding: "utf-8",
-      timeout: 5000,
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    const repoRoot = _gitRepoRoot();
+    if (!repoRoot) return {};
     const envPath = path.join(repoRoot, ".env.sticky");
-    if (fs.existsSync(envPath)) {
-      const raw = fs.readFileSync(envPath, "utf-8");
-      const vars = {};
-      for (const line of raw.split(/\r?\n/)) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#")) continue;
-        const eq = trimmed.indexOf("=");
-        if (eq > 0) {
-          vars[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
-        }
-      }
-      return vars;
+    let raw;
+    try {
+      raw = fs.readFileSync(envPath, "utf-8");
+    } catch (_) {
+      return {};
     }
+    const vars = {};
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq > 0) {
+        vars[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
+      }
+    }
+    return vars;
   } catch (_) {
-    // ignore
+    return {};
   }
-  return {};
 }
 
 let _envStickyCache = null;
@@ -1211,11 +1277,17 @@ function useCloud() {
   return _cachedUseCloud;
 }
 
+let _cachedProjectName = null;
 function getProjectName() {
+  if (_cachedProjectName !== null) return _cachedProjectName;
+
   // Check config override first
   try {
     const config = loadJson(getConfigPath(), {});
-    if (config.project) return config.project;
+    if (config.project) {
+      _cachedProjectName = config.project;
+      return _cachedProjectName;
+    }
   } catch (_) {}
 
   // Auto-detect from git remote
@@ -1228,13 +1300,22 @@ function getProjectName() {
     // git@github.com:Owner/Repo.git → Owner/Repo
     // https://github.com/Owner/Repo.git → Owner/Repo
     const match = remote.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
-    if (match) return match[1];
+    if (match) {
+      _cachedProjectName = match[1];
+      return _cachedProjectName;
+    }
   } catch (_) {}
 
-  return "default";
+  _cachedProjectName = "default";
+  return _cachedProjectName;
 }
 
+let _cloudWarned = false;
 async function cloudFetch(method, endpoint, body) {
+  if (typeof fetch === "undefined") {
+    // Node < 18 — cloud transport not supported
+    return null;
+  }
   const { url, apiKey } = getCloudConfig();
   if (!url) return null;
 
@@ -1253,9 +1334,7 @@ async function cloudFetch(method, endpoint, body) {
   }
 
   try {
-    // Use dynamic import for fetch (Node 18+) or fall back to global
-    const fetchFn = typeof fetch !== "undefined" ? fetch : (await import("node:http")).default;
-    const resp = await fetchFn(`${url}${endpoint}`, opts);
+    const resp = await fetch(`${url}${endpoint}`, opts);
     if (!resp.ok) {
       return null;
     }
