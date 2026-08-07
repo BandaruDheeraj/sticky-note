@@ -1655,6 +1655,138 @@ function cmdResume() {
 }
 
 // ──────────────────────────────────────────────
+// TRANSCRIPT command
+// ──────────────────────────────────────────────
+
+/**
+ * Extract human-readable "[role] text" lines from a raw session transcript
+ * (Claude Code JSONL format, with a fallback for Copilot CLI-style hook
+ * entries). Tool use/results are summarized rather than dumped in full —
+ * pass --raw to cmdTranscript to see the untouched JSONL instead.
+ */
+function formatTranscriptText(rawTranscript) {
+  const lines = (rawTranscript || "").split(/\r?\n/).filter((l) => l.trim());
+  const out = [];
+
+  for (const line of lines) {
+    let entry;
+    try { entry = JSON.parse(line); } catch (_) { continue; }
+
+    const message = entry.message;
+    if (message && typeof message === "object" && !Array.isArray(message)) {
+      const role = message.role || entry.role || "unknown";
+      const content = message.content;
+      const blocks = Array.isArray(content) ? content : [content];
+
+      for (const block of blocks) {
+        if (typeof block === "string") {
+          if (block.trim()) out.push(`[${role}] ${block.trim()}`);
+        } else if (block && typeof block === "object") {
+          if (block.type === "text" && block.text) {
+            out.push(`[${role}] ${block.text.trim()}`);
+          } else if (block.type === "tool_use") {
+            out.push(`[${role}] → used tool: ${block.name || "?"}`);
+          } else if (block.type === "tool_result") {
+            const resultText = typeof block.content === "string"
+              ? block.content
+              : Array.isArray(block.content)
+                ? block.content.filter((c) => c && typeof c === "object" && c.type === "text").map((c) => c.text || "").join(" ")
+                : "";
+            if (resultText.trim()) {
+              out.push(`[tool result]${block.is_error ? " (error)" : ""} ${resultText.trim().slice(0, 300)}`);
+            }
+          }
+        }
+      }
+      continue;
+    }
+
+    // Copilot CLI-style hook entries
+    if (entry.tool_name) {
+      out.push(`[tool] ${entry.tool_name}`);
+    }
+  }
+
+  return out;
+}
+
+function _loadStickyUtils() {
+  try {
+    return require(path.join(__dirname, "..", "templates", "hooks", "sticky-utils.js"));
+  } catch (_) {
+    try {
+      return require(path.join(process.cwd(), ".claude", "hooks", "sticky-utils.js"));
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+function cmdTranscript() {
+  printBanner();
+  const args = process.argv.slice(3);
+  const raw = args.includes("--raw");
+  const threadIdArg = args.find((a) => !a.startsWith("--"));
+
+  const utils = _loadStickyUtils();
+  if (!utils) {
+    print("  [ERR] Could not load sticky-utils.js. Run `npx sticky-note init` first.");
+    process.exit(1);
+  }
+
+  const memory = utils.loadJson(utils.getMemoryPath(), { threads: [] });
+  const threads = (memory.threads || []).filter(Boolean);
+
+  if (!threadIdArg || args.includes("--list")) {
+    const withTranscripts = threads.filter((t) => t.transcript_captured);
+    if (!withTranscripts.length) {
+      print("  No threads have a captured transcript yet.");
+      print("  (Check capture_transcripts in sticky-note-config.json if you expected one.)");
+      return;
+    }
+    print("\n  Threads with a captured transcript:\n");
+    for (const t of withTranscripts) {
+      const note = t.last_note ? ` — ${t.last_note.slice(0, 60)}` : "";
+      print(`  ${t.id.slice(0, 8)}  ${t.user || "?"}${note}`);
+    }
+    print(`\n  Usage: npx sticky-note transcript <thread-id> [--raw]\n`);
+    return;
+  }
+
+  const match = threads.find((t) => t.id === threadIdArg || t.id.startsWith(threadIdArg));
+  if (!match) {
+    print(`  [ERR] No thread found matching "${threadIdArg}".`);
+    print("  Run `npx sticky-note transcript --list` to see threads with a captured transcript.");
+    process.exit(1);
+  }
+
+  const filePath = utils.getTranscriptPath(match.id);
+  if (!fs.existsSync(filePath)) {
+    print(`  No transcript captured for thread ${match.id.slice(0, 8)}.`);
+    print("  (capture_transcripts may be disabled, or this thread predates the feature.)");
+    return;
+  }
+
+  const lines = fs.readFileSync(filePath, "utf-8").split(/\r?\n/).filter((l) => l.trim());
+  print(`\n  ── Transcript for thread ${match.id.slice(0, 8)} (${lines.length} session${lines.length === 1 ? "" : "s"}) ──\n`);
+
+  for (const line of lines) {
+    let entry;
+    try { entry = JSON.parse(line); } catch (_) { continue; }
+    const shortSession = (entry.session_id || "?").slice(0, 8);
+    print(`  ── Session ${shortSession} · ${entry.tool || "?"} · ${entry.captured_at || "?"}${entry.redacted ? " · redacted" : ""} ──`);
+    if (raw) {
+      print(entry.transcript || "");
+    } else {
+      const formatted = formatTranscriptText(entry.transcript);
+      if (!formatted.length) print("  (no readable turns found — try --raw)");
+      for (const f of formatted) print("  " + f);
+    }
+    print("");
+  }
+}
+
+// ──────────────────────────────────────────────
 // AUDIT command
 // ──────────────────────────────────────────────
 
@@ -2788,10 +2920,30 @@ function cmdDeployBackend() {
     if (workerUrl) {
       print(`  [OK] Worker deployed: ${workerUrl}`);
 
-      // Write .env.sticky
+      // Generate API key and set it as a Wrangler secret
+      const crypto = require("crypto");
+      const apiKey = crypto.randomBytes(24).toString("base64url");
+
+      print("  Step 3: Setting API key on Worker...");
+      try {
+        execSync("wrangler secret put STICKY_API_KEY", {
+          cwd: serverDir,
+          input: apiKey,
+          encoding: "utf-8",
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+        print("  [OK] STICKY_API_KEY secret set on Worker");
+      } catch (err) {
+        print("  [WARN] Could not set STICKY_API_KEY automatically: " + (err.message || err));
+        print("         Run manually: wrangler secret put STICKY_API_KEY");
+      }
+
+      // Write .env.sticky with both URL and key
       const envPath = path.join(process.cwd(), ".env.sticky");
-      fs.writeFileSync(envPath, `STICKY_URL=${workerUrl}\n`, "utf-8");
-      print("  [OK] .env.sticky written with STICKY_URL");
+      fs.writeFileSync(envPath, `STICKY_URL=${workerUrl}\nSTICKY_API_KEY=${apiKey}\n`, "utf-8");
+      print("  [OK] .env.sticky written with STICKY_URL and STICKY_API_KEY");
+      print("\n  Share STICKY_URL and STICKY_API_KEY with your team securely");
+      print("  (e.g. org secrets, 1Password). Do not commit .env.sticky.\n");
     } else {
       print("  [OK] Worker deployed (URL not detected — check wrangler output)");
     }
@@ -4177,6 +4329,9 @@ async function main() {
     case "resume":
       cmdResume();
       break;
+    case "transcript":
+      cmdTranscript();
+      break;
     case "audit":
       cmdAudit();
       break;
@@ -4248,6 +4403,7 @@ async function main() {
       print("    status             Diagnostic report: threads, audit, attribution health");
       print("    threads            List open/stuck threads");
       print("    resume             Resume a previous thread (--list, --clear, <id>)");
+      print("    transcript         Show a thread's captured verbatim transcript (--list, --raw, <id>)");
       print("    resume-thread      Smart thread resume (--query, --user, --file, --json)");
       print("    audit              Query audit trail (--file, --user, --since, --session)");
       print("    who                Show active and recent team members");

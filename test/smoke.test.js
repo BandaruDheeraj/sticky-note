@@ -682,6 +682,53 @@ try {
     );
   });
 
+  run("deploy-backend: checks wrangler and provisions STICKY_API_KEY", () => {
+    const cliSource = fs.readFileSync(path.join(__dirname, "..", "bin", "cli.js"), "utf-8");
+    assert.ok(
+      cliSource.includes("wrangler --version"),
+      "deploy-backend should check for wrangler CLI"
+    );
+    assert.ok(
+      cliSource.includes("wrangler secret put STICKY_API_KEY"),
+      "deploy-backend should provision API key via wrangler secret"
+    );
+    assert.ok(
+      cliSource.includes("randomBytes"),
+      "deploy-backend should generate a random API key"
+    );
+    assert.ok(
+      cliSource.includes("STICKY_API_KEY=${apiKey}"),
+      "deploy-backend should write STICKY_API_KEY to .env.sticky"
+    );
+  });
+
+  run("migrate --to cloud: exits with error when STICKY_URL not configured", () => {
+    const envPath = path.join(tmpDir, ".env.sticky");
+    if (fs.existsSync(envPath)) fs.unlinkSync(envPath);
+    try {
+      const env = { ...process.env };
+      delete env.STICKY_URL;
+      cli(["migrate", "--to", "cloud"], { env });
+      assert.fail("Should have exited with error");
+    } catch (err) {
+      const output = (err.stdout || "") + (err.stderr || "") + (err.message || "");
+      assert.ok(output.includes("STICKY_URL"), "Error should mention STICKY_URL");
+    }
+  });
+
+  run("useCloud() returns false when STICKY_URL not set", () => {
+    const utilsPath = path.join(tmpDir, ".claude", "hooks", "sticky-utils.js");
+    delete require.cache[require.resolve(utilsPath)];
+    const utils = require(utilsPath);
+    const saved = process.env.STICKY_URL;
+    delete process.env.STICKY_URL;
+    try {
+      assert.strictEqual(utils.useCloud(), false, "useCloud() should be false without STICKY_URL");
+    } finally {
+      if (saved !== undefined) process.env.STICKY_URL = saved;
+    }
+  });
+
 } finally {
   cleanup();
 }
