@@ -37,10 +37,11 @@ npx sticky-note-cli deploy-backend
 ```
 
 This command:
-1. Checks for `wrangler` CLI (prompts to install if missing)
+1. Checks for `wrangler` CLI (install with `npm install -g wrangler` if missing)
 2. Creates a Cloudflare KV namespace
 3. Deploys the Sticky Note Worker
-4. Writes `.env.sticky` with your `STICKY_URL` and `STICKY_API_KEY`
+4. Generates a random API key and sets it on the Worker via `wrangler secret put`
+5. Writes `.env.sticky` with `STICKY_URL` and `STICKY_API_KEY`
 
 The `.env.sticky` file is gitignored — each developer gets their own copy
 with the same team URL and API key.
@@ -94,6 +95,19 @@ Or use the GitHub Action for zero-touch org rollout (see
 - Local `.sticky-note/` files are still written as cache
 - Git blame attribution stays local (no change)
 - Git Notes stay local (no change)
+
+#### MCP Server and Cloud
+
+When `STICKY_URL` is set, `npx sticky-note mcp-server` fetches threads and
+presence from the cloud backend at startup. All team-facing tools
+(`search_threads`, `check_overlaps`, `get_presence`, `get_stuck_threads`,
+`get_session_context`, `get_thread_context_for_files`) see cloud data
+automatically.
+
+The snapshot is taken at server boot — restart the MCP server to pick up
+threads written by teammates after it started.
+
+Audit trail and transcripts remain local-only in V3.0.
 
 ### Without `STICKY_URL` (local mode)
 
