@@ -1,9 +1,47 @@
 {
   "stale_days": 14,
   "inject_token_budget": 1000,
-  "mcp_servers": [],
+  "mcp_servers": [
+    {
+      "name": "sticky-note",
+      "type": "stdio",
+      "source": ".mcp.json",
+      "command": "npx",
+      "args": [
+        "-y",
+        "-p",
+        "sticky-note-cli",
+        "sticky-note",
+        "mcp-server"
+      ]
+    },
+    {
+      "name": "context7",
+      "type": "stdio",
+      "source": ".mcp.json",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ]
+    },
+    {
+      "name": "github",
+      "type": "stdio",
+      "source": ".mcp.json",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
+    }
+  ],
   "skills": [],
   "conventions": [],
-  "hook_version": "3.1.0",
-  "min_version": "2.9.1"
+  "hook_version": "3.1.5",
+  "min_version": "3.1.5",
+  "sticky_url": "https://sticky-note-server.sticky-server.workers.dev"
 }

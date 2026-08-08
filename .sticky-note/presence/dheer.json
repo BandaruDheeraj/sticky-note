@@ -1,0 +1,15 @@
+{
+  "active_files": [
+    "test\\smoke.test.js",
+    "templates\\hooks",
+    "templates\\hooks\\data-branch.js",
+    "bin\\cli.js",
+    ".superpowers\\sdd\\task-5-brief.md",
+    ".superpowers\\sdd\\task-5-report.md",
+    ".superpowers\\sdd\\review-b70a942..b2497ed.diff",
+    ".superpowers\\sdd\\task-6-brief.md",
+    "templates\\gitignore-additions.txt",
+    "package.json"
+  ],
+  "last_seen": "2026-07-18T20:44:30.988Z"
+}
