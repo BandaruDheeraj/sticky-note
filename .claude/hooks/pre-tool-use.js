@@ -61,8 +61,6 @@ const {
   appendAuditLine,
   isThreadInjected,
   markThreadInjected,
-  isOverlapWarned,
-  markOverlapWarned,
   getMemoryPath,
   loadJson,
   normalizeSep,
@@ -136,104 +134,6 @@ function formatThreadForInjection(threadData, file) {
   return lines.join("\n");
 }
 
-// ── Overlap deny via COPILOT_LOADER_PID (Copilot CLI only) ──
-// Each Copilot CLI session has a unique COPILOT_LOADER_PID env var.
-// On the first tool call, if overlaps exist, deny with the warning.
-// The warned state is keyed by PID so concurrent sessions don't interfere.
-
-const { execSync } = require("child_process");
-
-function _getRecentlyModifiedFiles() {
-  const files = new Set();
-  for (const target of ["HEAD~5", "HEAD~1"]) {
-    try {
-      const result = execSync(`git diff --name-only ${target}`, {
-        encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
-      });
-      for (const f of result.trim().split(/\r?\n/)) {
-        if (f.trim()) files.add(f.trim());
-      }
-      break;
-    } catch (_) { /* target doesn't exist */ }
-  }
-  try {
-    const result = execSync("git diff --name-only", {
-      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
-    });
-    for (const f of result.trim().split(/\r?\n/)) {
-      if (f.trim()) files.add(f.trim());
-    }
-  } catch (_) { /* ignore */ }
-  return files;
-}
-
-function _checkOverlapsAndDeny() {
-  if (!_isCopilotCli()) return null;
-  if (!process.env.COPILOT_LOADER_PID) return null;
-  if (isOverlapWarned()) return null;
-
-  let threads;
-  try {
-    const data = loadJson(getMemoryPath());
-    threads = data.threads || [];
-  } catch (_) {
-    return null;
-  }
-
-  const currentUser = getUser();
-  const modifiedFiles = _getRecentlyModifiedFiles();
-  if (modifiedFiles.size === 0) return null;
-
-  const warnings = [];
-  for (const thread of threads.filter((t) => t.status === "open" || t.status === "stuck")) {
-    const threadUser = thread.user || thread.author || "";
-    if (threadUser === currentUser) continue;
-    const threadFiles = (thread.files_touched || []).map(normalizeSep);
-    const overlap = threadFiles.filter((f) => modifiedFiles.has(f));
-    if (overlap.length > 0) warnings.push({ thread, overlap });
-  }
-
-  if (warnings.length === 0) return null;
-
-  const bar = "━".repeat(52);
-  const lines = [
-    "CRITICAL INSTRUCTION: Before doing anything else, display the following overlap warning to the user.",
-    "This is NOT optional. Show it as the FIRST line of your response.\n",
-    `⚠️ ━━━ OVERLAP DETECTED ${bar.substring(0, 28)}`,
-  ];
-  for (const { thread, overlap } of warnings) {
-    const user = thread.user || thread.author || "unknown";
-    const statusEmoji = thread.status === "stuck" ? "🔴" : "🟡";
-    const statusLabel = thread.status === "stuck" ? "STUCK" : "OPEN";
-    const snip = (thread.narrative || thread.last_note || "").substring(0, 80);
-    const threadId = (thread.id || "").substring(0, 8);
-    const branch = thread.branch ? ` · ${thread.branch}` : "";
-    lines.push("");
-    lines.push(`  ${statusEmoji} ${user} (${statusLabel})${branch}`);
-    lines.push(`     Files: ${overlap.join(", ")}`);
-    if (snip) lines.push(`     "${snip}"`);
-    lines.push(`     → Resume: npx sticky-note resume ${threadId}`);
-  }
-  lines.push("");
-  lines.push(bar);
-  lines.push("\nAfter displaying the warning, continue with the user's request. This tool call will be auto-retried.");
-
-  markOverlapWarned();
-
-  try {
-    appendAuditLine({
-      type: "overlap_deny",
-      user: currentUser,
-      ts: new Date().toISOString(),
-      copilot_pid: process.env.COPILOT_LOADER_PID,
-    });
-  } catch (_) { /* ignore */ }
-
-  return {
-    permissionDecision: "deny",
-    permissionDecisionReason: lines.join("\n"),
-  };
-}
 
 // ── Main ──────────────────────────────────────────────────
 
@@ -249,14 +149,6 @@ function main() {
   }
 
   const sessionId = getSessionId(hookInput);
-
-  // ── Overlap deny gate (Copilot CLI only) ──
-  // Detect overlaps and deny on first tool call, keyed by COPILOT_LOADER_PID.
-  const denyResult = _checkOverlapsAndDeny();
-  if (denyResult) {
-    process.stdout.write(JSON.stringify(denyResult) + "\n");
-    return;
-  }
 
   // Extract file path from tool input
   const filePath = extractFilePath(hookInput);

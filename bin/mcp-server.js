@@ -3,9 +3,10 @@
  * sticky-note MCP server — stdio-based
  *
  * Implements Model Context Protocol (JSON-RPC 2.0 over stdin/stdout)
- * with 8 tools for AI assistants:
+ * with 9 tools for AI assistants:
  *
  *   get_session_context(id)              — full thread payload by ID
+ *   get_full_transcript(id)              — full verbatim session transcript(s) for a thread
  *   get_stuck_threads()                  — all stuck threads
  *   search_threads(query)               — keyword search across threads
  *   get_audit_trail(...)                — query per-user JSONL audit logs
@@ -23,6 +24,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { execFileSync } = require("child_process");
 
 // ──────────────────────────────────────────────
 // Project root resolution
@@ -36,8 +38,113 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
+let _cachedStickyDir = null;
 function stickyDir() {
-  return path.join(PROJECT_ROOT, ".sticky-note");
+  if (_cachedStickyDir) return _cachedStickyDir;
+
+  // V3 default storage lives at <git-dir>/sticky-note (the sticky-note/data
+  // orphan branch's local working copy), not in the project's working tree.
+  // Try that first; fall back to the legacy in-tree .sticky-note/ for repos
+  // that haven't migrated (or aren't git repos at all).
+  try {
+    const gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"], cwd: PROJECT_ROOT,
+    }).trim();
+    const dataBranchDir = path.join(gitDir, "sticky-note");
+    if (fs.existsSync(path.join(dataBranchDir, "sticky-note.json"))) {
+      _cachedStickyDir = dataBranchDir;
+      return _cachedStickyDir;
+    }
+  } catch (_) {
+    // not a git repo, or git unavailable — fall through to legacy path
+  }
+
+  _cachedStickyDir = path.join(PROJECT_ROOT, ".sticky-note");
+  return _cachedStickyDir;
+}
+
+function getTranscriptPath(threadId) {
+  return path.join(stickyDir(), "transcripts", threadId + ".jsonl");
+}
+
+// ──────────────────────────────────────────────
+// Cloud config (V3 optional backend)
+// ──────────────────────────────────────────────
+
+function readEnvSticky() {
+  const envPath = path.join(PROJECT_ROOT, ".env.sticky");
+  const result = {};
+  if (!fs.existsSync(envPath)) return result;
+  for (const line of fs.readFileSync(envPath, "utf-8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("STICKY_URL=")) result.STICKY_URL = trimmed.slice("STICKY_URL=".length);
+    if (trimmed.startsWith("STICKY_API_KEY=")) result.STICKY_API_KEY = trimmed.slice("STICKY_API_KEY=".length);
+  }
+  return result;
+}
+
+function getCloudConfig() {
+  const envFile = readEnvSticky();
+  return {
+    url: process.env.STICKY_URL || envFile.STICKY_URL || "",
+    apiKey: process.env.STICKY_API_KEY || envFile.STICKY_API_KEY || "",
+  };
+}
+
+function getProjectName() {
+  try {
+    const remote = execFileSync("git", ["remote", "get-url", "origin"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"], cwd: PROJECT_ROOT,
+    }).trim();
+    const match = remote.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+    if (match) return match[1];
+  } catch (_) {}
+  return "default";
+}
+
+let _cloudThreads = null;
+let _cloudPresence = null;
+let _cloudPresenceMap = null;
+
+function buildPresenceMap(presence) {
+  const map = {};
+  for (const entry of presence) {
+    if (entry.user) map[entry.user] = { active_files: entry.active_files || [], last_seen: entry.last_seen };
+  }
+  return map;
+}
+
+async function initCloudCache() {
+  const { url, apiKey } = getCloudConfig();
+  if (!url) return;
+
+  const headers = { "X-Sticky-Project": getProjectName() };
+  if (apiKey) headers["X-Sticky-API-Key"] = apiKey;
+
+  function timedFetch(endpoint) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 5000);
+    return fetch(`${url}${endpoint}`, { headers, signal: controller.signal })
+      .finally(() => clearTimeout(t));
+  }
+
+  try {
+    const [threadsRes, presenceRes] = await Promise.all([
+      timedFetch("/threads"),
+      timedFetch("/presence"),
+    ]);
+    if (threadsRes.ok) {
+      const data = await threadsRes.json();
+      _cloudThreads = data.threads || [];
+    }
+    if (presenceRes.ok) {
+      const data = await presenceRes.json();
+      _cloudPresence = data.presence || [];
+      _cloudPresenceMap = buildPresenceMap(_cloudPresence);
+    }
+  } catch (_) {
+    process.stderr.write("[sticky-note] Cloud unreachable — using local data\n");
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -69,6 +176,7 @@ function getConfig() {
 }
 
 function getThreads() {
+  if (_cloudThreads !== null) return _cloudThreads;
   return getMemory().threads || [];
 }
 
@@ -77,10 +185,11 @@ function getThreads() {
  * Returns { username: { active_files, last_seen } }
  */
 function getAllPresence() {
+  if (_cloudPresenceMap !== null) return _cloudPresenceMap;
+
   const presenceDir = path.join(stickyDir(), "presence");
   const result = {};
   if (!fs.existsSync(presenceDir)) return result;
-
   for (const file of fs.readdirSync(presenceDir)) {
     if (!file.endsWith(".json")) continue;
     const user = file.replace(".json", "");
@@ -154,6 +263,60 @@ function toolGetSessionContext(params) {
   }
 
   return { thread };
+}
+
+/**
+ * Return the full verbatim transcript(s) captured for a thread — one entry
+ * per contributing session (a resumed thread may have several). Secrets
+ * are redacted before storage (see redactSecrets in sticky-utils.js) unless
+ * a team has disabled redact_transcripts.
+ */
+function toolGetFullTranscript(params) {
+  const { id } = params;
+  if (!id) {
+    return { error: "Missing required parameter: id" };
+  }
+
+  const threads = getThreads();
+  const thread = threads.find((t) => t.id === id || t.id.startsWith(id) || t.session_id === id);
+  if (!thread) {
+    return { error: `No thread found with id: ${id}` };
+  }
+
+  const filePath = getTranscriptPath(thread.id);
+  if (!fs.existsSync(filePath)) {
+    return {
+      thread_id: thread.id,
+      transcript_captured: !!thread.transcript_captured,
+      sessions: [],
+      note: "No transcript captured for this thread — it may predate transcript capture, or capture_transcripts is disabled for this team.",
+    };
+  }
+
+  const lines = fs.readFileSync(filePath, "utf-8").split(/\r?\n/).filter((l) => l.trim());
+  const sessions = [];
+  for (const line of lines) {
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    sessions.push({
+      session_id: entry.session_id,
+      tool: entry.tool,
+      user: entry.user,
+      captured_at: entry.captured_at,
+      redacted: !!entry.redacted,
+      transcript: entry.transcript,
+    });
+  }
+
+  return {
+    thread_id: thread.id,
+    session_count: sessions.length,
+    sessions,
+  };
 }
 
 function toolGetStuckThreads() {
@@ -515,6 +678,21 @@ const TOOLS = {
     },
     handler: toolGetSessionContext,
   },
+  get_full_transcript: {
+    description:
+      "Get the full verbatim transcript(s) captured for a thread by ID — one entry per contributing session. Secrets are redacted before storage unless a team disabled redact_transcripts. Returns an empty sessions array if no transcript was captured (e.g. capture_transcripts is off, or the thread predates this feature).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "Thread ID or session ID to look up",
+        },
+      },
+      required: ["id"],
+    },
+    handler: toolGetFullTranscript,
+  },
   get_stuck_threads: {
     description:
       "Get all threads with status 'stuck'. Returns full payloads including failed approaches and last notes. Call at session start to check for team blockers.",
@@ -634,7 +812,7 @@ const TOOLS = {
 
 const SERVER_INFO = {
   name: "sticky-note",
-  version: "3.0.0",
+  version: "3.1.0",
 };
 
 const CAPABILITIES = {
@@ -746,43 +924,47 @@ function handleRequest(msg) {
 // stdio transport
 // ──────────────────────────────────────────────
 
-let buffer = "";
+(async () => {
+  await initCloudCache();
 
-process.stdin.setEncoding("utf-8");
-process.stdin.on("data", (chunk) => {
-  buffer += chunk;
+  let buffer = "";
 
-  let newlineIdx;
-  while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
-    const line = buffer.slice(0, newlineIdx).trim();
-    buffer = buffer.slice(newlineIdx + 1);
+  process.stdin.setEncoding("utf-8");
+  process.stdin.on("data", (chunk) => {
+    buffer += chunk;
 
-    if (!line) continue;
+    let newlineIdx;
+    while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, newlineIdx).trim();
+      buffer = buffer.slice(newlineIdx + 1);
 
-    let msg;
-    try {
-      msg = JSON.parse(line);
-    } catch {
-      const errResp = {
-        jsonrpc: "2.0",
-        id: null,
-        error: { code: -32700, message: "Parse error" },
-      };
-      process.stdout.write(JSON.stringify(errResp) + "\n");
-      continue;
+      if (!line) continue;
+
+      let msg;
+      try {
+        msg = JSON.parse(line);
+      } catch {
+        const errResp = {
+          jsonrpc: "2.0",
+          id: null,
+          error: { code: -32700, message: "Parse error" },
+        };
+        process.stdout.write(JSON.stringify(errResp) + "\n");
+        continue;
+      }
+
+      const response = handleRequest(msg);
+      if (response) {
+        process.stdout.write(JSON.stringify(response) + "\n");
+      }
     }
+  });
 
-    const response = handleRequest(msg);
-    if (response) {
-      process.stdout.write(JSON.stringify(response) + "\n");
-    }
-  }
-});
+  process.stdin.on("end", () => {
+    process.exit(0);
+  });
 
-process.stdin.on("end", () => {
-  process.exit(0);
-});
-
-process.on("uncaughtException", (err) => {
-  process.stderr.write(`sticky-note MCP server error: ${err.message}\n`);
-});
+  process.on("uncaughtException", (err) => {
+    process.stderr.write(`sticky-note MCP server error: ${err.message}\n`);
+  });
+})();

@@ -600,7 +600,9 @@ function main() {
   outputLines.unshift(header);
 
   let output = outputLines.join("\n").trim();
-  output += scoringBlock;
+  if (process.env.STICKY_DEBUG) {
+    output += scoringBlock;
+  }
 
   // Prepend overlap warning if other users' threads touch the same files
   const overlapWarning = detectAndFormatOverlaps(threads, currentUser);

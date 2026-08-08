@@ -43,9 +43,12 @@ const {
   saveJson,
   saveMemoryMerged,
   appendAuditLine,
+  appendAuditLineBoth,
   getUser,
   getBranch,
   getSessionId,
+  useCloud,
+  cloudWritePresence,
   normalizeSep,
 } = utils;
 
@@ -227,6 +230,7 @@ function main() {
   }
 
   const sessionId = getSessionId(hookInput);
+  const cloud = useCloud();
 
   let toolName = hookInput.tool_name || "unknown";
   if (toolName === "unknown") {
@@ -282,27 +286,37 @@ function main() {
   if (checkpoint) {
     entry.checkpoint_topic = checkpoint.topic;
   }
-  appendAuditLine(entry);
+  appendAuditLineBoth(entry, cloud);
 
   updatePresence(user, filePath);
+  if (cloud) {
+    cloudWritePresence({
+      user,
+      last_seen: now,
+      active_files: filePath ? [filePath] : [],
+      session_id: sessionId,
+    }).catch(() => {});
+  }
 
   // V2.5: Write Git Note for write tools
   if (isWriteTool && filePath) {
     writeEditNote(sessionId, user, filePath, lineRanges, checkpoint);
   }
 
-  const serverName = autoDetectMcp(toolName);
-  if (serverName) {
-    const configPath = getConfigPath();
-    const config = loadJson(configPath, { stale_days: 14, mcp_servers: [] });
-    const mcpServers = config.mcp_servers || [];
-    const knownNames = new Set(
-      mcpServers.map((s) => (typeof s === "object" ? s.name : s))
-    );
-    if (!knownNames.has(serverName)) {
-      mcpServers.push({ name: serverName, source: "auto-detected" });
-      config.mcp_servers = mcpServers;
-      saveJson(configPath, config);
+  if (toolName && toolName.startsWith("mcp__")) {
+    const serverName = autoDetectMcp(toolName);
+    if (serverName) {
+      const configPath = getConfigPath();
+      const config = loadJson(configPath, { stale_days: 14, mcp_servers: [] });
+      const mcpServers = config.mcp_servers || [];
+      const knownNames = new Set(
+        mcpServers.map((s) => (typeof s === "object" ? s.name : s))
+      );
+      if (!knownNames.has(serverName)) {
+        mcpServers.push({ name: serverName, source: "auto-detected" });
+        config.mcp_servers = mcpServers;
+        saveJson(configPath, config);
+      }
     }
   }
 

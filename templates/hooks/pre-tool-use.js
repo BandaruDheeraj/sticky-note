@@ -59,10 +59,11 @@ const {
   getSessionId,
   getUser,
   appendAuditLine,
+  appendAuditLineBoth,
   isThreadInjected,
   markThreadInjected,
-  isOverlapWarned,
-  markOverlapWarned,
+  useCloud,
+  cloudReadPresence,
   getMemoryPath,
   loadJson,
   normalizeSep,
@@ -137,47 +138,41 @@ function formatThreadForInjection(threadData, file) {
   return lines.join("\n");
 }
 
-// ── Overlap deny via COPILOT_LOADER_PID (Copilot CLI only) ──
-// Each Copilot CLI session has a unique COPILOT_LOADER_PID env var.
-// On the first tool call, if overlaps exist, deny with the warning.
-// The warned state is keyed by PID so concurrent sessions don't interfere.
+let _presenceCache = null;
+let _presenceCacheTs = 0;
+const PRESENCE_CACHE_TTL_MS = 60000;
 
-const { execSync } = require("child_process");
-
-function _getRecentlyModifiedFiles() {
-  const files = new Set();
-  for (const target of ["HEAD~5", "HEAD~1"]) {
-    try {
-      const result = execSync(`git diff --name-only ${target}`, {
-        encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
-      });
-      for (const f of result.trim().split(/\r?\n/)) {
-        if (f.trim()) files.add(f.trim());
-      }
-      break;
-    } catch (_) { /* target doesn't exist */ }
-  }
+async function _checkConflict(filePath) {
+  if (!filePath || !useCloud()) return "";
   try {
-    const result = execSync("git diff --name-only", {
-      encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
-    });
-    for (const f of result.trim().split(/\r?\n/)) {
-      if (f.trim()) files.add(f.trim());
+    const now = Date.now();
+    if (!_presenceCache || (now - _presenceCacheTs) > PRESENCE_CACHE_TTL_MS) {
+      _presenceCache = await cloudReadPresence();
+      _presenceCacheTs = now;
     }
-  } catch (_) { /* ignore */ }
-  return files;
+    const presence = _presenceCache;
+    if (!presence) return "";
+    const currentUser = getUser();
+    const conflicting = presence.filter(p => {
+      if (!p.user || p.user === currentUser) return false;
+      return (p.active_files || []).some(f =>
+        f === filePath || filePath.endsWith(f) || f.endsWith(filePath)
+      );
+    });
+    if (conflicting.length > 0) {
+      const names = conflicting.map(p => p.user).join(", ");
+      return `⚠️ [STICKY-NOTE] Conflict warning: ${names} also editing ${filePath}`;
+    }
+  } catch (_) {
+    // ignore
+  }
+  return "";
 }
 
-function _checkOverlapsAndDeny() {
-  // Overlap alerting is now handled by the MCP server's check_overlaps tool.
-  // This deny-based approach was unreliable (deny reason consumed silently).
-  // Kept as no-op to avoid breaking the call site.
-  return null;
-}
 
 // ── Main ──────────────────────────────────────────────────
 
-function main() {
+async function main() {
   let hookInput = {};
   try {
     const raw = require("fs").readFileSync(0, "utf-8");
@@ -189,6 +184,7 @@ function main() {
   }
 
   const sessionId = getSessionId(hookInput);
+  const cloud = useCloud();
 
   // ── Auto-sync before git pull/merge/rebase ──
   // Prevents "local changes would be overwritten" errors for .sticky-note/ files
@@ -201,14 +197,6 @@ function main() {
     }
   }
 
-  // ── Overlap deny gate (Copilot CLI only) ──
-  // Detect overlaps and deny on first tool call, keyed by COPILOT_LOADER_PID.
-  const denyResult = _checkOverlapsAndDeny();
-  if (denyResult) {
-    process.stdout.write(JSON.stringify(denyResult) + "\n");
-    return;
-  }
-
   // Extract file path from tool input
   const filePath = extractFilePath(hookInput);
   if (!filePath) {
@@ -216,7 +204,6 @@ function main() {
     return;
   }
 
-  // Run attribution engine: get threads for this file with line ranges
   let fileAttr;
   try {
     fileAttr = attribution.getFileAttribution(filePath);
@@ -226,6 +213,10 @@ function main() {
   }
 
   if (!fileAttr || !fileAttr.threads || fileAttr.threads.length === 0) {
+    if (cloud) {
+      const warning = await _checkConflict(filePath);
+      if (warning) { _emit(warning); return; }
+    }
     _emit("");
     return;
   }
@@ -236,6 +227,10 @@ function main() {
   );
 
   if (newThreads.length === 0) {
+    if (cloud) {
+      const warning = await _checkConflict(filePath);
+      if (warning) { _emit(warning); return; }
+    }
     _emit("");
     return;
   }
@@ -248,11 +243,11 @@ function main() {
     markThreadInjected(threadId, sessionId);
   }
 
-  const output = outputParts.join("\n\n");
+  let output = outputParts.join("\n\n");
 
   // Audit the injection
   try {
-    appendAuditLine({
+    const auditEntry = {
       type: "lazy_inject",
       user: getUser(),
       ts: new Date().toISOString(),
@@ -263,9 +258,15 @@ function main() {
         const id = t.thread ? t.thread.id : t.id;
         return (id || "").substring(0, 8);
       }),
-    });
+    };
+    appendAuditLineBoth(auditEntry, cloud);
   } catch (_) {
     // ignore
+  }
+
+  if (cloud) {
+    const warning = await _checkConflict(filePath);
+    if (warning) output += "\n\n" + warning;
   }
 
   _emit(output);
@@ -274,9 +275,5 @@ function main() {
 // ── Entry point ───────────────────────────────────────────
 
 if (require.main === module) {
-  try {
-    main();
-  } catch (_) {
-    _safeExit();
-  }
+  main().catch(() => _safeExit());
 }

@@ -19,7 +19,7 @@ function _safeExit() {
   process.exit(0);
 }
 
-let getMemoryPath, loadJson, saveJson, saveMemoryMerged, appendAuditLine, getUser, detectTool, getSessionId;
+let getMemoryPath, loadJson, saveJson, saveMemoryMerged, appendAuditLine, getUser, detectTool, getSessionId, logHookError;
 try {
   ({
     getMemoryPath,
@@ -30,6 +30,7 @@ try {
     getUser,
     detectTool,
     getSessionId,
+    logHookError,
   } = require("./sticky-utils.js"));
 } catch (_) {
   _safeExit();
@@ -115,6 +116,6 @@ function main() {
 try {
   main();
 } catch (err) {
-  try { utils.logHookError("on-error", err); } catch (_) {}
+  try { logHookError("on-error", err); } catch (_) {}
   _safeExit();
 }

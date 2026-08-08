@@ -291,18 +291,20 @@ function main() {
     writeEditNote(sessionId, user, filePath, lineRanges, checkpoint);
   }
 
-  const serverName = autoDetectMcp(toolName);
-  if (serverName) {
-    const configPath = getConfigPath();
-    const config = loadJson(configPath, { stale_days: 14, mcp_servers: [] });
-    const mcpServers = config.mcp_servers || [];
-    const knownNames = new Set(
-      mcpServers.map((s) => (typeof s === "object" ? s.name : s))
-    );
-    if (!knownNames.has(serverName)) {
-      mcpServers.push({ name: serverName, source: "auto-detected" });
-      config.mcp_servers = mcpServers;
-      saveJson(configPath, config);
+  if (toolName && toolName.startsWith("mcp__")) {
+    const serverName = autoDetectMcp(toolName);
+    if (serverName) {
+      const configPath = getConfigPath();
+      const config = loadJson(configPath, { stale_days: 14, mcp_servers: [] });
+      const mcpServers = config.mcp_servers || [];
+      const knownNames = new Set(
+        mcpServers.map((s) => (typeof s === "object" ? s.name : s))
+      );
+      if (!knownNames.has(serverName)) {
+        mcpServers.push({ name: serverName, source: "auto-detected" });
+        config.mcp_servers = mcpServers;
+        saveJson(configPath, config);
+      }
     }
   }
 

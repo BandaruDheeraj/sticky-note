@@ -34,10 +34,12 @@ try {
 
 const {
   getMemoryPath,
+  getConfigPath,
   loadJson,
   saveJson,
   saveMemoryMerged,
   appendAuditLine,
+  appendAuditLineBoth,
   getUser,
   getBranch,
   getSessionId,
@@ -45,10 +47,10 @@ const {
   extractSessionFromAudit,
   readHeadSha,
   normalizeSep,
+  redactSecrets,
   useCloud,
   cloudReadThreads,
   cloudWriteThread,
-  cloudAppendAudit,
 } = utils;
 
 // Files that belong to sticky-note internals — exclude from files_touched.
@@ -204,6 +206,8 @@ async function main() {
   const cloud = useCloud();
   const memoryPath = getMemoryPath();
   const memory = loadJson(memoryPath, { version: "2", project: "", threads: [] });
+  const config = loadJson(getConfigPath(), {});
+  const shouldRedact = config.redact_transcripts !== false;
 
   if (cloud) {
     const cloudThreads = await cloudReadThreads();
@@ -216,7 +220,8 @@ async function main() {
   const auditFiles = auditData.files || [];
   const gitFiles = getGitFilesTouched();
   const allFiles = [...new Set([...auditFiles, ...gitFiles])];
-  const narrative = buildNarrativeFromAudit(auditData);
+  let narrative = buildNarrativeFromAudit(auditData);
+  if (shouldRedact) narrative = redactSecrets(narrative);
   const workType = classifyWorkType(auditData);
 
   const threads = (memory.threads || []).filter(Boolean);
@@ -243,7 +248,10 @@ async function main() {
       }
       thread.tool_calls = prevCalls;
       // Store prompts if not already present
-      const storedPrompts = (auditData.prompts || []).slice(0, 20).map((p) => p.substring(0, 300));
+      const storedPrompts = (auditData.prompts || []).slice(0, 20).map((p) => {
+        const trimmed = p.substring(0, 300);
+        return shouldRedact ? redactSecrets(trimmed) : trimmed;
+      });
       if (storedPrompts.length && !(thread.prompts || []).length) {
         thread.prompts = storedPrompts;
       }
@@ -267,10 +275,7 @@ async function main() {
     session_id: sessionId,
     reason: reason ? reason.substring(0, 200) : "stop_checkpoint",
   };
-  appendAuditLine(auditEntry);
-  if (cloud) {
-    cloudAppendAudit(auditEntry).catch(() => {});
-  }
+  appendAuditLineBoth(auditEntry, cloud);
 
   saveMemoryMerged(memoryPath, memory);
   if (cloud) {

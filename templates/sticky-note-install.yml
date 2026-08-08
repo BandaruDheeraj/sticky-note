@@ -1,0 +1,80 @@
+# Sticky Note — Auto-Install GitHub Action
+#
+# Installs or updates Sticky Note hooks on every repo in your org.
+# Add this workflow to your org's .github repository, or to individual repos.
+#
+# Required org secrets:
+#   STICKY_URL     — Cloud backend URL (e.g., https://sticky.acme.workers.dev)
+#   STICKY_API_KEY — API key for cloud backend
+#
+# Optional org variables:
+#   STICKY_STALE_DAYS   — Thread expiry days (default: 14)
+#   STICKY_CONVENTIONS  — Comma-separated team conventions
+#   STICKY_MCP_SERVERS  — JSON array of MCP server configs
+
+name: Sticky Note Install
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Check if Sticky Note is installed
+        id: check
+        run: |
+          if [ -f ".claude/hooks/session-start.js" ]; then
+            echo "installed=true" >> $GITHUB_OUTPUT
+          else
+            echo "installed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install Sticky Note
+        if: steps.check.outputs.installed == 'false'
+        run: npx sticky-note-cli@latest init --ci --no-prompts
+        env:
+          STICKY_URL: ${{ secrets.STICKY_URL }}
+          STICKY_API_KEY: ${{ secrets.STICKY_API_KEY }}
+          STICKY_STALE_DAYS: ${{ vars.STICKY_STALE_DAYS }}
+          STICKY_CONVENTIONS: ${{ vars.STICKY_CONVENTIONS }}
+          STICKY_MCP_SERVERS: ${{ vars.STICKY_MCP_SERVERS }}
+
+      - name: Update Sticky Note
+        if: steps.check.outputs.installed == 'true'
+        run: npx sticky-note-cli@latest update --ci
+        env:
+          STICKY_URL: ${{ secrets.STICKY_URL }}
+          STICKY_API_KEY: ${{ secrets.STICKY_API_KEY }}
+
+      - name: Write .env.sticky
+        if: env.STICKY_URL != ''
+        run: |
+          echo "STICKY_URL=$STICKY_URL" > .env.sticky
+          echo "STICKY_API_KEY=$STICKY_API_KEY" >> .env.sticky
+        env:
+          STICKY_URL: ${{ secrets.STICKY_URL }}
+          STICKY_API_KEY: ${{ secrets.STICKY_API_KEY }}
+
+      - name: Commit changes
+        run: |
+          git config user.name "sticky-note[bot]"
+          git config user.email "sticky-note[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: install sticky note [sticky-note] [skip ci]"
+            git push
+          fi

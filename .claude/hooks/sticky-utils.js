@@ -11,7 +11,6 @@ const { execFileSync } = require("child_process");
 
 // ── Cross-platform path normalization ──────────────────────
 
-// Normalize path separators to forward slashes for consistent storage/comparison.
 function normalizeSep(p) {
   return typeof p === "string" ? p.replace(/\\/g, "/") : p;
 }
@@ -37,12 +36,15 @@ const FILE_PATH_PATTERN = /[\w./\\-]+\.\w{1,10}/g;
 
 // ── Path helpers ──────────────────────────────────────────
 
+let _cachedStickyDir = null;
 function _stickyDir() {
+  if (_cachedStickyDir) return _cachedStickyDir;
   try {
     const gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
       encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
     }).trim();
-    return path.resolve(gitDir, "sticky-note");
+    _cachedStickyDir = path.resolve(gitDir, "sticky-note");
+    return _cachedStickyDir;
   } catch (_) {
     // Fallback for non-git environments (e.g., unit tests without git init)
     const scriptDir = path.dirname(path.resolve(__filename));
@@ -103,9 +105,12 @@ function selfHealHookPaths(settingsPath) {
     if (!settingsPath) {
       settingsPath = path.join(process.cwd(), ".claude", "settings.json");
     }
-    if (!fs.existsSync(settingsPath)) return result;
-
-    const raw = fs.readFileSync(settingsPath, "utf-8");
+    let raw;
+    try {
+      raw = fs.readFileSync(settingsPath, "utf-8");
+    } catch (_) {
+      return result;
+    }
     let settings;
     try { settings = JSON.parse(raw); } catch (_) { return result; }
     if (!settings || !settings.hooks) return result;
@@ -245,14 +250,17 @@ function clearSessionFile() {
 
 // ── Git sync (auto-commit/push .sticky-note/ files) ──────
 
+let _cachedGitRepoRoot = null; // null = not yet computed; "" = computed but git failed
 function _gitRepoRoot() {
+  if (_cachedGitRepoRoot !== null) return _cachedGitRepoRoot || null;
   try {
-    return execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    _cachedGitRepoRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
       encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],
     }).trim();
   } catch (_) {
-    return null;
+    _cachedGitRepoRoot = "";
   }
+  return _cachedGitRepoRoot || null;
 }
 
 /**
@@ -267,7 +275,6 @@ function syncStickyNote(opts) {
     if (!root) { result.skipped = true; return result; }
 
     const syncGuard = path.join(_stickyDir(), ".sticky-syncing");
-    if (fs.existsSync(syncGuard)) { result.skipped = true; return result; }
 
     // Check for dirty .sticky-note/ files (staged or unstaged)
     const status = execFileSync("git", [
@@ -277,8 +284,12 @@ function syncStickyNote(opts) {
 
     if (!status) { result.skipped = true; return result; }
 
-    // Write guard to prevent recursive post-commit triggers
-    fs.writeFileSync(syncGuard, process.pid.toString(), "utf-8");
+    // Write guard atomically to prevent recursive post-commit triggers
+    try {
+      fs.writeFileSync(syncGuard, process.pid.toString(), { flag: "wx", encoding: "utf-8" });
+    } catch (_) {
+      result.skipped = true; return result;
+    }
 
     try {
       // Stage the relevant files
@@ -511,9 +522,7 @@ function saveMemoryMerged(memoryPath, memory) {
   const lockPath = acquireLock(memoryPath);
   try {
     // Create backup before writing
-    if (fs.existsSync(memoryPath)) {
-      rotateBackup(memoryPath);
-    }
+    rotateBackup(memoryPath);
 
     // Load merge helpers (field-level thread merge)
     let mergeOneThread2Way = null;
@@ -556,6 +565,17 @@ function appendAuditLine(entry) {
   const filePath = getUserAuditPath();
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.appendFileSync(filePath, JSON.stringify(entry) + "\n", "utf-8");
+}
+
+/**
+ * Write an audit entry both to the local JSONL file and (fire-and-forget)
+ * to the cloud backend when cloud mode is active.
+ */
+function appendAuditLineBoth(entry, cloud) {
+  try { appendAuditLine(entry); } catch (_) {}
+  if (cloud) {
+    cloudAppendAudit(entry).catch(() => {});
+  }
 }
 
 // ── Environment helpers ───────────────────────────────────
@@ -608,16 +628,20 @@ function getSessionId(hookInput) {
   return "unknown";
 }
 
+let _cachedBranch = null;
 function getBranch() {
+  if (_cachedBranch !== null) return _cachedBranch;
   try {
     const result = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     }).trim();
-    return result;
+    _cachedBranch = result;
+    return _cachedBranch;
   } catch (_) {
-    return "";
+    _cachedBranch = "";
+    return _cachedBranch;
   }
 }
 
@@ -1080,6 +1104,7 @@ module.exports = {
   saveJson,
   saveMemoryMerged,
   appendAuditLine,
+  appendAuditLineBoth,
   getUser,
   detectTool,
   getSessionId,

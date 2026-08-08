@@ -19,7 +19,7 @@ function _safeExit() {
   process.exit(0);
 }
 
-let getMemoryPath, loadJson, saveJson, saveMemoryMerged, appendAuditLine, getUser, detectTool, getSessionId;
+let getMemoryPath, loadJson, saveJson, saveMemoryMerged, appendAuditLine, appendAuditLineBoth, getUser, detectTool, getSessionId, useCloud, cloudReadThreads, cloudWriteThread;
 try {
   ({
     getMemoryPath,
@@ -27,15 +27,19 @@ try {
     saveJson,
     saveMemoryMerged,
     appendAuditLine,
+    appendAuditLineBoth,
     getUser,
     detectTool,
     getSessionId,
+    useCloud,
+    cloudReadThreads,
+    cloudWriteThread,
   } = require("./sticky-utils.js"));
 } catch (_) {
   _safeExit();
 }
 
-function main() {
+async function main() {
   let hookInput = {};
   try {
     if (!process.stdin.isTTY) {
@@ -57,8 +61,14 @@ function main() {
   const user = getUser();
   const now = new Date().toISOString();
 
+  const cloud = useCloud();
   const memoryPath = getMemoryPath();
   const memory = loadJson(memoryPath, { version: "2", project: "", threads: [] });
+
+  if (cloud) {
+    const cloudThreads = await cloudReadThreads();
+    if (cloudThreads) memory.threads = cloudThreads;
+  }
 
   if (!Array.isArray(memory.threads)) {
     memory.threads = [];
@@ -93,16 +103,21 @@ function main() {
   // thread now. Creating standalone "stuck" threads from tool failures produced
   // garbage entries (tool="Bash"/"Glob", no branch, no context).
 
-  appendAuditLine({
+  const auditEntry = {
     type: "error",
     user: user,
     ts: now,
     session_id: sessionId,
     error: errorMsg,
     tool: toolName,
-  });
+  };
+  appendAuditLineBoth(auditEntry, cloud);
 
   saveMemoryMerged(memoryPath, memory);
+  if (cloud) {
+    const threadToSync = existing || threads[threads.length - 1];
+    cloudWriteThread(threadToSync).catch(() => {});
+  }
   const statusMsg = `[STICKY-NOTE] Marked thread as STUCK - ${errorMsg.substring(0, 80)}`;
   try {
     process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
@@ -112,9 +127,7 @@ function main() {
   process.exit(0);
 }
 
-try {
-  main();
-} catch (err) {
-  try { utils.logHookError("on-error", err); } catch (_) {}
+main().catch((err) => {
+  try { logHookError("on-error", err); } catch (_) {}
   _safeExit();
-}
+});

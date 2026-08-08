@@ -720,13 +720,7 @@ function tombstoneSweep(threads, staleDays) {
 
 function clearPresence(user) {
   const presencePath = getUserPresencePath(user);
-  try {
-    if (fs.existsSync(presencePath)) {
-      fs.unlinkSync(presencePath);
-    }
-  } catch (_) {
-    // ignore
-  }
+  try { fs.unlinkSync(presencePath); } catch (_) {}
 }
 
 // ── Data-branch commit/push ───────────────────────────────
@@ -989,10 +983,9 @@ function main() {
   saveMemoryMerged(memoryPath, memory);
 
   // Auto-sync: commit (and optionally push) .sticky-note/ changes
-  const syncConfig = loadJson(getConfigPath(), {});
-  if (syncConfig.auto_sync !== false) {
+  if (config.auto_sync !== false) {
     try {
-      syncStickyNote({ push: syncConfig.auto_push === true });
+      syncStickyNote({ push: config.auto_push === true });
     } catch (_) {
       // Non-fatal — sync failure shouldn't block session-end
     }

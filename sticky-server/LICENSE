@@ -1,0 +1,31 @@
+GNU AFFERO GENERAL PUBLIC LICENSE
+Version 3, 19 November 2007
+
+Copyright (C) 2026 Dheeraj Bandaru
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+Additional permission under GNU AGPL version 3 section 7:
+
+If you modify this Program, or any covered work, by linking or combining
+it with other code, such combination is not considered a "covered work"
+under the AGPL, provided that the other code is licensed under a
+permissive license (MIT, BSD, Apache 2.0, or similar).
+
+---
+
+The client layer of Sticky Note (bin/, templates/, hooks) is licensed
+under the MIT License. See the root LICENSE file.
+
+Only the sticky-server/ directory is covered by this AGPL license.

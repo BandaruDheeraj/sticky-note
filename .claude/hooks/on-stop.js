@@ -32,6 +32,7 @@ const {
   saveJson,
   saveMemoryMerged,
   appendAuditLine,
+  appendAuditLineBoth,
   getUser,
   getBranch,
   getSessionId,
@@ -42,7 +43,6 @@ const {
   useCloud,
   cloudReadThreads,
   cloudWriteThread,
-  cloudAppendAudit,
 } = utils;
 
 // Files that belong to sticky-note internals — exclude from files_touched.
@@ -261,10 +261,7 @@ async function main() {
     session_id: sessionId,
     reason: reason ? reason.substring(0, 200) : "stop_checkpoint",
   };
-  appendAuditLine(auditEntry);
-  if (cloud) {
-    cloudAppendAudit(auditEntry).catch(() => {});
-  }
+  appendAuditLineBoth(auditEntry, cloud);
 
   saveMemoryMerged(memoryPath, memory);
   if (cloud) {
