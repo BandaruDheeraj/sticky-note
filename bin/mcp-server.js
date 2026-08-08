@@ -104,6 +104,15 @@ function getProjectName() {
 
 let _cloudThreads = null;
 let _cloudPresence = null;
+let _cloudPresenceMap = null;
+
+function buildPresenceMap(presence) {
+  const map = {};
+  for (const entry of presence) {
+    if (entry.user) map[entry.user] = { active_files: entry.active_files || [], last_seen: entry.last_seen };
+  }
+  return map;
+}
 
 async function initCloudCache() {
   const { url, apiKey } = getCloudConfig();
@@ -112,13 +121,17 @@ async function initCloudCache() {
   const headers = { "X-Sticky-Project": getProjectName() };
   if (apiKey) headers["X-Sticky-API-Key"] = apiKey;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  function timedFetch(endpoint) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 5000);
+    return fetch(`${url}${endpoint}`, { headers, signal: controller.signal })
+      .finally(() => clearTimeout(t));
+  }
 
   try {
     const [threadsRes, presenceRes] = await Promise.all([
-      fetch(`${url}/threads`, { headers, signal: controller.signal }),
-      fetch(`${url}/presence`, { headers, signal: controller.signal }),
+      timedFetch("/threads"),
+      timedFetch("/presence"),
     ]);
     if (threadsRes.ok) {
       const data = await threadsRes.json();
@@ -127,11 +140,10 @@ async function initCloudCache() {
     if (presenceRes.ok) {
       const data = await presenceRes.json();
       _cloudPresence = data.presence || [];
+      _cloudPresenceMap = buildPresenceMap(_cloudPresence);
     }
   } catch (_) {
     process.stderr.write("[sticky-note] Cloud unreachable — using local data\n");
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -173,13 +185,7 @@ function getThreads() {
  * Returns { username: { active_files, last_seen } }
  */
 function getAllPresence() {
-  if (_cloudPresence !== null) {
-    const result = {};
-    for (const entry of _cloudPresence) {
-      if (entry.user) result[entry.user] = { active_files: entry.active_files || [], last_seen: entry.last_seen };
-    }
-    return result;
-  }
+  if (_cloudPresenceMap !== null) return _cloudPresenceMap;
 
   const presenceDir = path.join(stickyDir(), "presence");
   const result = {};

@@ -2917,14 +2917,13 @@ function cmdDeployBackend() {
     const urlMatch = result.match(/(https:\/\/[^\s]+\.workers\.dev)/);
     const workerUrl = urlMatch ? urlMatch[1] : null;
 
+    const apiKey = require("crypto").randomBytes(24).toString("base64url");
+
     if (workerUrl) {
       print(`  [OK] Worker deployed: ${workerUrl}`);
 
-      // Generate API key and set it as a Wrangler secret
-      const crypto = require("crypto");
-      const apiKey = crypto.randomBytes(24).toString("base64url");
-
       print("  Step 3: Setting API key on Worker...");
+      let secretSet = false;
       try {
         execSync("wrangler secret put STICKY_API_KEY", {
           cwd: serverDir,
@@ -2933,17 +2932,24 @@ function cmdDeployBackend() {
           stdio: ["pipe", "pipe", "pipe"],
         });
         print("  [OK] STICKY_API_KEY secret set on Worker");
+        secretSet = true;
       } catch (err) {
         print("  [WARN] Could not set STICKY_API_KEY automatically: " + (err.message || err));
-        print("         Run manually: wrangler secret put STICKY_API_KEY");
+        print(`         Set it manually: echo '${apiKey}' | wrangler secret put STICKY_API_KEY`);
       }
 
-      // Write .env.sticky with both URL and key
+      // Always write .env.sticky so the key is available even if secret-put failed
       const envPath = path.join(process.cwd(), ".env.sticky");
       fs.writeFileSync(envPath, `STICKY_URL=${workerUrl}\nSTICKY_API_KEY=${apiKey}\n`, "utf-8");
       print("  [OK] .env.sticky written with STICKY_URL and STICKY_API_KEY");
-      print("\n  Share STICKY_URL and STICKY_API_KEY with your team securely");
-      print("  (e.g. org secrets, 1Password). Do not commit .env.sticky.\n");
+
+      if (secretSet) {
+        print("\n  Share STICKY_URL and STICKY_API_KEY with your team securely");
+        print("  (e.g. org secrets, 1Password). Do not commit .env.sticky.\n");
+      } else {
+        print("\n  [!] API key is in .env.sticky but NOT yet set on the Worker.");
+        print("  Run the manual command above, then share with your team.\n");
+      }
     } else {
       print("  [OK] Worker deployed (URL not detected — check wrangler output)");
     }
