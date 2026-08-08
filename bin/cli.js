@@ -2952,25 +2952,43 @@ function provisionCloudBackend() {
     return { error: "sticky-server/worker.js not found. Make sure you have the full sticky-note package." };
   }
 
-  // Step 1: KV namespace
+  // Step 1: KV namespace — create or reuse existing
   print("  Step 1: Creating KV namespace...");
-  let kvResult;
+  let namespaceId = null;
   try {
-    kvResult = execSync("wrangler kv:namespace create STICKY_KV", {
+    const kvResult = execSync("wrangler kv namespace create STICKY_KV", {
       cwd: serverDir,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     });
+    const idMatch = kvResult.match(/id\s*=\s*"([^"]+)"/);
+    if (idMatch) namespaceId = idMatch[1];
     print("  [OK] KV namespace created");
   } catch (err) {
-    return { error: "Failed to create KV namespace: " + (err.message || err) + "\n        Make sure you're logged in: wrangler login" };
+    if (err.message && err.message.includes("already exists")) {
+      // Reuse the existing namespace
+      print("  [OK] KV namespace already exists — retrieving ID...");
+      try {
+        const listResult = execSync("wrangler kv namespace list", {
+          cwd: serverDir,
+          encoding: "utf-8",
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+        const namespaces = JSON.parse(listResult);
+        const existing = namespaces.find(ns => ns.title === "STICKY_KV");
+        if (existing) namespaceId = existing.id;
+      } catch (listErr) {
+        return { error: "KV namespace exists but could not retrieve ID: " + (listErr.message || listErr) };
+      }
+    } else {
+      return { error: "Failed to create KV namespace: " + (err.message || err) + "\n        Make sure you're logged in: wrangler login" };
+    }
   }
 
-  const idMatch = kvResult.match(/id\s*=\s*"([^"]+)"/);
-  if (idMatch) {
+  if (namespaceId) {
     const tomlPath = path.join(serverDir, "wrangler.toml");
     let toml = fs.readFileSync(tomlPath, "utf-8");
-    toml = toml.replace("PLACEHOLDER_KV_NAMESPACE_ID", idMatch[1]);
+    toml = toml.replace("PLACEHOLDER_KV_NAMESPACE_ID", namespaceId);
     fs.writeFileSync(tomlPath, toml);
     print("  [OK] wrangler.toml updated with namespace ID");
   }

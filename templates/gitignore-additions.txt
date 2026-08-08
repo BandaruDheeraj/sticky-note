@@ -3,6 +3,7 @@
 
 # Sticky Note - local overrides
 .claude/settings.local.json
+.env.sticky
 
 # Sticky Note - transient session/resume signals
 .sticky-note/.sticky-session
