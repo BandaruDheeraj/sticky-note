@@ -574,6 +574,7 @@ async function cmdInit() {
   print("");
 
   let mcpServers, skills, conventions, staleDaysResolved, injectTokenBudgetResolved;
+  let wantsCloud = false;
 
   if (ciMode) {
     // CI mode: no prompts, use env vars
@@ -596,6 +597,7 @@ async function cmdInit() {
     conventions = convRaw ? convRaw.split(",").map(s => s.trim()).filter(Boolean) : [];
     staleDaysResolved = parseIntOr(staleDaysRaw, 14);
     injectTokenBudgetResolved = 1000;
+    wantsCloud = v3Mode; // --v3 in CI mode implies cloud
   } else {
     // Interactive prompts
     const rl = readline.createInterface({
@@ -623,6 +625,13 @@ async function cmdInit() {
     // Sync MCP servers from teammate's sticky-note config
     await syncMcpFromStickyNote(rl);
 
+    const cloudAnswer = await ask(
+      rl,
+      "Set up Cloudflare cloud backend for real-time team sync? (y/N)",
+      v3Mode ? "y" : "N"
+    );
+    wantsCloud = cloudAnswer.toLowerCase() === "y" || cloudAnswer.toLowerCase() === "yes";
+
     rl.close();
 
     // Build MCP server list: prefer detected objects, fall back to names
@@ -643,20 +652,36 @@ async function cmdInit() {
     injectTokenBudgetResolved = parseIntOr(injectTokenBudget, 1000);
   }
 
-  // V3: write .env.sticky if STICKY_URL is available
-  if (v3Mode || process.env.STICKY_URL) {
-    const envStickyPath = path.join(process.cwd(), ".env.sticky");
-    const stickyUrl = process.env.STICKY_URL || "";
-    const stickyApiKey = process.env.STICKY_API_KEY || "";
-    if (stickyUrl) {
-      let content = `STICKY_URL=${stickyUrl}\n`;
-      if (stickyApiKey) content += `STICKY_API_KEY=${stickyApiKey}\n`;
-      fs.writeFileSync(envStickyPath, content, "utf-8");
-      print("  [OK] .env.sticky (cloud backend configured)");
-    } else if (v3Mode && !ciMode) {
-      print("  [WARN] --v3 specified but STICKY_URL not set.");
-      print("         Run `npx sticky-note deploy-backend` to provision a cloud backend.");
+  // Cloud backend: provision inline if requested, or write existing STICKY_URL from env
+  if (wantsCloud) {
+    print("\n  Cloud Backend Setup...\n");
+    const cloudResult = provisionCloudBackend();
+    if (cloudResult === null) {
+      print("  [ERR] `wrangler` CLI not found.");
+      print("        Install it: npm install -g wrangler");
+      print("        Then authenticate: wrangler login");
+      print("        And run `npx sticky-note deploy-backend` when ready.\n");
+    } else if (cloudResult.error) {
+      print("  [WARN] Cloud setup failed: " + cloudResult.error);
+      print("         Run `npx sticky-note deploy-backend` to retry.\n");
+    } else {
+      if (cloudResult.secretSet) {
+        print("\n  Share STICKY_URL and STICKY_API_KEY with teammates securely.");
+        print("  (e.g. org secrets, 1Password — do not commit .env.sticky)\n");
+      } else {
+        print("\n  [!] API key written to .env.sticky but NOT yet set on the Worker.");
+        print("  Run the manual command shown above, then share with your team.\n");
+      }
     }
+  } else if (process.env.STICKY_URL) {
+    // Write existing STICKY_URL from environment into .env.sticky
+    const envStickyPath = path.join(process.cwd(), ".env.sticky");
+    const stickyUrl = process.env.STICKY_URL;
+    const stickyApiKey = process.env.STICKY_API_KEY || "";
+    let content = `STICKY_URL=${stickyUrl}\n`;
+    if (stickyApiKey) content += `STICKY_API_KEY=${stickyApiKey}\n`;
+    fs.writeFileSync(envStickyPath, content, "utf-8");
+    print("  [OK] .env.sticky (cloud backend configured)");
   }
 
   print("\n  📁 Creating files...\n");
@@ -2859,106 +2884,124 @@ function cmdGc() {
 // DEPLOY-BACKEND command (V3)
 // ──────────────────────────────────────────────
 
-function cmdDeployBackend() {
-  printBanner();
-  print("  Deploy Cloudflare KV Backend\n");
-
+// Shared provisioning logic used by both cmdInit and cmdDeployBackend.
+// Returns null if wrangler is missing.
+// Returns { workerUrl, apiKey, secretSet } on success.
+// Returns { error } on deployment failure.
+function provisionCloudBackend() {
   // Check wrangler
   try {
     execSync("wrangler --version", { stdio: "pipe" });
   } catch (_) {
+    return null; // caller prints the install message
+  }
+
+  const serverDir = path.join(__dirname, "..", "sticky-server");
+  if (!fs.existsSync(path.join(serverDir, "worker.js"))) {
+    return { error: "sticky-server/worker.js not found. Make sure you have the full sticky-note package." };
+  }
+
+  // Step 1: KV namespace
+  print("  Step 1: Creating KV namespace...");
+  let kvResult;
+  try {
+    kvResult = execSync("wrangler kv:namespace create STICKY_KV", {
+      cwd: serverDir,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    print("  [OK] KV namespace created");
+  } catch (err) {
+    return { error: "Failed to create KV namespace: " + (err.message || err) + "\n        Make sure you're logged in: wrangler login" };
+  }
+
+  const idMatch = kvResult.match(/id\s*=\s*"([^"]+)"/);
+  if (idMatch) {
+    const tomlPath = path.join(serverDir, "wrangler.toml");
+    let toml = fs.readFileSync(tomlPath, "utf-8");
+    toml = toml.replace("PLACEHOLDER_KV_NAMESPACE_ID", idMatch[1]);
+    fs.writeFileSync(tomlPath, toml);
+    print("  [OK] wrangler.toml updated with namespace ID");
+  }
+
+  // Step 2: Deploy Worker
+  print("  Step 2: Deploying Worker...");
+  let deployResult;
+  try {
+    deployResult = execSync("wrangler deploy", {
+      cwd: serverDir,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  } catch (err) {
+    return { error: "Failed to deploy Worker: " + (err.message || err) };
+  }
+
+  const urlMatch = deployResult.match(/(https:\/\/[^\s]+\.workers\.dev)/);
+  const workerUrl = urlMatch ? urlMatch[1] : null;
+  const apiKey = require("crypto").randomBytes(24).toString("base64url");
+
+  if (workerUrl) {
+    print(`  [OK] Worker deployed: ${workerUrl}`);
+  } else {
+    print("  [OK] Worker deployed (URL not detected — check wrangler output)");
+  }
+
+  // Step 3: Set API key
+  print("  Step 3: Setting API key on Worker...");
+  let secretSet = false;
+  try {
+    execSync("wrangler secret put STICKY_API_KEY", {
+      cwd: serverDir,
+      input: apiKey,
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    print("  [OK] STICKY_API_KEY set on Worker");
+    secretSet = true;
+  } catch (err) {
+    print("  [WARN] Could not set STICKY_API_KEY automatically: " + (err.message || err));
+    if (workerUrl) print(`         Set it manually: echo '${apiKey}' | wrangler secret put STICKY_API_KEY`);
+  }
+
+  // Write .env.sticky
+  if (workerUrl) {
+    const envPath = path.join(process.cwd(), ".env.sticky");
+    fs.writeFileSync(envPath, `STICKY_URL=${workerUrl}\nSTICKY_API_KEY=${apiKey}\n`, "utf-8");
+    print("  [OK] .env.sticky written with STICKY_URL and STICKY_API_KEY");
+  }
+
+  return { workerUrl, apiKey, secretSet };
+}
+
+function cmdDeployBackend() {
+  printBanner();
+  print("  Deploy Cloudflare KV Backend\n");
+
+  const result = provisionCloudBackend();
+
+  if (result === null) {
     print("  [ERR] `wrangler` CLI not found.");
     print("        Install it: npm install -g wrangler");
     print("        Then authenticate: wrangler login\n");
     process.exit(1);
   }
 
-  const serverDir = path.join(__dirname, "..", "sticky-server");
-  if (!fs.existsSync(path.join(serverDir, "worker.js"))) {
-    print("  [ERR] sticky-server/worker.js not found.");
-    print("        Make sure you have the full sticky-note package.\n");
+  if (result.error) {
+    print("  [ERR] " + result.error + "\n");
     process.exit(1);
   }
 
-  print("  Step 1: Creating KV namespace...");
-  try {
-    const result = execSync("wrangler kv:namespace create STICKY_KV", {
-      cwd: serverDir,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    print("  [OK] KV namespace created");
-
-    // Extract namespace ID from wrangler output
-    const idMatch = result.match(/id\s*=\s*"([^"]+)"/);
-    if (idMatch) {
-      const namespaceId = idMatch[1];
-      // Update wrangler.toml with real namespace ID
-      const tomlPath = path.join(serverDir, "wrangler.toml");
-      let toml = fs.readFileSync(tomlPath, "utf-8");
-      toml = toml.replace("PLACEHOLDER_KV_NAMESPACE_ID", namespaceId);
-      fs.writeFileSync(tomlPath, toml);
-      print(`  [OK] wrangler.toml updated with namespace ID`);
-    }
-  } catch (err) {
-    print("  [ERR] Failed to create KV namespace: " + (err.message || err));
-    print("        Make sure you're logged in: wrangler login\n");
-    process.exit(1);
+  const { secretSet } = result;
+  if (secretSet) {
+    print("\n  Share STICKY_URL and STICKY_API_KEY with your team securely");
+    print("  (e.g. org secrets, 1Password). Do not commit .env.sticky.\n");
+  } else {
+    print("\n  [!] API key is in .env.sticky but NOT yet set on the Worker.");
+    print("  Run the manual command above, then share with your team.\n");
   }
 
-  print("  Step 2: Deploying Worker...");
-  try {
-    const result = execSync("wrangler deploy", {
-      cwd: serverDir,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    // Extract worker URL
-    const urlMatch = result.match(/(https:\/\/[^\s]+\.workers\.dev)/);
-    const workerUrl = urlMatch ? urlMatch[1] : null;
-
-    const apiKey = require("crypto").randomBytes(24).toString("base64url");
-
-    if (workerUrl) {
-      print(`  [OK] Worker deployed: ${workerUrl}`);
-
-      print("  Step 3: Setting API key on Worker...");
-      let secretSet = false;
-      try {
-        execSync("wrangler secret put STICKY_API_KEY", {
-          cwd: serverDir,
-          input: apiKey,
-          encoding: "utf-8",
-          stdio: ["pipe", "pipe", "pipe"],
-        });
-        print("  [OK] STICKY_API_KEY secret set on Worker");
-        secretSet = true;
-      } catch (err) {
-        print("  [WARN] Could not set STICKY_API_KEY automatically: " + (err.message || err));
-        print(`         Set it manually: echo '${apiKey}' | wrangler secret put STICKY_API_KEY`);
-      }
-
-      // Always write .env.sticky so the key is available even if secret-put failed
-      const envPath = path.join(process.cwd(), ".env.sticky");
-      fs.writeFileSync(envPath, `STICKY_URL=${workerUrl}\nSTICKY_API_KEY=${apiKey}\n`, "utf-8");
-      print("  [OK] .env.sticky written with STICKY_URL and STICKY_API_KEY");
-
-      if (secretSet) {
-        print("\n  Share STICKY_URL and STICKY_API_KEY with your team securely");
-        print("  (e.g. org secrets, 1Password). Do not commit .env.sticky.\n");
-      } else {
-        print("\n  [!] API key is in .env.sticky but NOT yet set on the Worker.");
-        print("  Run the manual command above, then share with your team.\n");
-      }
-    } else {
-      print("  [OK] Worker deployed (URL not detected — check wrangler output)");
-    }
-  } catch (err) {
-    print("  [ERR] Failed to deploy Worker: " + (err.message || err));
-    process.exit(1);
-  }
-
-  print("\n  Backend ready! Run `npx sticky-note init --v3` in your repos.\n");
+  print("\n  Backend ready! Run `npx sticky-note init` in your repos.\n");
 }
 
 // ──────────────────────────────────────────────

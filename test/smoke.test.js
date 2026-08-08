@@ -686,19 +686,27 @@ try {
     const cliSource = fs.readFileSync(path.join(__dirname, "..", "bin", "cli.js"), "utf-8");
     assert.ok(
       cliSource.includes("wrangler --version"),
-      "deploy-backend should check for wrangler CLI"
+      "provisionCloudBackend should check for wrangler CLI"
     );
     assert.ok(
       cliSource.includes("wrangler secret put STICKY_API_KEY"),
-      "deploy-backend should provision API key via wrangler secret"
+      "provisionCloudBackend should provision API key via wrangler secret"
     );
     assert.ok(
       cliSource.includes("randomBytes"),
-      "deploy-backend should generate a random API key"
+      "provisionCloudBackend should generate a random API key"
     );
     assert.ok(
       cliSource.includes("STICKY_API_KEY=${apiKey}"),
-      "deploy-backend should write STICKY_API_KEY to .env.sticky"
+      "provisionCloudBackend should write STICKY_API_KEY to .env.sticky"
+    );
+    assert.ok(
+      cliSource.includes("provisionCloudBackend"),
+      "both cmdInit and cmdDeployBackend should share provisionCloudBackend()"
+    );
+    assert.ok(
+      cliSource.includes("Set up Cloudflare cloud backend"),
+      "cmdInit should ask about cloud backend setup"
     );
   });
 

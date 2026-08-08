@@ -32,11 +32,20 @@ when `STICKY_URL` is not set.
 
 Skip this step if you want to stay in local-only mode.
 
+The easiest way is to answer **y** when `npx sticky-note-cli init` asks:
+
+```
+Set up Cloudflare cloud backend for real-time team sync? (y/N)
+```
+
+The `init` wizard handles everything inline. Alternatively, run it as a
+standalone command (useful for re-provisioning an existing install):
+
 ```bash
 npx sticky-note-cli deploy-backend
 ```
 
-This command:
+Either way, the command:
 1. Checks for `wrangler` CLI (install with `npm install -g wrangler` if missing)
 2. Creates a Cloudflare KV namespace
 3. Deploys the Sticky Note Worker
