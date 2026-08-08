@@ -653,18 +653,34 @@ async function cmdInit() {
   }
 
   // Cloud backend: provision inline if requested, or write existing STICKY_URL from env
-  if (wantsCloud) {
+  if (wantsCloud && !ciMode) {
     print("\n  Cloud Backend Setup...\n");
-    const cloudResult = provisionCloudBackend();
+    let cloudResult = provisionCloudBackend();
+
+    // wrangler not installed — guide the user through it inline
     if (cloudResult === null) {
-      print("  [ERR] `wrangler` CLI not found.");
-      print("        Install it: npm install -g wrangler");
-      print("        Then authenticate: wrangler login");
-      print("        And run `npx sticky-note deploy-backend` when ready.\n");
-    } else if (cloudResult.error) {
+      print("  wrangler CLI is not installed. Let's set it up.\n");
+      print("  Run these two commands in another terminal:\n");
+      print("    npm install -g wrangler");
+      print("    wrangler login\n");
+
+      const rl2 = readline.createInterface({ input: process.stdin, output: process.stdout });
+      await ask(rl2, "Press Enter once wrangler is installed and you've logged in", "");
+      rl2.close();
+
+      print("");
+      cloudResult = provisionCloudBackend();
+
+      if (cloudResult === null) {
+        print("  [ERR] wrangler still not found in PATH.");
+        print("        Run `npx sticky-note deploy-backend` once it's installed.\n");
+      }
+    }
+
+    if (cloudResult && cloudResult.error) {
       print("  [WARN] Cloud setup failed: " + cloudResult.error);
       print("         Run `npx sticky-note deploy-backend` to retry.\n");
-    } else {
+    } else if (cloudResult && !cloudResult.error) {
       if (cloudResult.secretSet) {
         print("\n  Share STICKY_URL and STICKY_API_KEY with teammates securely.");
         print("  (e.g. org secrets, 1Password — do not commit .env.sticky)\n");
@@ -672,6 +688,15 @@ async function cmdInit() {
         print("\n  [!] API key written to .env.sticky but NOT yet set on the Worker.");
         print("  Run the manual command shown above, then share with your team.\n");
       }
+    }
+  } else if (wantsCloud && ciMode) {
+    // CI mode: can't pause for wrangler install, just try and warn on failure
+    print("\n  Cloud Backend Setup...\n");
+    const cloudResult = provisionCloudBackend();
+    if (!cloudResult) {
+      print("  [ERR] `wrangler` CLI not found. Skipping cloud setup in CI mode.\n");
+    } else if (cloudResult.error) {
+      print("  [WARN] Cloud setup failed: " + cloudResult.error + "\n");
     }
   } else if (process.env.STICKY_URL) {
     // Write existing STICKY_URL from environment into .env.sticky

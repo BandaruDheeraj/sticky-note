@@ -1,5 +1,16 @@
 # Changelog
 
+## V3.1.2
+
+### Improved: Init Wizard Walks Through Wrangler Install
+- When cloud backend setup is chosen in `init` but `wrangler` is not
+  installed, the wizard now pauses and guides the user:
+  prints the install commands, waits for "Press Enter", then retries
+  provisioning — instead of immediately erroring and bailing out.
+- CI mode skips the pause and warns instead of blocking.
+
+---
+
 ## V3.1.1
 
 ### Improved: Cloud Setup Built Into Init Wizard
