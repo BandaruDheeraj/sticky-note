@@ -190,19 +190,33 @@ after. A raw `git checkout` or `git switch` will fail if sticky-note
 files have uncommitted changes. The alias `git sw <branch>` also works
 if set up by `npx sticky-note init`.
 
-### ⚠️ Overlap warnings (CRITICAL — always surface these)
+### Pulling changes
 
-Sticky-note hooks detect when your files overlap with other teammates'
-open or stuck threads. Overlap warnings arrive through TWO channels:
+**IMPORTANT:** Before pulling remote changes, always use:
+```bash
+npx sticky-note pull
+```
+This auto-commits `.sticky-note/` tracking data before pulling, preventing
+"local changes would be overwritten" errors. The alias `git spull` also
+works if set up by `npx sticky-note init`. The PreToolUse hook handles
+this automatically for AI tool calls, but prefer `git spull` when running
+git commands directly.
+
+### ⚠️ Overlap warnings
+
+Sticky-note detects when your files overlap with other teammates'
+open or stuck threads. When the MCP server is available, use the
+`check_overlaps` tool before editing files for the most reliable detection.
+
+Hooks also inject overlap context through two fallback channels:
 
 1. **Injected context** — `[STICKY-NOTE] ⚠️ OVERLAP DETECTED` appears in
    your `additionalContext`. This fires on every user prompt.
-2. **Tool call deny** — Your first tool call may be denied with a
-   `permissionDecisionReason` containing "CRITICAL INSTRUCTION" and the
-   overlap details. After the deny, the tool is auto-retried.
+2. **Tool call deny** — Your first tool call may be denied with overlap
+   details (Copilot CLI only). After the deny, the tool is auto-retried.
 
-When you receive an overlap warning through EITHER channel, you **MUST**
-start your response with this styled banner format before doing ANYTHING else:
+When you detect an overlap (via MCP tool or hook), surface it to the user
+using this styled banner format:
 
 ```
 ⚠️ ━━━ OVERLAP DETECTED ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -217,29 +231,6 @@ start your response with this styled banner format before doing ANYTHING else:
 
 Use 🔴 for STUCK threads, 🟡 for OPEN threads. For multiple overlaps,
 add additional entries between the bars.
-
-Example:
-```
-⚠️ ━━━ OVERLAP DETECTED ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  🔴 alice (STUCK) · feat/auth
-     Files: session-start.js, cli.js
-     "Fixing auth token refresh — tried retry logic, tokens expire mid-request"
-     → Resume: npx sticky-note resume demo-ali
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-Rules:
-- This banner MUST be the **very first thing** in your response
-- Show it BEFORE your thinking indicators (◐, ●, etc.)
-- Do NOT bury it at the end or in a footnote
-- Do NOT rephrase it as "Also noted..." or "By the way..."
-- If a tool call was denied with overlap info, display the warning then proceed
-- Then continue with the user's actual request normally
-
-This pattern exists to prevent two teammates from wasting hours on the
-same problem. Treat it like a system alert, not optional context.
 
 ### `[STICKY-NOTE]` tags
 
@@ -259,4 +250,19 @@ when sticky-note is acting on their behalf.
 ### Team config
 
 Check `.sticky-note/sticky-note-config.json` for team conventions and settings.
+
+### Team environment sync
+
+The team's vibe coding environment is defined in `.sticky-note/environment/`.
+Skills, agents, commands, MCP servers, and permissions are auto-provisioned
+by the session-start hook — no manual setup needed.
+
+- **Skills:** `.sticky-note/environment/skills/*.md` → auto-copied to plugin dirs
+- **Agents:** `.sticky-note/environment/agents/*.md` → auto-copied to plugin dirs
+- **Commands:** `.sticky-note/environment/commands/*.md` → auto-copied to plugin dirs
+- **MCP servers:** Defined in `manifest.json` → secret-free servers auto-provisioned
+- **Permissions:** Defined in `manifest.json` → merged into settings
+
+Use `get_environment_status()` MCP tool to check what's provisioned vs missing.
+If MCP servers need secrets, tell the user to run `npx sticky-note bootstrap`.
 <!-- sticky-note:end -->

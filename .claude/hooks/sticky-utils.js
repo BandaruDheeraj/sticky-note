@@ -34,6 +34,48 @@ const RETRY_PATTERNS = new RegExp(
 
 const FILE_PATH_PATTERN = /[\w./\\-]+\.\w{1,10}/g;
 
+// ── Secret redaction (best-effort, applied before transcripts are persisted) ──
+// This is a pattern-matching floor, not a guarantee — it catches common,
+// recognizably-shaped secrets (cloud provider keys, tokens, private key
+// blocks, labeled key=value pairs) before a transcript is written to
+// sticky-note/data and pushed to the team's remote. It will not catch novel
+// or oddly-formatted secrets. Teams handling especially sensitive sessions
+// should still set `capture_transcripts: false` for those repos.
+const REDACTION_PATTERNS = [
+  // AWS access key IDs
+  { name: "aws_access_key", re: /\bAKIA[0-9A-Z]{16}\b/g, replacement: "[REDACTED:aws_access_key]" },
+  // GitHub tokens (ghp_, gho_, ghu_, ghs_, ghr_)
+  { name: "github_token", re: /\bgh[pousr]_[A-Za-z0-9]{36,255}\b/g, replacement: "[REDACTED:github_token]" },
+  // Slack tokens
+  { name: "slack_token", re: /\bxox[baprs]-[A-Za-z0-9-]{10,72}\b/g, replacement: "[REDACTED:slack_token]" },
+  // PEM-style private key blocks
+  { name: "private_key_block", re: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, replacement: "[REDACTED:private_key_block]" },
+  // Bearer tokens in headers/output
+  { name: "bearer_token", re: /\bBearer\s+[A-Za-z0-9\-_.~+/]+=*/gi, replacement: "Bearer [REDACTED:token]" },
+  // JWTs (three base64url segments)
+  { name: "jwt", re: /\bey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, replacement: "[REDACTED:jwt]" },
+  // Labeled secrets: api_key=..., token: "...", password=... etc. Keeps the
+  // label so the transcript still reads sensibly, redacts only the value.
+  //
+  // Deliberately no trailing ["']? here: transcripts are stored as raw JSONL
+  // text, so a value sitting right before a JSON string's closing quote is
+  // common ("...token: abc123"}) — an earlier version of this pattern also
+  // matched that closing quote and dropped it in the replacement, corrupting
+  // the line's JSON so it failed to parse back. The value class below
+  // ([^\s"'\n]{6,}) already excludes quotes, so it naturally stops just
+  // before one and the quote is left untouched in the output.
+  { name: "labeled_secret", re: /((?:api|secret|access)[_-]?key|token|password|passwd|pwd)(\s*[:=]\s*)["']?[^\s"'\n]{6,}/gi, replacement: "$1$2[REDACTED]" },
+];
+
+function redactSecrets(text) {
+  if (!text || typeof text !== "string") return text;
+  let out = text;
+  for (const pattern of REDACTION_PATTERNS) {
+    out = out.replace(pattern.re, pattern.replacement);
+  }
+  return out;
+}
+
 // ── Path helpers ──────────────────────────────────────────
 
 let _cachedStickyDir = null;
@@ -170,6 +212,7 @@ const _paths = {
   config: "sticky-note-config.json",
   auditDir: "audit",
   presenceDir: "presence",
+  transcriptsDir: "transcripts",
   // Legacy single-file paths (for migration only)
   legacyAudit: "sticky-note-audit.jsonl",
   legacyPresence: ".sticky-presence.json",
@@ -185,6 +228,18 @@ function getAuditDir() { return _p("auditDir"); }
 function getPresenceDir() { return _p("presenceDir"); }
 function getLegacyAuditPath() { return _p("legacyAudit"); }
 function getLegacyPresencePath() { return _p("legacyPresence"); }
+
+// ── Transcript storage (session-level, keyed by thread ID) ────
+// Transcripts live alongside audit/presence in the sticky-note/data
+// storage layer — one JSONL file per thread, one line per contributing
+// session. Not commit-anchored (git notes) because a thread's transcript
+// belongs to the whole session, not to any single commit it produced.
+
+function getTranscriptsDir() { return _p("transcriptsDir"); }
+
+function getTranscriptPath(threadId) {
+  return path.join(getTranscriptsDir(), threadId + ".jsonl");
+}
 
 function getUserAuditPath(user) {
   if (!user) user = getUser();
@@ -1073,6 +1128,11 @@ module.exports = {
   ERROR_PATTERNS,
   RETRY_PATTERNS,
   FILE_PATH_PATTERN,
+  // Transcript capture
+  REDACTION_PATTERNS,
+  redactSecrets,
+  getTranscriptsDir,
+  getTranscriptPath,
   logHookError,
   reportHookError,
   selfHealHookPaths,
@@ -1137,6 +1197,22 @@ module.exports = {
   markOverlapDismissed,
   // V2.5: cross-platform path helper
   normalizeSep,
+  // V3: cloud transport (opt-in when STICKY_URL is set)
+  useCloud,
+  getCloudConfig,
+  getProjectName,
+  cloudFetch,
+  cloudReadThreads,
+  cloudReadThread,
+  cloudWriteThread,
+  cloudDeleteThread,
+  cloudAppendAudit,
+  cloudQueryAudit,
+  cloudReadPresence,
+  cloudWritePresence,
+  cloudDeletePresence,
+  cloudReadConfig,
+  cloudWriteConfig,
   // V2.7: auto-sync
   syncStickyNote,
   // V2.9: Copilot CLI MCP config
@@ -1148,10 +1224,195 @@ module.exports = {
   rotateBackup,
   acquireLock,
   releaseLock,
-  // Cloud sync stubs (feature not yet implemented — on-stop.js uses these)
-  useCloud: () => false,
-  cloudReadThreads: async () => null,
-  cloudWriteThread: async () => {},
-  cloudAppendAudit: async () => {},
 };
+
+// ── V3: Cloud transport layer ─────────────────────────────
+
+function _loadEnvStickyFile() {
+  try {
+    const repoRoot = _gitRepoRoot();
+    if (!repoRoot) return {};
+    const envPath = path.join(repoRoot, ".env.sticky");
+    let raw;
+    try {
+      raw = fs.readFileSync(envPath, "utf-8");
+    } catch (_) {
+      return {};
+    }
+    const vars = {};
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eq = trimmed.indexOf("=");
+      if (eq > 0) {
+        vars[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
+      }
+    }
+    return vars;
+  } catch (_) {
+    return {};
+  }
+}
+
+let _envStickyCache = null;
+function _getEnvSticky() {
+  if (_envStickyCache === null) {
+    _envStickyCache = _loadEnvStickyFile();
+  }
+  return _envStickyCache;
+}
+
+function getCloudConfig() {
+  const envFile = _getEnvSticky();
+  return {
+    url: process.env.STICKY_URL || envFile.STICKY_URL || "",
+    apiKey: process.env.STICKY_API_KEY || envFile.STICKY_API_KEY || "",
+  };
+}
+
+let _cachedUseCloud = null;
+function useCloud() {
+  if (_cachedUseCloud !== null) return _cachedUseCloud;
+  _cachedUseCloud = !!getCloudConfig().url;
+  return _cachedUseCloud;
+}
+
+let _cachedProjectName = null;
+function getProjectName() {
+  if (_cachedProjectName !== null) return _cachedProjectName;
+
+  // Check config override first
+  try {
+    const config = loadJson(getConfigPath(), {});
+    if (config.project) {
+      _cachedProjectName = config.project;
+      return _cachedProjectName;
+    }
+  } catch (_) {}
+
+  // Auto-detect from git remote
+  try {
+    const remote = execFileSync("git", ["remote", "get-url", "origin"], {
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    // git@github.com:Owner/Repo.git → Owner/Repo
+    // https://github.com/Owner/Repo.git → Owner/Repo
+    const match = remote.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+    if (match) {
+      _cachedProjectName = match[1];
+      return _cachedProjectName;
+    }
+  } catch (_) {}
+
+  _cachedProjectName = "default";
+  return _cachedProjectName;
+}
+
+let _cloudWarned = false;
+async function cloudFetch(method, endpoint, body) {
+  if (typeof fetch === "undefined") {
+    // Node < 18 — cloud transport not supported
+    return null;
+  }
+  const { url, apiKey } = getCloudConfig();
+  if (!url) return null;
+
+  const project = getProjectName();
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Sticky-Project": project,
+  };
+  if (apiKey) {
+    headers["X-Sticky-API-Key"] = apiKey;
+  }
+
+  const opts = { method, headers };
+  if (body && (method === "POST" || method === "PUT")) {
+    opts.body = JSON.stringify(body);
+  }
+
+  try {
+    const resp = await fetch(`${url}${endpoint}`, opts);
+    if (!resp.ok) {
+      return null;
+    }
+    const text = await resp.text();
+    return text ? JSON.parse(text) : {};
+  } catch (err) {
+    if (!_cloudWarned) {
+      _cloudWarned = true;
+      process.stderr.write(
+        "[STICKY-NOTE] Cloud unreachable, using local fallback\n"
+      );
+    }
+    return null;
+  }
+}
+
+// ── Cloud: Threads ────────────────────────────────────────
+
+async function cloudReadThreads(filters) {
+  const params = new URLSearchParams();
+  if (filters && filters.status) params.set("status", filters.status);
+  if (filters && filters.q) params.set("q", filters.q);
+  const qs = params.toString();
+  const result = await cloudFetch("GET", `/threads${qs ? "?" + qs : ""}`);
+  return result ? result.threads || [] : null;
+}
+
+async function cloudReadThread(id) {
+  return await cloudFetch("GET", `/threads/${id}`);
+}
+
+async function cloudWriteThread(thread) {
+  return await cloudFetch("PUT", `/threads/${thread.id}`, thread);
+}
+
+async function cloudDeleteThread(id) {
+  return await cloudFetch("DELETE", `/threads/${id}`);
+}
+
+// ── Cloud: Audit ──────────────────────────────────────────
+
+async function cloudAppendAudit(record) {
+  return await cloudFetch("POST", "/audit", record);
+}
+
+async function cloudQueryAudit(filters) {
+  const params = new URLSearchParams();
+  if (filters && filters.user) params.set("user", filters.user);
+  if (filters && filters.file) params.set("file", filters.file);
+  if (filters && filters.tool) params.set("tool", filters.tool);
+  if (filters && filters.since) params.set("since", filters.since);
+  const qs = params.toString();
+  const result = await cloudFetch("GET", `/audit${qs ? "?" + qs : ""}`);
+  return result ? result.audit || [] : null;
+}
+
+// ── Cloud: Presence ───────────────────────────────────────
+
+async function cloudReadPresence() {
+  const result = await cloudFetch("GET", "/presence");
+  return result ? result.presence || [] : null;
+}
+
+async function cloudWritePresence(record) {
+  return await cloudFetch("POST", "/presence", record);
+}
+
+async function cloudDeletePresence(user) {
+  return await cloudFetch("DELETE", `/presence/${encodeURIComponent(user)}`);
+}
+
+// ── Cloud: Config ─────────────────────────────────────────
+
+async function cloudReadConfig() {
+  return await cloudFetch("GET", "/config");
+}
+
+async function cloudWriteConfig(config) {
+  return await cloudFetch("PUT", "/config", config);
+}
 // tier1 test

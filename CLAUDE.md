@@ -206,18 +206,33 @@ after. A raw `git checkout` or `git switch` will fail if sticky-note
 files have uncommitted changes. The alias `git sw <branch>` also works
 if set up by `npx sticky-note init`.
 
-### ⚠️ Overlap warnings (CRITICAL — always surface these)
+### Pulling changes
 
-Sticky-note hooks detect when your files overlap with other teammates'
-open or stuck threads. Overlap warnings arrive through TWO channels:
+**IMPORTANT:** Before pulling remote changes, always use:
+```bash
+npx sticky-note pull
+```
+This auto-commits `.sticky-note/` tracking data before pulling, preventing
+"local changes would be overwritten" errors. The alias `git spull` also
+works if set up by `npx sticky-note init`. The PreToolUse hook handles
+this automatically for AI tool calls, but prefer `git spull` when running
+git commands directly.
+
+### ⚠️ Overlap warnings
+
+Sticky-note detects when your files overlap with other teammates'
+open or stuck threads. When the MCP server is available, use the
+`check_overlaps` tool before editing files for the most reliable detection.
+
+Hooks also inject overlap context through two fallback channels:
 
 1. **Injected context** — `[STICKY-NOTE] ⚠️ OVERLAP DETECTED` appears in
    your hook output. This fires on every user prompt.
 2. **Tool call deny** — Your first tool call may be denied with a reason
-   containing "CRITICAL INSTRUCTION" and the overlap details.
+   containing overlap details (Copilot CLI only).
 
-When you receive an overlap warning through EITHER channel, you **MUST**
-start your response with this exact banner format before doing ANYTHING else:
+When you detect an overlap (via MCP tool or hook), surface it to the user
+using this styled banner format:
 
 ```
 ⚠️ ━━━ OVERLAP DETECTED ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -233,15 +248,28 @@ start your response with this exact banner format before doing ANYTHING else:
 Use 🔴 for STUCK threads, 🟡 for OPEN threads. For multiple overlaps,
 add additional entries between the bars.
 
-Rules:
-- This banner MUST be the **very first thing** in your response
-- Do NOT bury it at the end or in a footnote
-- Do NOT rephrase it as "Also noted..." or "By the way..."
-- If a tool call was denied with overlap info, display the warning then proceed
-- Then continue with the user's actual request normally
+## Sticky Note MCP Server
 
-This pattern exists to prevent two teammates from wasting hours on the
-same problem. Treat it like a system alert, not optional context.
+You have access to a `sticky-note` MCP server. Use it:
+
+1. **At session start**: Call `get_stuck_threads()` and `get_environment_status()`
+   to check for team blockers and environment changes. Surface any warnings.
+
+2. **Before editing files**: Call `check_overlaps(files)` with the files you
+   plan to edit. If overlaps exist, warn the user before proceeding.
+
+3. **For prior work context**: Call `get_thread_context_for_files(files)` or
+   `search_threads(query)` to find relevant thread history.
+
+4. **For audit history**: Call `get_audit_trail(file)` to understand who
+   changed a file and when.
+
+5. **For the full conversation, not just the summary**: Call
+   `get_full_transcript(id)` to get the verbatim session transcript(s) for
+   a thread, when `narrative` or `prompts` aren't enough detail.
+
+These tools are the primary way sticky-note communicates with you.
+Hook-injected context supplements but does not replace MCP tool calls.
 
 ### `[STICKY-NOTE]` tags
 

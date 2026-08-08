@@ -118,6 +118,7 @@ const {
   saveJson,
   saveMemoryMerged,
   appendAuditLine,
+  appendAuditLineBoth,
   getUser,
   getBranch,
   getSessionId,
@@ -130,6 +131,10 @@ const {
   markThreadInjected,
   clearActiveResumeThreadId,
   getActiveResumeThreadId,
+  useCloud,
+  cloudReadThreads,
+  cloudReadPresence,
+  cloudReadConfig,
   normalizeSep,
   detectLostThreads,
 } = utils;
@@ -926,7 +931,7 @@ function fetchAndMergeDataBranch() {
 
 // ── Main ──────────────────────────────────────────────────
 
-function main() {
+async function main() {
   let hookInput = {};
   try {
     if (!process.stdin.isTTY) {
@@ -969,12 +974,19 @@ function main() {
   // Auto-register sticky-note MCP server in .mcp.json
   ensureMcpServerRegistered();
 
+  const cloud = useCloud();
   const memoryPath = getMemoryPath();
   const memory = loadJson(memoryPath, {
     version: "2",
     project: "",
     threads: [],
   });
+
+  let cloudThreads = null, cloudConfig = null;
+  if (cloud) {
+    [cloudThreads, cloudConfig] = await Promise.all([cloudReadThreads(), cloudReadConfig()]);
+  }
+  if (cloudThreads) memory.threads = cloudThreads;
 
   // Rollback detection: warn if threads went missing (e.g., after git reset)
   try {
@@ -989,7 +1001,7 @@ function main() {
     }
   } catch (_) { /* rollback detection must not break session */ }
 
-  const config = loadJson(getConfigPath(), { stale_days: 14 });
+  const config = cloudConfig || loadJson(getConfigPath(), { stale_days: 14 });
   const staleDays = config.stale_days != null ? config.stale_days : 14;
   const autoCloseHours =
     config.copilot_cli_auto_close_hours != null
@@ -1072,7 +1084,20 @@ function main() {
   const threadResult = formatThreadsForInjection((memory.threads || []).filter(Boolean));
   const threadContext = threadResult.text;
   const configContext = formatConfigForInjection(config);
-  const presenceData = loadAllPresence();
+  let presenceData;
+  if (cloud) {
+    const cloudPresence = await cloudReadPresence();
+    if (cloudPresence) {
+      presenceData = {};
+      for (const entry of cloudPresence) {
+        const u = entry.user || entry.name;
+        if (u) presenceData[u] = entry;
+      }
+    }
+  }
+  if (!presenceData) {
+    presenceData = loadAllPresence();
+  }
   const presenceContext = formatPresence(presenceData, (memory.threads || []).filter(Boolean));
   const overlapContext = formatOverlapWarnings(
     (memory.threads || []).filter(Boolean), getUser(), memory
@@ -1088,12 +1113,13 @@ function main() {
     }
   }
 
-  appendAuditLine({
+  const auditEntry = {
     type: "session_start",
     user: getUser(),
     ts: new Date().toISOString(),
     session_id: sessionId,
-  });
+  };
+  appendAuditLineBoth(auditEntry, cloud);
 
   saveMemoryMerged(memoryPath, memory);
 
@@ -1228,11 +1254,9 @@ function main() {
 
 // ── Entry point ───────────────────────────────────────────
 
-try {
-  main();
-} catch (err) {
+main().catch((err) => {
   try { utils.reportHookError("session-start", err); } catch (_) {
     try { utils.logHookError("session-start", err); } catch (_) {}
   }
   _safeExit();
-}
+});

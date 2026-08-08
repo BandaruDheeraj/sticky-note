@@ -39,9 +39,19 @@ function _safeExit() {
 let utils;
 try {
   utils = require("./sticky-utils.js");
-} catch (_) {
+} catch (err) {
+  try {
+    process.stderr.write(
+      `[STICKY-NOTE] UserPromptSubmit hook error: failed to load sticky-utils.js — ${err.message}\n` +
+      `[STICKY-NOTE]   hint: re-run \`npx sticky-note init\` to restore .claude/hooks/.\n`
+    );
+  } catch (_) { /* ignore */ }
   _safeExit();
 }
+
+// Issue #13: also self-heal from this hook (Copilot CLI doesn't fire
+// SessionStart, so inject-context may be the first hook to run successfully).
+try { utils.selfHealHookPaths && utils.selfHealHookPaths(); } catch (_) { /* non-fatal */ }
 
 let gitNotes;
 try {
@@ -52,8 +62,9 @@ try {
 const {
   getMemoryPath, loadJson, saveJson, saveMemoryMerged, getUser, getBranch,
   getResumeThreadId, findThreadById, getSessionId,
-  appendAuditLine, detectTool, getConfigPath,
+  appendAuditLine, appendAuditLineBoth, detectTool, getConfigPath,
   isThreadInjected, markThreadInjected, normalizeSep,
+  useCloud, cloudReadThreads, cloudWriteThread,
 } = utils;
 
 // ── Git helpers ───────────────────────────────────────────
@@ -357,7 +368,7 @@ function formatThread(thread, detailed) {
 
 // ── Main ──────────────────────────────────────────────────
 
-function main() {
+async function main() {
   let hookInput = {};
   try {
     const raw = require("fs").readFileSync(0, "utf-8");
@@ -375,6 +386,7 @@ function main() {
   }
 
   const sessionId = getSessionId(hookInput);
+  const cloud = useCloud();
 
   function _auditInject(result, threadsScored, threadsInjected, topScores, error) {
     threadsScored = threadsScored || 0;
@@ -392,7 +404,7 @@ function main() {
       };
       if (topScores) entry.top_scores = topScores;
       if (error) entry.error = String(error).substring(0, 200);
-      appendAuditLine(entry);
+      appendAuditLineBoth(entry, cloud);
     } catch (_) {
       // ignore
     }
@@ -400,13 +412,14 @@ function main() {
 
   // Audit the user prompt
   try {
-    appendAuditLine({
+    const promptAudit = {
       type: "user_prompt",
       user: getUser(),
       ts: new Date().toISOString(),
       session_id: sessionId,
       prompt: prompt.substring(0, 500),
-    });
+    };
+    appendAuditLineBoth(promptAudit, cloud);
   } catch (_) {
     // ignore
   }
@@ -426,8 +439,13 @@ function main() {
     }
   }
 
-  const memory = loadJson(getMemoryPath(), { version: "2", threads: [] });
-  const threads = memory.threads || [];
+  const memoryPath = getMemoryPath();
+  const memory = loadJson(memoryPath, { version: "2", threads: [] });
+  if (cloud) {
+    const cloudThreads = await cloudReadThreads();
+    if (cloudThreads) memory.threads = cloudThreads;
+  }
+  const threads = (memory.threads || []).filter(Boolean);
 
   const live = threads.filter(
     (t) => t.status === "open" || t.status === "stuck" || t.status === "closed"
@@ -494,7 +512,13 @@ function main() {
 
   if (memoryDirty) {
     try {
-      saveMemoryMerged(getMemoryPath(), memory);
+      saveMemoryMerged(memoryPath, memory);
+      if (cloud && resumeThreadId) {
+        const resumed = findThreadById(threads, resumeThreadId);
+        if (resumed) {
+          cloudWriteThread(resumed).catch(() => {});
+        }
+      }
     } catch (_) {
       // ignore
     }
@@ -625,9 +649,10 @@ function main() {
 // ── Entry point ───────────────────────────────────────────
 
 if (require.main === module) {
-  try {
-    main();
-  } catch (exc) {
+  main().catch((exc) => {
+    try {
+      utils.reportHookError("UserPromptSubmit", exc);
+    } catch (_) { /* ignore */ }
     try {
       appendAuditLine({
         type: "inject_result",
@@ -639,5 +664,5 @@ if (require.main === module) {
       // ignore
     }
     _safeExit();
-  }
+  });
 }

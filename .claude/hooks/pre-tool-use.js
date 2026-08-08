@@ -59,11 +59,15 @@ const {
   getSessionId,
   getUser,
   appendAuditLine,
+  appendAuditLineBoth,
   isThreadInjected,
   markThreadInjected,
+  useCloud,
+  cloudReadPresence,
   getMemoryPath,
   loadJson,
   normalizeSep,
+  syncStickyNote,
 } = utils;
 
 // ── File path extraction from tool input ──────────────────
@@ -134,10 +138,41 @@ function formatThreadForInjection(threadData, file) {
   return lines.join("\n");
 }
 
+let _presenceCache = null;
+let _presenceCacheTs = 0;
+const PRESENCE_CACHE_TTL_MS = 60000;
+
+async function _checkConflict(filePath) {
+  if (!filePath || !useCloud()) return "";
+  try {
+    const now = Date.now();
+    if (!_presenceCache || (now - _presenceCacheTs) > PRESENCE_CACHE_TTL_MS) {
+      _presenceCache = await cloudReadPresence();
+      _presenceCacheTs = now;
+    }
+    const presence = _presenceCache;
+    if (!presence) return "";
+    const currentUser = getUser();
+    const conflicting = presence.filter(p => {
+      if (!p.user || p.user === currentUser) return false;
+      return (p.active_files || []).some(f =>
+        f === filePath || filePath.endsWith(f) || f.endsWith(filePath)
+      );
+    });
+    if (conflicting.length > 0) {
+      const names = conflicting.map(p => p.user).join(", ");
+      return `⚠️ [STICKY-NOTE] Conflict warning: ${names} also editing ${filePath}`;
+    }
+  } catch (_) {
+    // ignore
+  }
+  return "";
+}
+
 
 // ── Main ──────────────────────────────────────────────────
 
-function main() {
+async function main() {
   let hookInput = {};
   try {
     const raw = require("fs").readFileSync(0, "utf-8");
@@ -149,6 +184,18 @@ function main() {
   }
 
   const sessionId = getSessionId(hookInput);
+  const cloud = useCloud();
+
+  // ── Auto-sync before git pull/merge/rebase ──
+  // Prevents "local changes would be overwritten" errors for .sticky-note/ files
+  const toolName = (hookInput.tool_name || hookInput.toolName || "").toLowerCase();
+  if (toolName === "bash" || toolName === "shell" || toolName === "command") {
+    const toolInput = hookInput.tool_input || hookInput.input || hookInput.toolArgs || {};
+    const cmd = typeof toolInput === "string" ? toolInput : (toolInput.command || "");
+    if (/\bgit\s+(pull|merge|rebase|fetch)\b/.test(cmd)) {
+      try { syncStickyNote({}); } catch (_) {}
+    }
+  }
 
   // Extract file path from tool input
   const filePath = extractFilePath(hookInput);
@@ -157,7 +204,6 @@ function main() {
     return;
   }
 
-  // Run attribution engine: get threads for this file with line ranges
   let fileAttr;
   try {
     fileAttr = attribution.getFileAttribution(filePath);
@@ -167,6 +213,10 @@ function main() {
   }
 
   if (!fileAttr || !fileAttr.threads || fileAttr.threads.length === 0) {
+    if (cloud) {
+      const warning = await _checkConflict(filePath);
+      if (warning) { _emit(warning); return; }
+    }
     _emit("");
     return;
   }
@@ -177,6 +227,10 @@ function main() {
   );
 
   if (newThreads.length === 0) {
+    if (cloud) {
+      const warning = await _checkConflict(filePath);
+      if (warning) { _emit(warning); return; }
+    }
     _emit("");
     return;
   }
@@ -189,11 +243,11 @@ function main() {
     markThreadInjected(threadId, sessionId);
   }
 
-  const output = outputParts.join("\n\n");
+  let output = outputParts.join("\n\n");
 
   // Audit the injection
   try {
-    appendAuditLine({
+    const auditEntry = {
       type: "lazy_inject",
       user: getUser(),
       ts: new Date().toISOString(),
@@ -204,9 +258,15 @@ function main() {
         const id = t.thread ? t.thread.id : t.id;
         return (id || "").substring(0, 8);
       }),
-    });
+    };
+    appendAuditLineBoth(auditEntry, cloud);
   } catch (_) {
     // ignore
+  }
+
+  if (cloud) {
+    const warning = await _checkConflict(filePath);
+    if (warning) output += "\n\n" + warning;
   }
 
   _emit(output);
@@ -215,9 +275,5 @@ function main() {
 // ── Entry point ───────────────────────────────────────────
 
 if (require.main === module) {
-  try {
-    main();
-  } catch (_) {
-    _safeExit();
-  }
+  main().catch(() => _safeExit());
 }
