@@ -673,9 +673,17 @@ async function cmdInit() {
 
       if (!cloudResult) {
         // installed — now authenticate (opens browser, runs interactively)
+        // stdin is piped with "n\n" to auto-decline wrangler's post-login
+        // "install Cloudflare skills?" prompt, which can't be answered inside
+        // Claude Code's session. stdout/stderr are inherited so the browser
+        // URL and success message still appear in the terminal.
         print("\n  Authenticating with Cloudflare (this will open your browser)...\n");
         try {
-          execSync("wrangler login", { stdio: "inherit" });
+          execSync("wrangler login", {
+            stdio: ["pipe", "inherit", "inherit"],
+            input: "n\n",
+            encoding: "utf-8",
+          });
           print("\n  [OK] Logged in to Cloudflare");
         } catch (err) {
           print("  [ERR] wrangler login failed: " + (err.message || err));
