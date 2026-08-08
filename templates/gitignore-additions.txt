@@ -1,7 +1,4 @@
-# Sticky Note - data moved to sticky-note/data branch (.git/sticky-note/ cache)
-.sticky-note/
-
-# Sticky Note - local overrides
+# Sticky Note - local overrides (never commit these)
 .claude/settings.local.json
 .env.sticky
 
