@@ -50,6 +50,24 @@ their next session by relevance.
 
 ---
 
+## What's New in V3.1
+
+- **Full transcript capture**: Every session's complete verbatim transcript
+  is now captured by default — not just the narrative summary — stored
+  alongside audit logs and presence data, keyed by thread ID rather than
+  commit SHA (a thread's transcript belongs to the whole session, not to
+  any single commit it produced).
+- **Secret redaction**: Before anything is written or synced, transcripts
+  (and the narrative/last_note/prompts summary fields) are scrubbed of
+  common secret shapes — cloud provider keys, tokens, private key blocks,
+  labeled `key=value` pairs. Best-effort, not a guarantee — see
+  [What Gets Captured](#what-gets-captured).
+- **Opt-out**: set `"capture_transcripts": false` in
+  `sticky-note-config.json` for repos where this isn't wanted.
+- **New CLI command**: `npx sticky-note transcript <thread-id>` (`--list`,
+  `--raw`) to read a thread's captured transcript(s).
+- **New MCP tool**: `get_full_transcript(id)` — 9 tools total now.
+
 ## What's New in V3
 
 - **Cloud backend (optional)**: Cloudflare KV-backed storage for real-time handoff — no git push/pull required. Hooks auto-detect `STICKY_URL` and switch between cloud and local mode. **Cloud is opt-in** — set `STICKY_URL` in `.env.sticky` to enable it; without it, the default git data-branch storage is used.
@@ -273,6 +291,32 @@ Runs when the user stops a session. Builds a structured handoff summary
 (what was done, what failed, current status, next steps) and saves it to
 the thread's `handoff_summary` field.
 
+### Full Transcript Capture
+
+`session-end.js` also persists the complete verbatim session transcript —
+Claude Code's native `transcript_path` JSONL file — not just the narrative
+summary the other hooks extract from it.
+
+- **Storage**: one JSONL file per thread at `transcripts/<thread-id>.jsonl`
+  in the `sticky-note/data` storage layer, alongside `audit/` and
+  `presence/`. Keyed by thread ID rather than commit SHA — a thread's
+  transcript belongs to the whole session, which may span zero, one, or
+  many commits, so it doesn't fit the commit-anchored git-notes model used
+  for line attribution. One entry is appended per contributing session, so
+  a thread resumed across multiple sessions accumulates its full history.
+- **Redaction**: before anything is written, both the full transcript and
+  the narrative/last_note/prompts summary fields are scrubbed of
+  recognizable secret shapes (AWS/GitHub/Slack tokens, PEM private key
+  blocks, bearer tokens, JWTs, labeled `key=value` pairs). This is a
+  pattern-matching floor, not a guarantee — it won't catch a secret in an
+  unrecognized shape. Disable with `"redact_transcripts": false` if you'd
+  rather have the raw text (not recommended for a shared remote).
+- **Opt-out**: set `"capture_transcripts": false` in
+  `sticky-note-config.json` to turn this off entirely for a repo.
+- **Retrieval**: `npx sticky-note transcript <thread-id>` (`--list` to see
+  which threads have one, `--raw` for the untouched JSONL) or the
+  `get_full_transcript(id)` MCP tool.
+
 ---
 
 ## What Gets Captured
@@ -286,9 +330,16 @@ the thread's `handoff_summary` field.
 | Narrative         | [OK]        | "Fixed auth token refresh flow"      |
 | Failed approaches | [OK]        | What was tried, errors, files        |
 | Work type         | [OK]        | bug-fix, feature, debugging, etc.    |
-| Code content      | [ERR]        | Never captured                       |
-| Conversation      | [ERR]        | Never captured                       |
-| Credentials       | [ERR]        | Never captured                       |
+| Full session transcript | [OK] — opt-out via `capture_transcripts: false` | Verbatim user/assistant messages, tool calls, tool output. See [Full Transcript Capture](#full-transcript-capture). |
+| Code content      | [OK] — as part of the transcript, not separately | Code you write or read shows up verbatim in the transcript's tool_use/tool_result entries |
+| Credentials       | [WARN] best-effort redacted, not guaranteed | Recognizable secret shapes (cloud keys, tokens, private key blocks, labeled key=value pairs) are scrubbed before anything is written or synced — see [Full Transcript Capture](#full-transcript-capture) |
+
+> [!NOTE]
+> Prior to V3.1, this table said conversations and code content were never
+> captured — that was true when only summary fields (narrative, prompts)
+> existed. Full transcript capture changes that by design (see
+> [What's New in V3.1](#whats-new-in-v31)). If your team doesn't want this,
+> set `capture_transcripts: false`.
 
 ---
 
@@ -364,6 +415,7 @@ npx sticky-note-cli resume         # List resumable threads
 npx sticky-note-cli resume <id>    # Resume a previous thread
 npx sticky-note-cli resume --clear # Cancel active resume
 npx sticky-note-cli resume-thread  # Smart resume: --query, --user, --file (V2.5)
+npx sticky-note-cli transcript <id> # Show a thread's captured transcript (--list, --raw) (V3.1)
 npx sticky-note-cli audit          # Query merged audit trail (all users)
 npx sticky-note-cli who            # Show active and recent team members
 npx sticky-note-cli overlap        # Detect file overlaps with teammates (V2.6)
@@ -418,6 +470,8 @@ Edit `.sticky-note/sticky-note-config.json`:
 | `mcp_servers`  | Shared MCP server references             | `[]`    |
 | `skills`       | Team skill definitions                   | `[]`    |
 | `conventions`  | Team coding conventions (injected)       | `[]`    |
+| `capture_transcripts` | Persist each session's full verbatim transcript (V3.1) | `true` |
+| `redact_transcripts`  | Scrub recognizable secrets before writing transcripts/narrative/prompts (V3.1) | `true` |
 
 ---
 
@@ -477,6 +531,7 @@ Add to `.mcp.json` at your project root:
 | Tool | Description |
 |------|-------------|
 | `get_session_context(id)` | Full thread payload by ID |
+| `get_full_transcript(id)` | Full verbatim session transcript(s) for a thread (V3.1) |
 | `get_stuck_threads()` | All stuck threads with failed approaches |
 | `search_threads(query)` | Keyword search across threads |
 | `get_audit_trail(file, user, since, ...)` | Query per-user audit logs |
@@ -579,7 +634,13 @@ design discussion.
 ## FAQ
 
 **Q: Does this capture my code or conversations?**
-A: No. Only file paths, timestamps, usernames, and status metadata.
+A: As of V3.1, yes, by default — each session's full verbatim transcript is
+captured (see [Full Transcript Capture](#full-transcript-capture)), which
+necessarily includes code you write or read and the conversation itself.
+Recognizable secrets are redacted before anything is written, but that's a
+best-effort pattern match, not a guarantee. Set `"capture_transcripts": false`
+in `sticky-note-config.json` to turn this off and go back to metadata-only
+capture (files touched, timestamps, usernames, status, narrative summaries).
 
 **Q: What happens with merge conflicts in sticky-note.json?**
 A: `merge=union` in `.gitattributes` handles most cases automatically.

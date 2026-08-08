@@ -1,5 +1,47 @@
 # Changelog
 
+## V3.1.0
+
+### New: Full Transcript Capture
+- `session-end.js` now persists each session's complete verbatim transcript
+  (Claude Code's native `transcript_path` JSONL), not just the narrative
+  summary extracted from it.
+- Stored one file per thread at `transcripts/<thread-id>.jsonl` in the
+  `sticky-note/data` storage layer, keyed by thread ID rather than commit
+  SHA — appended to across resumed sessions, so a thread accumulates its
+  full history.
+- `sticky-utils.js` — new `getTranscriptsDir()`, `getTranscriptPath(id)`.
+- New config keys: `capture_transcripts` (default `true`) and
+  `redact_transcripts` (default `true`).
+
+### New: Secret Redaction
+- `sticky-utils.js` — new `redactSecrets()` / `REDACTION_PATTERNS`. Scrubs
+  AWS/GitHub/Slack tokens, PEM private key blocks, bearer tokens, JWTs, and
+  labeled `key=value` pairs (api_key, token, password, etc.) before a
+  transcript is written.
+- Also applied to the pre-existing `narrative`, `last_note`, and `prompts`
+  summary fields in `session-end.js` and `on-stop.js`, which are extracted
+  from the same raw transcript and were previously stored unredacted.
+- Best-effort pattern matching, not a guarantee — documented as such.
+
+### New: CLI Command
+- `npx sticky-note-cli transcript <thread-id>` — show a thread's captured
+  transcript(s), formatted as readable turns by default, `--raw` for the
+  untouched JSONL, `--list` to see which threads have one captured.
+
+### New: MCP Tool
+- `get_full_transcript(id)` — ninth MCP tool; returns the full verbatim
+  transcript(s) captured for a thread.
+
+### Fixed: MCP server storage path
+- `bin/mcp-server.js` resolved thread data from `<project>/.sticky-note/`
+  unconditionally, which is the pre-V3 storage location. Since V3's default
+  storage moved to `<git-dir>/sticky-note/` (the `sticky-note/data` orphan
+  branch's local working copy), the MCP server could read stale or empty
+  data on any repo using V3's default storage. `stickyDir()` now resolves
+  the git-dir path first and falls back to the legacy path only if the
+  former has no data.
+
 ## V3.0.0 (feature/v3)
 
 ### New: Cloud Backend (Cloudflare KV)
