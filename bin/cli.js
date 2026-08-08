@@ -3045,6 +3045,10 @@ function provisionCloudBackend() {
   if (namespaceId) {
     const tomlPath = path.join(serverDir, "wrangler.toml");
     let toml = fs.readFileSync(tomlPath, "utf-8");
+    // Reset any previously-written ID back to placeholder first, then patch.
+    // This makes re-runs idempotent even when provisionCloudBackend is called
+    // multiple times in the same init (e.g. after auto-installing wrangler).
+    toml = toml.replace(/id\s*=\s*"[^"]*"/, 'id = "PLACEHOLDER_KV_NAMESPACE_ID"');
     toml = toml.replace("PLACEHOLDER_KV_NAMESPACE_ID", namespaceId);
     fs.writeFileSync(tomlPath, toml);
     print("  [OK] wrangler.toml updated with namespace ID");
@@ -3066,7 +3070,20 @@ function provisionCloudBackend() {
 
   const urlMatch = deployResult.match(/(https:\/\/[^\s]+\.workers\.dev)/);
   const workerUrl = urlMatch ? urlMatch[1] : null;
-  const apiKey = require("crypto").randomBytes(24).toString("base64url");
+
+  // Reuse an existing API key from .env.sticky if present — prevents divergence
+  // when init is re-run on an already-provisioned repo. Only generate a new key
+  // if there isn't one already.
+  const envPath = path.join(process.cwd(), ".env.sticky");
+  let apiKey = null;
+  try {
+    const existing = fs.readFileSync(envPath, "utf-8");
+    const m = existing.match(/^STICKY_API_KEY=(.+)$/m);
+    if (m && m[1].trim()) apiKey = m[1].trim();
+  } catch (_) { /* no existing .env.sticky */ }
+  if (!apiKey) {
+    apiKey = require("crypto").randomBytes(24).toString("base64url");
+  }
 
   if (workerUrl) {
     print(`  [OK] Worker deployed: ${workerUrl}`);
@@ -3074,7 +3091,7 @@ function provisionCloudBackend() {
     print("  [OK] Worker deployed (URL not detected — check wrangler output)");
   }
 
-  // Step 3: Set API key
+  // Step 3: Set API key on Worker — always sync so Worker and .env.sticky agree
   print("  Step 3: Setting API key on Worker...");
   let secretSet = false;
   try {
@@ -3091,11 +3108,20 @@ function provisionCloudBackend() {
     if (workerUrl) print(`         Set it manually: echo '${apiKey}' | wrangler secret put STICKY_API_KEY --name ${workerName}`);
   }
 
-  // Write .env.sticky
-  if (workerUrl) {
-    const envPath = path.join(process.cwd(), ".env.sticky");
+  // Write .env.sticky only after the secret is confirmed set on the Worker,
+  // so the local key always matches what the Worker expects.
+  if (workerUrl && secretSet) {
     fs.writeFileSync(envPath, `STICKY_URL=${workerUrl}\nSTICKY_API_KEY=${apiKey}\n`, "utf-8");
     print("  [OK] .env.sticky written with STICKY_URL and STICKY_API_KEY");
+  } else if (workerUrl && !secretSet) {
+    // Secret set failed — still write .env.sticky with the key we tried,
+    // and tell the user to set it manually so both sides match.
+    fs.writeFileSync(envPath, `STICKY_URL=${workerUrl}\nSTICKY_API_KEY=${apiKey}\n`, "utf-8");
+    print("  [WARN] .env.sticky written but STICKY_API_KEY was NOT set on the Worker.");
+    print(`         Sync manually: echo '${apiKey}' | wrangler secret put STICKY_API_KEY --name ${workerName}`);
+  }
+
+  if (workerUrl) {
 
     // Write sticky_url to committed config so teammates get it on git pull
     const configPath = path.join(process.cwd(), ".sticky-note", "sticky-note-config.json");
