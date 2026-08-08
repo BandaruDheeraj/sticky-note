@@ -657,23 +657,41 @@ async function cmdInit() {
     print("\n  Cloud Backend Setup...\n");
     let cloudResult = provisionCloudBackend();
 
-    // wrangler not installed — guide the user through it inline
+    // wrangler not installed — install it and authenticate automatically
     if (cloudResult === null) {
-      print("  wrangler CLI is not installed. Let's set it up.\n");
-      print("  Run these two commands in another terminal:\n");
-      print("    npm install -g wrangler");
-      print("    wrangler login\n");
+      print("  wrangler CLI not found. Installing now...\n");
+      try {
+        execSync("npm install -g wrangler", { stdio: "inherit" });
+        print("\n  [OK] wrangler installed");
+      } catch (err) {
+        print("  [ERR] Failed to install wrangler: " + (err.message || err));
+        print("        Try manually: npm install -g wrangler");
+        print("        Then run `npx sticky-note deploy-backend`.\n");
+        // skip remaining cloud setup and continue init
+        cloudResult = { error: "wrangler install failed" };
+      }
 
-      const rl2 = readline.createInterface({ input: process.stdin, output: process.stdout });
-      await ask(rl2, "Press Enter once wrangler is installed and you've logged in", "");
-      rl2.close();
+      if (!cloudResult) {
+        // installed — now authenticate (opens browser, runs interactively)
+        print("\n  Authenticating with Cloudflare (this will open your browser)...\n");
+        try {
+          execSync("wrangler login", { stdio: "inherit" });
+          print("\n  [OK] Logged in to Cloudflare");
+        } catch (err) {
+          print("  [ERR] wrangler login failed: " + (err.message || err));
+          print("        Run `wrangler login` manually, then `npx sticky-note deploy-backend`.\n");
+          cloudResult = { error: "wrangler login failed" };
+        }
+      }
 
-      print("");
-      cloudResult = provisionCloudBackend();
-
-      if (cloudResult === null) {
-        print("  [ERR] wrangler still not found in PATH.");
-        print("        Run `npx sticky-note deploy-backend` once it's installed.\n");
+      if (!cloudResult) {
+        print("");
+        cloudResult = provisionCloudBackend();
+        if (cloudResult === null) {
+          print("  [ERR] wrangler still not found after install.");
+          print("        Run `npx sticky-note deploy-backend` in a new terminal.\n");
+          cloudResult = { error: "wrangler not found after install" };
+        }
       }
     }
 

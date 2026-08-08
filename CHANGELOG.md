@@ -1,5 +1,17 @@
 # Changelog
 
+## V3.1.3
+
+### Improved: Init Wizard Auto-Installs and Authenticates Wrangler
+- When cloud backend is chosen but `wrangler` is not installed, the init
+  wizard now runs `npm install -g wrangler` automatically, then launches
+  `wrangler login` (opens the browser for Cloudflare OAuth) — all inline,
+  no manual steps needed.
+- Errors at any step (install or login failure) are caught with clear
+  instructions to retry via `npx sticky-note deploy-backend`.
+
+---
+
 ## V3.1.2
 
 ### Improved: Init Wizard Walks Through Wrangler Install
