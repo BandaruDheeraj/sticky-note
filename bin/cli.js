@@ -3014,7 +3014,6 @@ function provisionCloudBackend() {
     print("  [OK] KV namespace created");
   } catch (err) {
     if (err.message && err.message.includes("already exists")) {
-      // Reuse the existing namespace
       print("  [OK] KV namespace already exists — retrieving ID...");
       try {
         const listResult = execSync("wrangler kv namespace list", {

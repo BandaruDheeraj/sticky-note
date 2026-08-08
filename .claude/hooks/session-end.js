@@ -68,6 +68,8 @@ const {
   clearInjectedSet,
   normalizeSep,
   useCloud,
+  getCloudConfig,
+  getProjectName,
   cloudReadThreads,
   cloudWriteThread,
   cloudDeletePresence,
@@ -1054,6 +1056,35 @@ async function main() {
     hookInput, existing.id, sessionId, aiTool, user, now, config
   );
   if (transcriptCaptured) existing.transcript_captured = true;
+
+  // Push transcript to cloud if configured
+  if (transcriptCaptured && useCloud()) {
+    try {
+      const transcriptFile = getTranscriptPath(existing.id);
+      if (fs.existsSync(transcriptFile)) {
+        const lines = fs.readFileSync(transcriptFile, "utf-8")
+          .split(/\r?\n/).filter(l => l.trim());
+        const entry = lines
+          .map(l => { try { return JSON.parse(l); } catch (_) { return null; } })
+          .filter(Boolean)
+          .find(e => e.session_id === sessionId);
+        if (entry) {
+          const { url: stickyUrl, apiKey: stickyApiKey } = getCloudConfig();
+          const projectName = getProjectName();
+          const headers = {
+            "Content-Type": "application/json",
+            "X-Sticky-Project": projectName,
+          };
+          if (stickyApiKey) headers["X-Sticky-API-Key"] = stickyApiKey;
+          fetch(`${stickyUrl}/transcripts/${existing.id}`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(entry),
+          }).catch(() => {}); // non-fatal
+        }
+      }
+    } catch (_) {} // transcript cloud sync is non-fatal
+  }
 
   // V2.5: Capture commit SHAs for attribution engine
   const commitShas = getSessionCommitShas();
