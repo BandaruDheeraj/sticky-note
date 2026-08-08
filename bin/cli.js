@@ -2983,6 +2983,23 @@ function cmdGc() {
 // DEPLOY-BACKEND command (V3)
 // ──────────────────────────────────────────────
 
+// Derive a safe Worker name from the git remote or cwd.
+// e.g. "BandaruDheeraj/sticky-note" → "sticky-dheeraj-sticky-note"
+function deriveWorkerName() {
+  try {
+    const remote = execSync("git remote get-url origin", { encoding: "utf-8", stdio: "pipe" }).trim();
+    const match = remote.match(/[:/]([^/]+)\/([^/]+?)(?:\.git)?$/);
+    if (match) {
+      const [, owner, repo] = match;
+      const slug = `${owner}-${repo}`.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 50);
+      return `sticky-${slug}`;
+    }
+  } catch (_) {}
+  // Fallback to cwd folder name
+  const folder = path.basename(process.cwd()).toLowerCase().replace(/[^a-z0-9-]/g, "-").slice(0, 40);
+  return `sticky-${folder}`;
+}
+
 // Shared provisioning logic used by both cmdInit and cmdDeployBackend.
 // Returns null if wrangler is missing.
 // Returns { workerUrl, apiKey, secretSet } on success.
@@ -3040,11 +3057,12 @@ function provisionCloudBackend() {
     print("  [OK] wrangler.toml updated with namespace ID");
   }
 
-  // Step 2: Deploy Worker
-  print("  Step 2: Deploying Worker...");
+  // Step 2: Deploy Worker (name derived from git repo for unique URL)
+  const workerName = deriveWorkerName();
+  print(`  Step 2: Deploying Worker as "${workerName}"...`);
   let deployResult;
   try {
-    deployResult = execSync("wrangler deploy", {
+    deployResult = execSync(`wrangler deploy --name ${workerName}`, {
       cwd: serverDir,
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
@@ -3067,7 +3085,7 @@ function provisionCloudBackend() {
   print("  Step 3: Setting API key on Worker...");
   let secretSet = false;
   try {
-    execSync("wrangler secret put STICKY_API_KEY", {
+    execSync(`wrangler secret put STICKY_API_KEY --name ${workerName}`, {
       cwd: serverDir,
       input: apiKey,
       encoding: "utf-8",
@@ -3077,7 +3095,7 @@ function provisionCloudBackend() {
     secretSet = true;
   } catch (err) {
     print("  [WARN] Could not set STICKY_API_KEY automatically: " + (err.message || err));
-    if (workerUrl) print(`         Set it manually: echo '${apiKey}' | wrangler secret put STICKY_API_KEY`);
+    if (workerUrl) print(`         Set it manually: echo '${apiKey}' | wrangler secret put STICKY_API_KEY --name ${workerName}`);
   }
 
   // Write .env.sticky
