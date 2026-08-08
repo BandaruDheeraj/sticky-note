@@ -95,9 +95,8 @@ function resolveHookPaths(_obj, _rootDir) {
   return;
 }
 
-// Detects hook commands in an existing settings.json that point at an absolute
-// path (likely written by an older sticky-note-cli on another developer's
-// machine). Returns the list of stale command strings, or [] if all clean.
+// Detects hook commands in an existing settings.json that are broken or stale.
+// Returns the list of stale command strings, or [] if all clean.
 function findStaleHookPaths(settings) {
   const stale = [];
   const hooks = (settings && settings.hooks) || {};
@@ -107,9 +106,6 @@ function findStaleHookPaths(settings) {
         const cmd = h && h.command;
         if (typeof cmd !== "string") continue;
         // Absolute paths (Unix /Users, /home, /root or Windows C:/, D:/ etc.)
-        // inside the hook command are the smoking gun. Match anywhere in the
-        // string — the path may be preceded by other tokens (env vars, shell
-        // prefixes) and may contain spaces.
         if (
           /["'][A-Za-z]:[\\/]/.test(cmd) ||
           /["']\/(?:Users|home|root|tmp)\//.test(cmd) ||
@@ -117,12 +113,9 @@ function findStaleHookPaths(settings) {
         ) {
           stale.push(cmd);
         }
-        // Old relative-path format: node ".claude/hooks/foo.js"
-        // This fails when Claude Code launches from a subdirectory of the
-        // project root, because the path resolves relative to the launch cwd,
-        // not relative to where .claude/settings.json lives. The fix is to
-        // use `npx sticky-note run-hook foo` which walks up to find the hooks.
-        if (/node\s+["']\.claude[\\/]hooks[\\/][^"']+\.js["']/.test(cmd)) {
+        // Broken `npx sticky-note run-hook X` — npm has no package named "sticky-note"
+        // (the package is "sticky-note-cli"). Written by earlier 3.x releases.
+        if (/^npx\s+sticky-note\s+run-hook\s+\S+/.test(cmd)) {
           stale.push(cmd);
         }
       }

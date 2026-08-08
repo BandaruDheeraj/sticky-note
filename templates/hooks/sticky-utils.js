@@ -157,13 +157,13 @@ function selfHealHookPaths(settingsPath) {
     try { settings = JSON.parse(raw); } catch (_) { return result; }
     if (!settings || !settings.hooks) return result;
 
-    // Two stale patterns:
+    // Stale patterns that need rewriting to the canonical template format:
     // 1. Absolute paths (written by older sticky-note-cli or copied from another machine)
-    // 2. Old relative form `node ".claude/hooks/foo.js"` — fails when Claude Code
-    //    launches from a subdirectory, because the path resolves relative to the
-    //    launch cwd, not the directory containing .claude/settings.json.
+    // 2. `npx sticky-note run-hook X` — broken: npm has no package named "sticky-note"
+    //    (the package is "sticky-note-cli"). Written by earlier 3.x releases via the
+    //    now-removed selfHeal rewrite. Canonical form is `node ".claude/hooks/X.js"`.
     const STALE_ABSOLUTE = /["'][A-Za-z]:[\\/]|["']\/(?:Users|home|root|tmp)\/|\$\(git rev-parse/;
-    const STALE_RELATIVE = /^node\s+["']\.claude[\\/]hooks[\\/][^"']+\.js["']\s*$/;
+    const STALE_NPX = /^npx\s+sticky-note\s+run-hook\s+(\S+)/;
     // Match the script basename in either quoted or bare form.
     const BASENAME = /([A-Za-z0-9_.-]+)\.(?:js|sh|cjs|mjs)(?:["'`\s]|$)/;
 
@@ -174,12 +174,17 @@ function selfHealHookPaths(settingsPath) {
         for (const h of (entry && entry.hooks) || []) {
           const cmd = h && h.command;
           if (typeof cmd !== "string") continue;
-          const isStale = STALE_ABSOLUTE.test(cmd) || STALE_RELATIVE.test(cmd);
-          if (!isStale) continue;
-          const m = cmd.match(BASENAME);
-          if (!m) continue;
-          const basename = m[1];
-          const newCmd = `npx sticky-note run-hook ${basename}`;
+          let basename = null;
+          // Check for broken `npx sticky-note run-hook X` pattern first
+          const npxMatch = cmd.match(STALE_NPX);
+          if (npxMatch) {
+            basename = npxMatch[1];
+          } else if (STALE_ABSOLUTE.test(cmd)) {
+            const m = cmd.match(BASENAME);
+            if (m) basename = m[1];
+          }
+          if (!basename) continue;
+          const newCmd = `node ".claude/hooks/${basename}.js"`;
           result.push({ event, oldCommand: cmd, newCommand: newCmd });
           h.command = newCmd;
           changed = true;
@@ -192,9 +197,9 @@ function selfHealHookPaths(settingsPath) {
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n", "utf-8");
     try {
       const summary =
-        `[STICKY-NOTE] ⚠️  Detected ${result.length} stale hook path(s) in ` +
+        `[STICKY-NOTE] ⚠️  Detected ${result.length} stale hook command(s) in ` +
         `${path.relative(process.cwd(), settingsPath) || settingsPath} — rewrote to ` +
-        `"npx sticky-note run-hook <name>" so hooks work from any subdirectory. ` +
+        `"node \\".claude/hooks/<name>.js\\"" (canonical form). ` +
         `Commit the change to share the fix with your team.`;
       process.stderr.write(summary + "\n");
       for (const { event, oldCommand, newCommand } of result.slice(0, 5)) {
