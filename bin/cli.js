@@ -14,6 +14,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 const readline = require("readline");
 const { execSync, execFileSync } = require("child_process");
 
@@ -551,6 +552,11 @@ async function cmdInit() {
   print("  [OK] Git repository detected");
   print("");
 
+  // Read existing sticky-note-config.json for teammate flow (cloud URL pre-set via git)
+  const existingConfigPath = path.join(process.cwd(), ".sticky-note", "sticky-note-config.json");
+  const existingConfig = readJsonSafe(existingConfigPath, {});
+  const configStickyUrl = existingConfig.sticky_url || "";
+
   // Auto-detect MCP servers and skills
   print("  Scanning for existing configuration...");
   const detectedMcp = detectMcpServers();
@@ -575,6 +581,7 @@ async function cmdInit() {
 
   let mcpServers, skills, conventions, staleDaysResolved, injectTokenBudgetResolved;
   let wantsCloud = false;
+  let cloudProvisionedUrl = null; // set after successful provisioning, written to config
 
   if (ciMode) {
     // CI mode: no prompts, use env vars
@@ -597,7 +604,7 @@ async function cmdInit() {
     conventions = convRaw ? convRaw.split(",").map(s => s.trim()).filter(Boolean) : [];
     staleDaysResolved = parseIntOr(staleDaysRaw, 14);
     injectTokenBudgetResolved = 1000;
-    wantsCloud = v3Mode; // --v3 in CI mode implies cloud
+    wantsCloud = v3Mode && !configStickyUrl; // --v3 implies cloud, but not if URL already in config
   } else {
     // Interactive prompts
     const rl = readline.createInterface({
@@ -625,12 +632,25 @@ async function cmdInit() {
     // Sync MCP servers from teammate's sticky-note config
     await syncMcpFromStickyNote(rl);
 
-    const cloudAnswer = await ask(
-      rl,
-      "Set up Cloudflare cloud backend for real-time team sync? (y/N)",
-      v3Mode ? "y" : "N"
-    );
-    wantsCloud = cloudAnswer.toLowerCase() === "y" || cloudAnswer.toLowerCase() === "yes";
+    if (configStickyUrl) {
+      // Teammate flow: URL already in committed config — just need their API key
+      print(`\n  Cloud backend detected: ${configStickyUrl}`);
+      const keyAnswer = await ask(rl, "Enter your STICKY_API_KEY (get it from your team lead)", "");
+      if (keyAnswer.trim()) {
+        const envPath = path.join(process.cwd(), ".env.sticky");
+        fs.writeFileSync(envPath, `STICKY_URL=${configStickyUrl}\nSTICKY_API_KEY=${keyAnswer.trim()}\n`, "utf-8");
+        print("  [OK] .env.sticky written");
+      } else {
+        print("  ⏭️  No API key entered — skipping .env.sticky (local-only mode)");
+      }
+    } else {
+      const cloudAnswer = await ask(
+        rl,
+        "Set up Cloudflare cloud backend for real-time team sync? (y/N)",
+        v3Mode ? "y" : "N"
+      );
+      wantsCloud = cloudAnswer.toLowerCase() === "y" || cloudAnswer.toLowerCase() === "yes";
+    }
 
     rl.close();
 
@@ -707,13 +727,13 @@ async function cmdInit() {
       print("  [WARN] Cloud setup failed: " + cloudResult.error);
       print("         Run `npx sticky-note deploy-backend` to retry.\n");
     } else if (cloudResult && !cloudResult.error) {
-      if (cloudResult.secretSet) {
-        print("\n  Share STICKY_URL and STICKY_API_KEY with teammates securely.");
-        print("  (e.g. org secrets, 1Password — do not commit .env.sticky)\n");
-      } else {
-        print("\n  [!] API key written to .env.sticky but NOT yet set on the Worker.");
-        print("  Run the manual command shown above, then share with your team.\n");
-      }
+      cloudProvisionedUrl = cloudResult.workerUrl;
+      print("\n  ┌─────────────────────────────────────────────────────────────┐");
+      print("  │  Share this with teammates (once, via DM or 1Password):      │");
+      print(`  │  STICKY_API_KEY=${cloudResult.apiKey.padEnd(43)}│`);
+      print("  │                                                               │");
+      print("  │  STICKY_URL is committed to git — teammates get it on pull.  │");
+      print("  └─────────────────────────────────────────────────────────────┘\n");
     }
   } else if (wantsCloud && ciMode) {
     // CI mode: can't pause for wrangler install, just try and warn on failure
@@ -845,6 +865,7 @@ async function cmdInit() {
     existing.inject_token_budget = injectTokenBudgetResolved;
     existing.hook_version = VERSION;
     existing.min_version = bumpMinVersion(existing.min_version, VERSION);
+    if (cloudProvisionedUrl) existing.sticky_url = cloudProvisionedUrl;
     fs.writeFileSync(configDest, JSON.stringify(existing, null, 2) + "\n");
   }
   print("  [OK] .sticky-note/sticky-note-config.json");
@@ -1072,16 +1093,43 @@ async function cmdInit() {
     }
   }
 
+  // Register sticky-note MCP server in Claude Code's global settings (~/.claude/settings.json)
+  const claudeGlobalSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
+  try {
+    const claudeGlobal = readJsonSafe(claudeGlobalSettingsPath, {});
+    if (!claudeGlobal.mcpServers) claudeGlobal.mcpServers = {};
+    if (!claudeGlobal.mcpServers["sticky-note"]) {
+      claudeGlobal.mcpServers["sticky-note"] = {
+        type: "stdio",
+        command: "npx",
+        args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
+      };
+      fs.writeFileSync(claudeGlobalSettingsPath, JSON.stringify(claudeGlobal, null, 2) + "\n");
+      print("  [OK] Registered sticky-note MCP server in ~/.claude/settings.json (Claude Code)");
+    } else {
+      print("  ⏭️  sticky-note already registered in ~/.claude/settings.json");
+    }
+  } catch (err) {
+    print("  ⏭️  Could not update ~/.claude/settings.json: " + (err.message || err));
+  }
+
   // Done!
-  print("\n  ✨ Sticky Note V2 initialized!\n");
+  print("\n  ✨ Sticky Note initialized!\n");
   print("  Next steps:");
   print("  ┌──────────────────────────────────────────────────────────────┐");
   print("  │  git add .claude .github .sticky-note .gitignore .gitattributes CLAUDE.md  │");
-  print("  │  git commit -m \"feat: add sticky-note v2 hooks\"                  │");
+  print("  │  git commit -m \"feat: add sticky-note hooks\"                      │");
   print("  │  git push                                                        │");
   print("  └──────────────────────────────────────────────────────────────┘");
   print("");
-  print("  Teammates just need to `git pull` — no extra setup.");
+  if (cloudProvisionedUrl) {
+    print("  Teammates: git pull → run `npx sticky-note init` → enter API key when prompted.");
+    print("  Restart Claude Code to activate the sticky-note MCP server.");
+  } else if (configStickyUrl) {
+    print("  Restart Claude Code to activate the sticky-note MCP server.");
+  } else {
+    print("  Teammates just need to `git pull` — no extra setup.");
+  }
   print("");
 }
 
@@ -3038,6 +3086,17 @@ function provisionCloudBackend() {
     const envPath = path.join(process.cwd(), ".env.sticky");
     fs.writeFileSync(envPath, `STICKY_URL=${workerUrl}\nSTICKY_API_KEY=${apiKey}\n`, "utf-8");
     print("  [OK] .env.sticky written with STICKY_URL and STICKY_API_KEY");
+
+    // Write sticky_url to committed config so teammates get it on git pull
+    const configPath = path.join(process.cwd(), ".sticky-note", "sticky-note-config.json");
+    if (fs.existsSync(configPath)) {
+      try {
+        const cfg = readJsonSafe(configPath, {});
+        cfg.sticky_url = workerUrl;
+        fs.writeFileSync(configPath, JSON.stringify(cfg, null, 2) + "\n");
+        print("  [OK] sticky_url written to .sticky-note/sticky-note-config.json (commit this!)");
+      } catch (_) {}
+    }
   }
 
   return { workerUrl, apiKey, secretSet };
