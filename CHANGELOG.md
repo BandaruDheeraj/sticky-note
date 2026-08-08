@@ -1,5 +1,20 @@
 # Changelog
 
+## V3.1.1
+
+### Improved: Cloud Setup Built Into Init Wizard
+- `npx sticky-note init` now asks "Set up Cloudflare cloud backend for
+  real-time team sync? (y/N)" after team configuration questions.
+- Answering **y** provisions the cloud backend inline — no need to know to
+  run `deploy-backend` separately first.
+- `--v3` flag pre-answers yes, keeping the existing shorthand working.
+- `deploy-backend` remains as a standalone command for re-provisioning an
+  existing install or setting up cloud without running `init`.
+- Extracted shared `provisionCloudBackend()` helper — no duplicated deploy
+  logic between the two code paths.
+
+---
+
 ## V3.1.0
 
 ### New: Full Transcript Capture
