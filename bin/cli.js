@@ -847,6 +847,9 @@ async function cmdInit() {
     configTemplate.inject_token_budget = injectTokenBudgetResolved;
     configTemplate.hook_version = VERSION;
     configTemplate.min_version = VERSION;
+    // When cloud is configured, default auto_push to true so threads reach
+    // GitHub even when Cloudflare KV hits its daily write limit.
+    if (cloudProvisionedUrl || configStickyUrl) configTemplate.auto_push = true;
     fs.writeFileSync(configDest, JSON.stringify(configTemplate, null, 2) + "\n");
   } else {
     // Update existing config with new settings
@@ -859,6 +862,10 @@ async function cmdInit() {
     existing.hook_version = VERSION;
     existing.min_version = bumpMinVersion(existing.min_version, VERSION);
     if (cloudProvisionedUrl) existing.sticky_url = cloudProvisionedUrl;
+    // Enable auto_push when cloud is configured (if not already explicitly set)
+    if ((cloudProvisionedUrl || configStickyUrl) && existing.auto_push === false) {
+      existing.auto_push = true;
+    }
     fs.writeFileSync(configDest, JSON.stringify(existing, null, 2) + "\n");
   }
   print("  [OK] .sticky-note/sticky-note-config.json");
