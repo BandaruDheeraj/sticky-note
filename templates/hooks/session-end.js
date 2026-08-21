@@ -378,6 +378,139 @@ function extractFailedApproaches(hookInput) {
   return extractFailedFromEntries(entries);
 }
 
+// ── AI event extraction for AI blame ─────────────────────
+
+let _eventWriter = null;
+try { _eventWriter = require("./event-writer.js"); } catch (_) {}
+
+/**
+ * Parse Claude Code's transcript JSONL to extract ai_thinking,
+ * ai_response, and context_compressed events for the AI blame stream.
+ * Returns an array of structured events ordered by their appearance.
+ */
+function extractAiEventsFromTranscript(transcriptPath, sessionId) {
+  if (!_eventWriter) return [];
+  if (!transcriptPath || !fs.existsSync(transcriptPath)) return [];
+
+  const events = [];
+  let raw;
+  try {
+    raw = fs.readFileSync(transcriptPath, "utf-8");
+  } catch (_) {
+    return [];
+  }
+
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let entry;
+    try { entry = JSON.parse(trimmed); } catch (_) { continue; }
+
+    // Context compression: Claude Code emits entries with a summary field
+    // when the context window is compacted.
+    if (entry.type === "summary" && entry.summary) {
+      events.push(_eventWriter.buildEvent(
+        _eventWriter.EVENT_TYPES.CONTEXT_COMPRESSED,
+        {
+          summary: String(entry.summary).substring(0, 1000),
+          tokens_before: entry.tokens_before || null,
+          tokens_after: entry.tokens_after || null,
+        },
+        sessionId
+      ));
+      continue;
+    }
+
+    const message = entry.message;
+    if (!message || typeof message !== "object") continue;
+    const role = message.role || entry.role || "";
+    if (role !== "assistant") continue;
+
+    const contentBlocks = _getContentBlocks(entry);
+    if (!Array.isArray(contentBlocks)) continue;
+
+    for (const block of contentBlocks) {
+      if (!block || typeof block !== "object") continue;
+
+      if (block.type === "thinking" && block.thinking) {
+        events.push(_eventWriter.buildEvent(
+          _eventWriter.EVENT_TYPES.AI_THINKING,
+          { content: block.thinking },
+          sessionId
+        ));
+      }
+
+      if (block.type === "text" && block.text && block.text.trim()) {
+        events.push(_eventWriter.buildEvent(
+          _eventWriter.EVENT_TYPES.AI_RESPONSE,
+          { content: block.text },
+          sessionId
+        ));
+      }
+    }
+
+    // Token usage may appear on the entry itself (Claude Code's format)
+    if (entry.usage && _eventWriter) {
+      const last = events[events.length - 1];
+      if (last && last.type === _eventWriter.EVENT_TYPES.AI_RESPONSE) {
+        last.data.input_tokens = entry.usage.input_tokens || null;
+        last.data.output_tokens = entry.usage.output_tokens || null;
+        last.data.cache_read_tokens = entry.usage.cache_read_input_tokens || null;
+      }
+    }
+  }
+
+  return events;
+}
+
+/**
+ * Collect all events for this session from the audit JSONL files
+ * (tool_call, tool_result, tool_error, tool_denied, user_prompt, session_open)
+ * plus the AI events extracted from the transcript.
+ * Sort by ts. Returns an array ready to push to the Worker.
+ */
+function collectSessionEvents(sessionId, hookInput) {
+  const events = [];
+
+  // Gather structured events from audit (written by hooks during the session)
+  const typesForBlame = new Set([
+    "tool_call", "tool_result", "tool_error", "tool_denied",
+    "user_prompt", "session_open", "checkpoint",
+  ]);
+
+  for (const auditPath of getAllAuditPaths()) {
+    try {
+      const raw = fs.readFileSync(auditPath, "utf-8");
+      for (const line of raw.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        let entry;
+        try { entry = JSON.parse(trimmed); } catch (_) { continue; }
+        if (entry.session_id === sessionId && typesForBlame.has(entry.type)) {
+          events.push(entry);
+        }
+      }
+    } catch (_) {
+      // ignore unreadable audit file
+    }
+  }
+
+  // Add AI events from transcript
+  const transcriptEvents = extractAiEventsFromTranscript(
+    hookInput.transcript_path || "", sessionId
+  );
+  events.push(...transcriptEvents);
+
+  // Sort by ts ascending
+  events.sort((a, b) => {
+    if (a.ts < b.ts) return -1;
+    if (a.ts > b.ts) return 1;
+    return 0;
+  });
+
+  return events;
+}
+
 // ── Transcript capture ────────────────────────────────────
 // Persists the full verbatim session transcript (Claude Code's native
 // transcript_path JSONL file) into sticky-note/data storage, keyed by
@@ -1084,6 +1217,43 @@ async function main() {
         }
       }
     } catch (_) {} // transcript cloud sync is non-fatal
+  }
+
+  // Extract AI events from transcript and write to audit for local AI blame
+  try {
+    const aiEvents = extractAiEventsFromTranscript(
+      hookInput.transcript_path || "", sessionId
+    );
+    for (const ev of aiEvents) {
+      try { appendAuditLineBoth(ev, cloud); } catch (_) {}
+    }
+  } catch (_) {
+    // non-fatal — AI event extraction must never interrupt session-end
+  }
+
+  // Push complete event stream to Worker for team-wide AI blame
+  // This is a no-op if cloud is not configured or the endpoint doesn't exist yet.
+  if (cloud && existing && existing.id) {
+    try {
+      const allEvents = collectSessionEvents(sessionId, hookInput);
+      if (allEvents.length > 0) {
+        const { url: stickyUrl, apiKey: stickyApiKey } = getCloudConfig();
+        const projectName = getProjectName();
+        const headers = {
+          "Content-Type": "application/json",
+          "X-Sticky-Project": projectName,
+        };
+        if (stickyApiKey) headers["X-Sticky-API-Key"] = stickyApiKey;
+        fetch(`${stickyUrl}/threads/${existing.id}/events`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ events: allEvents }),
+          signal: AbortSignal.timeout(10000),
+        }).catch(() => {}); // non-fatal
+      }
+    } catch (_) {
+      // non-fatal — Worker endpoint may not exist until Plan 2 ships
+    }
   }
 
   // V2.5: Capture commit SHAs for attribution engine
