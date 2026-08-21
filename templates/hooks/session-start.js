@@ -1248,6 +1248,33 @@ async function main() {
   if (configContext) parts.push(configContext);
   if (presenceContext) parts.push(presenceContext);
 
+  // Write session_open event for AI blame
+  let _eventWriter = null;
+  try { _eventWriter = require("./event-writer.js"); } catch (_) {}
+  if (_eventWriter) {
+    try {
+      const pkg = (() => {
+        try { return require("../../package.json"); } catch (_) { return {}; }
+      })();
+      const openEvent = _eventWriter.buildEvent(
+        _eventWriter.EVENT_TYPES.SESSION_OPEN,
+        {
+          model: hookInput.model || (hookInput.api_info && hookInput.api_info.model) || null,
+          branch: getBranch(),
+          user: getUser(),
+          sticky_version: pkg.version || null,
+          mcp_servers: (loadJson(getConfigPath(), {}).mcp_servers || [])
+            .map(s => (typeof s === "object" ? s.name : s))
+            .filter(Boolean),
+        },
+        getSessionId(hookInput)
+      );
+      appendAuditLineBoth(openEvent, cloud);
+    } catch (_) {
+      // best-effort — never break the hook
+    }
+  }
+
   const output = parts.join("\n").trim();
   _emit(output);
 }
