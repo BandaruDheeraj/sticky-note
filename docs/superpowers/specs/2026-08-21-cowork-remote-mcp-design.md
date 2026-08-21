@@ -2,53 +2,63 @@
 
 **Date:** 2026-08-21
 **Status:** Draft
-**Scope:** Phase 1 — claude.ai cowork sessions and mobile sessions
+**Scope:** Phase 1 — claude.ai cowork and mobile sessions
 
 ---
 
 ## Problem
 
-Claude Code CLI and Desktop sessions are tracked via hooks (PostToolUse, SessionStart, etc.) that fire automatically and capture granular session data. Sessions that run in claude.ai cowork or mobile have no equivalent capture mechanism — no hooks fire, no transcript is written locally, and no thread is created. This means any AI work done outside a local terminal disappears with no record.
+Claude Code CLI and Desktop sessions are tracked via hooks that fire automatically and capture granular session data. Sessions in claude.ai cowork or mobile have no equivalent — no hooks fire, no thread is created, and the work disappears.
 
-Additionally, the existing local audit trail is too thin for **AI blame** — the ability to trace any line of code back to the prompt, reasoning chain, and tool calls that produced it. The current audit JSONL records only tool name + file + line ranges. Full args, results, AI reasoning, and thinking blocks are only in Claude Code's local transcript JSONL, which is not shared with the team or pushed to the cloud.
+The existing local audit trail is also too thin for **AI blame** (tracing a line of code back to the prompt, reasoning chain, and tool calls that produced it). The current audit JSONL records tool name + file + line ranges only. Full args, results, AI reasoning, and thinking blocks live only in Claude Code's local transcript, which is not shared with the team.
 
----
+**This phase delivers:**
+1. Full-fidelity event capture for claude.ai cowork sessions, matching the richness of local sessions.
+2. Enriched local audit trail that supports AI blame.
+3. Unified event schema across both session types.
 
-## Goals
-
-1. Full-fidelity event capture for claude.ai cowork and mobile sessions — same richness as local sessions.
-2. Enrich local session capture so the shared audit trail supports AI blame (not just the local transcript).
-3. Unified event schema across all session types (local hooks and remote MCP).
-4. Single source of truth: `sticky-note.json` in git + Cloudflare KV as live cache.
-
-**Out of scope (Phase 1):** Codex app, GitHub Copilot Desktop — adapter interfaces for those come later.
+**Out of scope (Phase 1):** Mobile sessions (auth mechanism unspecified — descoped to Phase 2). Codex app, GitHub Copilot Desktop — adapter interfaces come later.
 
 ---
 
 ## Architecture
 
 ```
-Local sessions                        Remote sessions (cowork / mobile)
-─────────────                         ──────────────────────────────────
+Local sessions                        Remote sessions (cowork)
+─────────────                         ──────────────────────
 Hooks (PostToolUse etc.)              claude.ai remote MCP connector
-        │                                           │
-        ▼                                           ▼
+        │                                       │
+        ▼                                       ▼
 Enriched audit JSONL              Worker /mcp endpoint (HTTP/SSE)
-+ transcript JSONL push                append_event write tool
-        │                                           │
-        └──────────────┬───────────────────────────┘
++ event stream push                      Durable Object (per thread)
+        │                                       │
+        └──────────────┬────────────────────────┘
                        ▼
-             Cloudflare KV (live cache)
-             GitHub REST API → .sticky-note/sticky-note.json (source of truth)
+         Cloudflare KV  ←  event stream (full fidelity, live)
+         GitHub REST    ←  thread metadata only (sticky-note.json)
 ```
 
-Both paths write the same event schema to the same storage layer. AI blame queries either path identically.
+Both paths write to the same event schema. AI blame queries either path identically.
+
+**Key constraint:** `sticky-note.json` in git stores thread metadata only (same schema as today — status, narrative, files_touched, etc.). Full event streams live in KV only. This keeps git commits small and avoids the GitHub Contents API 1 MB file limit.
+
+---
+
+## Capture Constraints
+
+These constraints apply to all event writes, both local and remote:
+
+- **tool_result data** is capped at 10 KB per event. Tool results for Read calls on large files are truncated; the full content is available in the local transcript for local sessions.
+- **tool_call args** containing file content (Write, Edit) store a diff or content hash, not the full body. Verbatim args are stored for all other tool types.
+- **ai_thinking** events are only emitted if the session runtime exposes thinking blocks. For claude.ai cowork, this depends on Anthropic enabling thinking-block visibility to MCP tools — if unavailable, the event type is silently omitted for remote sessions.
+- **Secrets** are redacted from all event data before writing (best-effort pattern matching, same policy as transcript capture today).
+- **User-authored lines** (not written by the AI) will show no thread in AI blame — this is correct behavior.
 
 ---
 
 ## Event Schema
 
-Every captured action — regardless of session type — is stored as a structured event. Events are ordered by `seq` (monotonically increasing integer within a thread) and `ts` (ISO timestamp).
+Every captured action is stored as a structured event. Events are ordered by `ts` (ISO timestamp with millisecond precision). When two events share the same `ts`, insertion order is the tiebreaker — the Durable Object processes `append_event` calls serially per thread to guarantee this.
 
 ### Core fields (all events)
 
@@ -56,7 +66,6 @@ Every captured action — regardless of session type — is stored as a structur
 {
   "thread_id": "uuid",
   "session_id": "uuid",
-  "seq": 1,
   "ts": "2026-08-21T14:32:00.123Z",
   "type": "<event_type>",
   "data": { ... }
@@ -65,158 +74,46 @@ Every captured action — regardless of session type — is stored as a structur
 
 ### Event types
 
-**`session_open`** — first event written when a session begins
-```json
-{
-  "type": "session_open",
-  "data": {
-    "model": "claude-sonnet-4-6",
-    "mcp_servers": ["sticky-note"],
-    "claude_md_hash": "a3f2c1...",
-    "branch": "main",
-    "user": "dheer",
-    "sticky_version": "3.1.0"
-  }
-}
-```
+**`session_open`** — first event; captures model, branch, user, mcp_servers, claude_md_hash, sticky_version
 
 **`user_prompt`** — verbatim user message
-```json
-{
-  "type": "user_prompt",
-  "data": { "content": "fix the auth sliding window bug" }
-}
+
+**`ai_thinking`** — extended thinking block before a response (see capture constraints)
+
+**`ai_response`** — assistant message; data includes content, model, input_tokens, output_tokens, cache_read_tokens
+
+**`tool_call`** — full tool invocation; data includes tool name and full args (see capture constraints for file-content args)
+
+**`tool_result`** — tool output; data includes tool name, result (capped at 10 KB), duration_ms, lines_changed (for write tools)
+
+**`tool_error`** — failed tool call; data includes tool name, args, error message
+
+**`tool_denied`** — user rejected permission prompt; data includes tool name, args, reason
+
+**`context_compressed`** — context window compaction; data includes tokens_before, tokens_after, summary. This marks a critical AI blame boundary — reasoning before and after compression operated on different context.
+
+**`git_commit`** — commit made during the session; data includes sha, message, files, diff_stat
+
+**`subagent_spawn`** — Agent tool invoked; data includes description, agent_type
+
+**`subagent_result`** — Agent tool completed; data includes summary
+
+**`checkpoint`** — topic switch mid-session; data includes topic string
+
+**`session_close`** — final event; data includes narrative, work_type, handoff_summary, failed_approaches, files_touched
+
+---
+
+## KV Storage Schema
+
+```
+{project}:thread:{uuid}          → thread metadata (status, narrative, files_touched, etc.)
+{project}:thread:{uuid}:events   → ordered event array (full event stream)
 ```
 
-**`ai_thinking`** — extended thinking block (before response)
-```json
-{
-  "type": "ai_thinking",
-  "data": { "content": "The issue is likely in the expiry calculation..." }
-}
-```
+Events are stored as a JSON array in KV. When the array exceeds 2 MB, it is chunked into sequential keys (`:events:0`, `:events:1`, etc.) — chunked by bytes, not event count, since individual events vary widely in size. Chunk count is stored in thread metadata so readers can fetch all chunks in parallel.
 
-**`ai_response`** — assistant message with token metadata
-```json
-{
-  "type": "ai_response",
-  "data": {
-    "content": "I'll look at the token refresh logic first...",
-    "model": "claude-sonnet-4-6",
-    "input_tokens": 12400,
-    "output_tokens": 847,
-    "cache_read_tokens": 8200
-  }
-}
-```
-
-**`tool_call`** — full tool invocation including all args
-```json
-{
-  "type": "tool_call",
-  "data": {
-    "tool": "Edit",
-    "args": {
-      "file_path": "src/auth.ts",
-      "old_string": "...",
-      "new_string": "..."
-    }
-  }
-}
-```
-
-**`tool_result`** — full result returned by the tool
-```json
-{
-  "type": "tool_result",
-  "data": {
-    "tool": "Edit",
-    "result": "File updated successfully",
-    "duration_ms": 42,
-    "lines_changed": ["40-55"]
-  }
-}
-```
-
-**`tool_error`** — tool call that failed or threw
-```json
-{
-  "type": "tool_error",
-  "data": {
-    "tool": "Bash",
-    "args": { "command": "npx sticky-note update" },
-    "error": "command not found: npx"
-  }
-}
-```
-
-**`tool_denied`** — tool call the user rejected at the permission prompt
-```json
-{
-  "type": "tool_denied",
-  "data": {
-    "tool": "Bash",
-    "args": { "command": "rm -rf dist/" },
-    "reason": "user denied"
-  }
-}
-```
-
-**`context_compressed`** — context window compaction event
-```json
-{
-  "type": "context_compressed",
-  "data": {
-    "tokens_before": 180000,
-    "tokens_after": 42000,
-    "summary": "Working on auth token refresh bug in src/auth.ts..."
-  }
-}
-```
-
-**`git_commit`** — commit made during the session
-```json
-{
-  "type": "git_commit",
-  "data": {
-    "sha": "abc123def456",
-    "message": "fix auth sliding window expiry",
-    "files": ["src/auth.ts"],
-    "diff_stat": "+12 -4"
-  }
-}
-```
-
-**`subagent_spawn`** / **`subagent_result`** — Agent tool invocations
-```json
-{ "type": "subagent_spawn",
-  "data": { "description": "Explore auth codebase", "agent_type": "Explore" } }
-
-{ "type": "subagent_result",
-  "data": { "summary": "Found token expiry logic in src/auth.ts:L120-145" } }
-```
-
-**`checkpoint`** — user or AI topic switch mid-session
-```json
-{
-  "type": "checkpoint",
-  "data": { "topic": "fixing auth token sliding window expiry" }
-}
-```
-
-**`session_close`** — final event with narrative and classification
-```json
-{
-  "type": "session_close",
-  "data": {
-    "narrative": "Fixed sliding window expiry bug in auth token refresh...",
-    "work_type": "bug-fix",
-    "handoff_summary": "Token expiry now uses relative time from last activity...",
-    "failed_approaches": ["tried resetting expiry on every read — caused infinite refresh loop"],
-    "files_touched": ["src/auth.ts", "tests/auth.test.ts"]
-  }
-}
-```
+The Durable Object for each thread holds the current events array in memory and flushes to KV in batches (every 10 events or every 5 seconds, whichever comes first), eliminating the read-modify-write hot-key problem.
 
 ---
 
@@ -224,39 +121,25 @@ Every captured action — regardless of session type — is stored as a structur
 
 ### 1. Enrich `track-work.js` (PostToolUse hook)
 
-**Current:** writes `{ tool, file, lines_changed }` — no args, no result.
+**Current:** writes `{ tool, file, lines_changed }`.
 
-**New:** writes full `tool_call` + `tool_result` event pair to audit JSONL:
-```json
-{ "type": "tool_call", "tool": "Edit", "args": { "file_path": "...", "old_string": "...", "new_string": "..." }, ... }
-{ "type": "tool_result", "tool": "Edit", "result": "...", "lines_changed": ["40-55"], "duration_ms": 42, ... }
-```
-
-Full args are available in `hookInput.tool_input`. Full result is available in `hookInput.tool_response`.
+**New:** writes full `tool_call` + `tool_result` event pair. Full args are in `hookInput.tool_input`; full result is in `hookInput.tool_response`. Apply capture constraints (diff instead of full body for Write/Edit; 10 KB cap on result).
 
 ### 2. Capture `tool_denied` events
 
-Extend `on-error.js` (the existing PostToolUseFailure hook) to write `tool_denied` events when the user rejects a permission prompt. The hook already fires in this case — it just needs to write the structured event to the audit JSONL.
+Extend `on-error.js` (PostToolUseFailure hook) to write `tool_denied` events when the user rejects a permission prompt. The hook already fires in this case.
 
-### 3. Capture `user_prompt` in UserPromptSubmit hook
+### 3. Capture `user_prompt` events
 
-The `inject-context.js` hook already fires on UserPromptSubmit. Add a `user_prompt` event write there.
+The `inject-context.js` hook already fires on UserPromptSubmit. Add a `user_prompt` event write there with the verbatim prompt content.
 
-### 4. Push transcript JSONL to KV at session end
+### 4. Parse and push AI events from transcript at session end
 
-`session-end.js` already writes the local transcript. Add a step to push the full transcript JSONL to the Worker at:
-```
-PUT /threads/{thread_id}/transcript
-```
-This makes AI blame accessible to teammates without local file access.
+`session-end.js` already reads the local transcript JSONL. At session end, parse out `ai_thinking`, `ai_response`, and `context_compressed` entries and push them to the Worker event stream via `append_event`. These are not available in hooks directly — only in the transcript.
 
-### 5. Capture `ai_thinking` and `ai_response` from transcript
+### 5. Push enriched event stream to KV at session end
 
-The local transcript JSONL (Claude Code's own format) contains assistant messages and thinking blocks. At session end, parse these out and include them in the pushed event stream.
-
-### 6. Capture `context_compressed` events
-
-Claude Code emits a context compression event in its transcript. Parse and forward this as a `context_compressed` event — it marks a critical boundary for AI blame (reasoning before and after compression operated on different context).
+After parsing, call the Worker's batch event endpoint to write all events (tool calls already captured by hooks + AI events from transcript) to `{project}:thread:{uuid}:events` in KV. This makes AI blame accessible to teammates via KV, not just from the local audit file.
 
 ---
 
@@ -268,96 +151,82 @@ The Worker exposes an MCP-over-HTTP endpoint at `/mcp` using HTTP+SSE transport.
 
 Authentication: `X-Sticky-API-Key` header (same as existing Worker auth).
 
+### Durable Object: `StickyThread`
+
+Each thread is backed by a Durable Object instance keyed by thread ID. The Durable Object:
+- Holds the in-flight event buffer in memory
+- Processes `append_event` calls serially (no concurrent writes, no KV race)
+- Flushes to KV in batches on a count or time threshold
+- Serializes all GitHub REST writes for the thread, with exponential backoff on 409 conflicts
+
 ### New write tools
 
 **`open_thread(prompt, branch, user, model, mcp_servers, claude_md_hash)`**
-- Creates thread in KV with status `open`
+- Creates thread in KV with status `open` via `StickyThread` DO
 - Writes `session_open` + `user_prompt` events
 - Returns `thread_id` for subsequent calls
-- Also triggers GitHub REST API commit to add thread to `sticky-note.json`
+- Triggers async GitHub REST commit to add thread metadata to `sticky-note.json`
 
 **`append_event(thread_id, type, data)`**
-- Appends one event to the thread's event stream in KV
-- `seq` is assigned server-side; implementation uses timestamp ordering as the primary sort key since KV has no native atomic increment (exact mechanism is an implementation detail for the plan phase)
-- Called for every action: `ai_thinking`, `ai_response`, `tool_call`, `tool_result`, `tool_error`, `tool_denied`, `context_compressed`, `git_commit`, `subagent_spawn`, `subagent_result`, `checkpoint`
-- No git commit on every call — KV only (low latency path)
+- Called for every event in the session — every event type in the schema above, for every action
+- "Every action" means every item in the event type list: `user_prompt`, `ai_thinking`, `ai_response`, `tool_call`, `tool_result`, `tool_error`, `tool_denied`, `context_compressed`, `git_commit`, `subagent_spawn`, `subagent_result`, `checkpoint`. Does not include streaming tokens or internal transport retries.
+- Routed to the `StickyThread` DO for serialized, batched write to KV
+- No GitHub commit per call
 
 **`set_checkpoint(thread_id, topic)`**
-- Shorthand for `append_event(..., "checkpoint", { topic })`
-- Updates thread's active checkpoint label in KV
+- Shorthand: appends a `checkpoint` event and updates the active checkpoint label in thread metadata
 
-**`close_thread(thread_id, narrative, work_type, handoff_summary, failed_approaches, files_touched)`**
-- Writes `session_close` event
+**`close_thread(thread_id, ...session_close fields)`**
+- Appends a `session_close` event (fields: narrative, work_type, handoff_summary, failed_approaches, files_touched)
 - Updates thread status to `closed` in KV
-- Triggers GitHub REST API commit to update `sticky-note.json` with final thread state + all events
+- Triggers async GitHub REST commit to update thread metadata in `sticky-note.json`
 
-### Two-phase commit
-
-- **Fast path (KV):** Every `append_event` writes to KV immediately. Live data always in KV.
-- **Slow path (GitHub REST):** `open_thread` and `close_thread` trigger async GitHub REST commits. Events between open and close are flushed to git at close time.
-- **Crash recovery:** If `close_thread` never fires (session crash), a background Worker cron job flushes open threads older than 30 minutes to git with status `stale`.
-
-### GitHub REST API commit path
+### GitHub REST API (metadata only)
 
 ```
-GET  /repos/{owner}/{repo}/contents/.sticky-note/sticky-note.json  → read current sha + content
-PUT  /repos/{owner}/{repo}/contents/.sticky-note/sticky-note.json  → write updated content + sha
+GET /repos/{owner}/{repo}/contents/.sticky-note/sticky-note.json  → read SHA + content
+PUT /repos/{owner}/{repo}/contents/.sticky-note/sticky-note.json  → write metadata + SHA
 ```
 
-Requires a GitHub PAT (fine-grained, contents read+write on the repo) stored as a Worker secret. Added to `init` wizard as an optional step when cloud backend is configured.
+Only thread metadata is committed to git (same fields as `sticky-note.json` today). Full event streams stay in KV. The `StickyThread` DO serializes all GET+PUT calls for its thread, preventing 409 conflicts. Requires a GitHub PAT (fine-grained, contents read+write) stored as Worker secret `GITHUB_PAT`.
+
+If the GitHub PUT fails after retries, the Worker returns an error to the caller. Events remain in KV and will be retried by the recovery cron. If retries are exhausted, thread status is set to `lost` in KV metadata.
+
+### Crash recovery
+
+If `close_thread` never fires (session crash or timeout), a Worker cron job runs every 5 minutes and flushes open threads older than 30 minutes to git with status `stale`. The cron writes a synthetic `session_close` event with `narrative='[recovered by cron]'` and `work_type='unknown'`. It reads all KV event chunks for the thread and commits the metadata to git. The cron uses exponential backoff on GitHub 409s and records `last_recovery_attempt` in thread metadata to avoid redundant retries.
 
 ---
 
-## KV Storage Schema
+## CLAUDE.md Updates — Project-Level System Prompt
 
-```
-{project}:thread:{uuid}           → thread metadata (status, files, narrative, etc.)
-{project}:thread:{uuid}:events    → ordered event array (full event stream)
-{project}:thread:{uuid}:transcript → raw transcript JSONL (local sessions, pushed at close)
-```
-
-Events are stored as a JSON array in a single KV value. For very long sessions (>1000 events), the array is chunked: `:events:0`, `:events:1`, etc.
-
----
-
-## CLAUDE.md Updates
-
-The CLAUDE.md template gains a **Cowork & Mobile Sessions** section instructing Claude to:
+The following instructions go into the **claude.ai project-level system prompt** for the cowork connector project, not into the repo CLAUDE.md template. They do not apply to local hook-driven sessions (hooks handle those automatically).
 
 1. Call `open_thread` at session start with the verbatim first user prompt
-2. Call `append_event` for every action as it happens — not just "meaningful" ones
-3. Call `append_event` with `ai_thinking` type to capture reasoning before tool calls
-4. Call `set_checkpoint` when the user switches topics
-5. Call `close_thread` at session end with full narrative and classification
-
-The instruction is precise enough that Claude follows it without judgment calls about what is "worth" capturing.
+2. Call `append_event` for every event in the event type list as it happens
+3. Call `set_checkpoint` when the user switches topics mid-session
+4. Call `close_thread` at session end with full narrative and classification
 
 ---
 
 ## Init Wizard Changes
 
-`npx sticky-note init` gains two new prompts when cloud backend is configured:
+`npx sticky-note init` gains two new steps when cloud backend is configured:
 
-1. **GitHub PAT** — for REST API commits from the Worker. Stored as Worker secret `GITHUB_PAT`. Repo and owner inferred from `git remote get-url origin`.
-2. **Remote MCP connector URL** — outputs the Worker `/mcp` URL + required header (`X-Sticky-API-Key`) for the user to paste into claude.ai project settings.
+1. **GitHub PAT** — collected and stored as Worker secret `GITHUB_PAT` (check if already set before prompting). Repo and owner inferred from `git remote get-url origin`. KV project key derived from repo full name (e.g., `acme/frontend` → `acme-frontend`) to prevent namespace collisions on shared Worker instances.
+
+2. **Remote MCP connector URL** — outputs the Worker `/mcp` URL + `X-Sticky-API-Key` header value for the user to paste into claude.ai project settings. The API key identifies the repository; user attribution in events is advisory and relies on the caller-supplied `user` field in `open_thread`.
 
 ---
 
 ## AI Blame Query Path
 
-Given a file + line number, AI blame resolves:
+Given a file + line number:
 
-1. `get-line-attribution --file src/auth.ts --lines 40:55` → returns `thread_id` + `session_id`
-2. Fetch `{project}:thread:{uuid}:events` from KV
-3. Filter events by timestamp window around the `git_commit` that touched those lines
-4. Return the sequence: `user_prompt` → `ai_thinking` → `tool_call` (Edit on that file) → `tool_result`
+1. `get-line-attribution --file src/auth.ts --lines 40:55` → returns `thread_id`
+2. Fetch all `{project}:thread:{uuid}:events` chunks from KV in parallel
+3. Find the `git_commit` event whose `files` includes `src/auth.ts`
+4. Walk backwards from that `git_commit` timestamp to find the most recent `tool_call` that modified the same file
+5. Return the surrounding chain: `user_prompt` → `ai_thinking` → `tool_call` → `tool_result`
 
-This gives the full chain: what was asked → how the AI reasoned → what it did → what the result was.
-
----
-
-## What Is Not Captured
-
-- Tool result content for `Read` calls on large files is truncated to 10KB to avoid KV value size limits. Full content is in the local transcript for local sessions.
-- AI blame for lines changed by the user (not the AI) will show no thread — this is correct behavior.
-- Secrets are redacted from event data before writing (best-effort pattern matching, same policy as transcript capture today).
+This gives the full sequence: what was asked → how the AI reasoned → what it did → what the result was.
