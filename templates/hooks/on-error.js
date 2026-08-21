@@ -136,7 +136,7 @@ async function main() {
           eventWriter.EVENT_TYPES.TOOL_DENIED,
           {
             tool: toolName,
-            args: hookInput.tool_input || {},
+            args: eventWriter.sanitizeToolArgs(toolName, hookInput.tool_input || {}),
             reason: errorMsg,
           },
           sessionId
@@ -147,7 +147,7 @@ async function main() {
           eventWriter.EVENT_TYPES.TOOL_ERROR,
           {
             tool: toolName,
-            args: hookInput.tool_input || {},
+            args: eventWriter.sanitizeToolArgs(toolName, hookInput.tool_input || {}),
             error: errorMsg,
           },
           sessionId
