@@ -284,6 +284,72 @@ export default {
       return error(`Internal error: ${err.message}`, 500);
     }
   },
+
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runCrashRecovery(env));
+  },
 };
+
+// ── Crash recovery (cron) ────────────────────────────────
+
+async function runCrashRecovery(env) {
+  const projects = ["default"]; // TODO: discover from KV index if multi-project
+  const staleThresholdMs = 30 * 60 * 1000; // 30 minutes
+  const now = Date.now();
+
+  // Wire DO accessor for mcp-tools.js calls inside the cron handler
+  setDOAccessor(getOrCreateDO);
+
+  for (const project of projects) {
+    const threadsListKey = `${project}:threads_index`;
+    const threadIds = await env.STICKY_KV.get(threadsListKey, { type: "json" })
+      .catch(() => []) || [];
+
+    for (const threadId of threadIds) {
+      const metaKey = `${project}:thread:${threadId}`;
+      const meta = await env.STICKY_KV.get(metaKey, { type: "json" }).catch(() => null);
+      if (!meta || meta.status !== "open") continue;
+
+      const lastActivity = new Date(meta.last_activity_at || meta.created_at).getTime();
+      if (now - lastActivity < staleThresholdMs) continue;
+
+      // Track last_recovery_attempt to avoid hammering
+      const lastAttempt = meta._last_recovery_attempt || 0;
+      if (now - lastAttempt < 5 * 60 * 1000) continue; // skip if tried < 5min ago
+
+      // Thread is stale — flush DO buffer and mark as stale
+      try {
+        const do_stub = getOrCreateDO(env, threadId);
+        const recovery_event = {
+          ts: new Date().toISOString(), type: "session_close", session_id: null,
+          data: { narrative: "[recovered by cron]", work_type: "unknown", handoff_summary: "", failed_approaches: [], files_touched: [] },
+        };
+
+        meta._last_recovery_attempt = now;
+        await env.STICKY_KV.put(metaKey, JSON.stringify(meta));
+
+        await do_stub.fetch(new Request("http://do/do/close", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ close_event: recovery_event }),
+        }));
+
+        meta.status = "stale";
+        meta.last_activity_at = new Date().toISOString();
+        await env.STICKY_KV.put(metaKey, JSON.stringify(meta));
+
+        // GitHub commit for stale thread — use static import (already imported at top)
+        await handleMcpTool("close_thread", {
+          thread_id: threadId,
+          narrative: "[recovered by cron]",
+          work_type: "unknown",
+        }, env, project).catch(() => {});
+      } catch (_) {
+        // best-effort — log to console for observability
+        console.error(`[sticky-note] crash recovery failed for thread ${threadId}`);
+      }
+    }
+  }
+}
 
 export { StickyThread } from "./sticky-thread-do.js";
