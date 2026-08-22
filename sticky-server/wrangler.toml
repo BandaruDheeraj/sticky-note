@@ -5,6 +5,11 @@ compatibility_date = "2024-09-01"
 [vars]
 ENVIRONMENT = "production"
 
+# Required secrets (set via `wrangler secret put`):
+#   STICKY_API_KEY  — API key for X-Sticky-API-Key auth
+#   GITHUB_PAT      — Fine-grained PAT with Contents read+write on the target repo
+#   GITHUB_REPO     — Target repo in "owner/repo" format (e.g. "acme/frontend")
+
 [[kv_namespaces]]
 binding = "STICKY_KV"
 id = "PLACEHOLDER_KV_NAMESPACE_ID"
