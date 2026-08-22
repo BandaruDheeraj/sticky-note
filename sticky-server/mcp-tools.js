@@ -198,8 +198,8 @@ async function handleCloseThread(input, env, project) {
   return { ok: true };
 }
 
-// Internal helper — used by open_thread (fire-and-forget) and close_thread (awaited)
-async function _commitThreadToGit(env, project, threadId) {
+// Internal helper — used by open_thread (fire-and-forget), close_thread (awaited), and crash recovery
+export async function _commitThreadToGit(env, project, threadId) {
   const kv = env.STICKY_KV;
 
   // Always maintain the threads index (even without GitHub creds).
@@ -227,7 +227,7 @@ async function _commitThreadToGit(env, project, threadId) {
   );
   const threads = allMeta.filter(Boolean).map(m => {
     // Strip internal KV fields before writing to git
-    const { _event_chunks, ...rest } = m;
+    const { _event_chunks, _last_recovery_attempt, ...rest } = m;
     return rest;
   });
 

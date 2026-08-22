@@ -23,7 +23,7 @@
  */
 
 import * as adapter from "./adapters/cf-kv.js";
-import { MCP_TOOL_DEFINITIONS, handleMcpTool, setDOAccessor } from "./mcp-tools.js";
+import { MCP_TOOL_DEFINITIONS, handleMcpTool, setDOAccessor, _commitThreadToGit } from "./mcp-tools.js";
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -338,12 +338,8 @@ async function runCrashRecovery(env) {
         meta.last_activity_at = new Date().toISOString();
         await env.STICKY_KV.put(metaKey, JSON.stringify(meta));
 
-        // GitHub commit for stale thread — use static import (already imported at top)
-        await handleMcpTool("close_thread", {
-          thread_id: threadId,
-          narrative: "[recovered by cron]",
-          work_type: "unknown",
-        }, env, project).catch(() => {});
+        // GitHub commit for stale thread — commit the already-written stale metadata directly
+        await _commitThreadToGit(env, project, threadId).catch(() => {});
       } catch (_) {
         // best-effort — log to console for observability
         console.error(`[sticky-note] crash recovery failed for thread ${threadId}`);
