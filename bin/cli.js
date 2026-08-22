@@ -748,6 +748,59 @@ async function cmdInit() {
     print("  [OK] .env.sticky (cloud backend configured)");
   }
 
+  // GitHub PAT collection + MCP connector URL output (cloud backend only, interactive only)
+  const workerUrl = cloudProvisionedUrl || configStickyUrl;
+  if (workerUrl && !ciMode) {
+    const rl2 = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const ask2 = (q) => new Promise((res) => rl2.question(q, res));
+
+    const pat = await ask2(
+      "\nOptional: GitHub PAT for Worker → git commits (enables remote cowork session tracking).\n" +
+      "Create at https://github.com/settings/tokens/new (fine-grained, Contents read+write).\n" +
+      "PAT (leave blank to skip): "
+    );
+
+    if (pat && pat.trim()) {
+      const repo = await ask2("GitHub repo in owner/repo format (e.g. acme/frontend): ");
+      if (repo && repo.trim().includes("/")) {
+        try {
+          execSync(`wrangler secret put GITHUB_PAT`, { input: pat.trim(), stdio: ["pipe", "inherit", "inherit"] });
+          execSync(`wrangler secret put GITHUB_REPO`, { input: repo.trim(), stdio: ["pipe", "inherit", "inherit"] });
+          print("  ✓ GitHub PAT and repo stored as Worker secrets");
+        } catch (_) {
+          print("  ⚠ Could not store secrets via wrangler — set manually:");
+          print(`    wrangler secret put GITHUB_PAT`);
+          print(`    wrangler secret put GITHUB_REPO  # value: ${repo.trim()}`);
+        }
+      }
+    }
+    rl2.close();
+
+    // Always print connector instructions if Worker URL is configured
+    let envStickyApiKey = "";
+    try {
+      const envStickyPath = path.join(process.cwd(), ".env.sticky");
+      const envContent = fs.readFileSync(envStickyPath, "utf-8");
+      const m = envContent.match(/^STICKY_API_KEY=(.+)$/m);
+      if (m && m[1].trim()) envStickyApiKey = m[1].trim();
+    } catch (_) { /* no .env.sticky yet */ }
+
+    print("\n── claude.ai Cowork MCP Connector ──────────────────────────");
+    print("To track cowork sessions, add this connector in claude.ai project settings:");
+    print(`  URL:    ${workerUrl}/mcp`);
+    if (envStickyApiKey) {
+      print(`  Header: X-Sticky-API-Key: ${envStickyApiKey}`);
+    }
+    print("\nThe CLAUDE.md project system prompt (paste into claude.ai project instructions):");
+    print("  1. Call open_thread at session start with the verbatim first user prompt");
+    print("  2. Call append_event for every action: ai_thinking, ai_response, tool_call,");
+    print("     tool_result, tool_error, tool_denied, context_compressed, git_commit,");
+    print("     subagent_spawn, subagent_result, checkpoint");
+    print("  3. Call set_checkpoint when the user switches topics");
+    print("  4. Call close_thread at session end with narrative and work_type");
+    print("────────────────────────────────────────────────────────────\n");
+  }
+
   print("\n  📁 Creating files...\n");
 
   // Create directories
