@@ -40,7 +40,6 @@ export class StickyThread {
       const closeEvent = body.close_event;
       if (closeEvent) this.buffer.push(closeEvent);
       await this._flush();
-      // Cancel pending alarm
       try { await this.state.storage.deleteAlarm(); } catch (_) {}
       return new Response(JSON.stringify({ ok: true, flushed: true }), {
         headers: { "Content-Type": "application/json" },
@@ -60,7 +59,6 @@ export class StickyThread {
   }
 
   async alarm() {
-    // Alarm fires after 5s inactivity — flush buffered events
     if (this.buffer.length > 0) {
       await this._flush();
     }
@@ -90,15 +88,19 @@ export class StickyThread {
         ? (await kv.get(`${metaKey}:events:${currentChunkIdx}`, { type: "json" }).catch(() => []) || [])
         : [];
 
+      const enc = new TextEncoder();
+      let chunkBytes = enc.encode(JSON.stringify(currentChunk)).length;
+
       for (const event of toFlush) {
-        const eventBytes = new TextEncoder().encode(JSON.stringify(event)).length;
-        const chunkBytes = new TextEncoder().encode(JSON.stringify(currentChunk)).length;
+        const eventBytes = enc.encode(JSON.stringify(event)).length;
         if (chunkBytes + eventBytes > MAX_CHUNK_BYTES && currentChunk.length > 0) {
           await kv.put(`${metaKey}:events:${currentChunkIdx}`, JSON.stringify(currentChunk));
           currentChunkIdx++;
           currentChunk = [];
+          chunkBytes = 0;
         }
         currentChunk.push(event);
+        chunkBytes += eventBytes;
       }
       await kv.put(`${metaKey}:events:${currentChunkIdx}`, JSON.stringify(currentChunk));
       meta._event_chunks = currentChunkIdx + 1;

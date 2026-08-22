@@ -305,9 +305,14 @@ async function runCrashRecovery(env) {
     const threadIds = await env.STICKY_KV.get(threadsListKey, { type: "json" })
       .catch(() => []) || [];
 
-    for (const threadId of threadIds) {
-      const metaKey = `${project}:thread:${threadId}`;
-      const meta = await env.STICKY_KV.get(metaKey, { type: "json" }).catch(() => null);
+    const metas = await Promise.all(
+      threadIds.map(id =>
+        env.STICKY_KV.get(`${project}:thread:${id}`, { type: "json" }).catch(() => null)
+      )
+    );
+    for (let i = 0; i < threadIds.length; i++) {
+      const meta = metas[i];
+      const threadId = threadIds[i];
       if (!meta || meta.status !== "open") continue;
 
       const lastActivity = new Date(meta.last_activity_at || meta.created_at).getTime();

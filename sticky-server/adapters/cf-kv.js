@@ -213,19 +213,22 @@ async function appendEvents(kv, project, threadId, newEvents) {
       [];
   }
 
+  const enc = new TextEncoder();
+  let chunkBytes = enc.encode(JSON.stringify(currentChunk)).length;
+
   for (const event of newEvents) {
-    const eventBytes = new TextEncoder().encode(JSON.stringify(event)).length;
-    const chunkBytes = new TextEncoder().encode(JSON.stringify(currentChunk)).length;
+    const eventBytes = enc.encode(JSON.stringify(event)).length;
     if (chunkBytes + eventBytes > MAX_CHUNK_BYTES && currentChunk.length > 0) {
       await kv.put(`${metaKey}:events:${currentChunkIdx}`, JSON.stringify(currentChunk));
       currentChunkIdx++;
       currentChunk = [];
+      chunkBytes = 0;
     }
     currentChunk.push(event);
+    chunkBytes += eventBytes;
   }
   await kv.put(`${metaKey}:events:${currentChunkIdx}`, JSON.stringify(currentChunk));
 
-  // Update chunk count in thread metadata
   const newMeta = { ...(meta || {}), _event_chunks: currentChunkIdx + 1 };
   await kv.put(metaKey, JSON.stringify(newMeta));
 }

@@ -124,20 +124,12 @@ async function handleOpenThread(input, env, project) {
 
 async function handleAppendEvent(input, env, project) {
   const { thread_id, type, data } = input;
-  const event = { ts: new Date().toISOString(), type, session_id: null, data: data || {} };
 
-  // Update last_activity_at in thread meta
   const metaKey = `${project}:thread:${thread_id}`;
-  const meta = await env.STICKY_KV.get(metaKey, { type: "json" }).catch(() => null);
-  if (meta) {
-    meta.last_activity_at = event.ts;
-    // Track files_touched from tool_result events
-    if (type === "tool_result" && Array.isArray(data.lines_changed)) {
-      const file = data.file || (data.args && data.args.file_path);
-      if (file && !meta.files_touched.includes(file)) meta.files_touched.push(file);
-    }
-    await env.STICKY_KV.put(metaKey, JSON.stringify(meta));
-  }
+  const exists = await env.STICKY_KV.get(metaKey, { type: "text" });
+  if (!exists) return { ok: false, error: "unknown thread_id" };
+
+  const event = { ts: new Date().toISOString(), type, session_id: null, data: data || {} };
 
   const do_stub = getOrCreateDO_internal(env, thread_id);
   await do_stub.fetch(new Request("http://do/do/append", {
@@ -222,6 +214,7 @@ export async function _commitThreadToGit(env, project, threadId) {
   const [owner, repo] = repoFull.split("/");
   if (!owner || !repo) return;
 
+  // threadIds is already populated above — no second KV read needed
   const allMeta = await Promise.all(
     threadIds.map(id => kv.get(`${project}:thread:${id}`, { type: "json" }).catch(() => null))
   );
