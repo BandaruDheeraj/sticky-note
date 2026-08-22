@@ -8,3 +8,12 @@ ENVIRONMENT = "production"
 [[kv_namespaces]]
 binding = "STICKY_KV"
 id = "PLACEHOLDER_KV_NAMESPACE_ID"
+
+[durable_objects]
+bindings = [
+  { name = "STICKY_THREAD", class_name = "StickyThread" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["StickyThread"]

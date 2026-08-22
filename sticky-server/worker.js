@@ -204,6 +204,13 @@ const handlers = {
   },
 };
 
+// ── Durable Object helper ────────────────────────────────
+
+function getOrCreateDO(env, threadId) {
+  const id = env.STICKY_THREAD.idFromName(threadId);
+  return env.STICKY_THREAD.get(id);
+}
+
 // ── Worker entry point ───────────────────────────────────
 
 export default {
@@ -251,3 +258,5 @@ export default {
     }
   },
 };
+
+export { StickyThread } from "./sticky-thread-do.js";
