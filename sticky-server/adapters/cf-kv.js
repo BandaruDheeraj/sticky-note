@@ -175,6 +175,61 @@ async function deletePresence(kv, project, user) {
   await kv.put(indexKey, JSON.stringify(filtered));
 }
 
+// ── Events ───────────────────────────────────────────────
+
+const MAX_CHUNK_BYTES = 2 * 1024 * 1024; // 2 MB per KV value
+
+async function getEvents(kv, project, threadId) {
+  const metaKey = `${project}:thread:${threadId}`;
+  const meta = await kv.get(metaKey, { type: "json" }).catch(() => null);
+  const chunkCount = (meta && meta._event_chunks) || 0;
+
+  if (chunkCount === 0) {
+    // Try legacy single-key format
+    const single = await kv.get(`${metaKey}:events`, { type: "json" }).catch(() => null);
+    return Array.isArray(single) ? single : [];
+  }
+
+  const chunks = await Promise.all(
+    Array.from({ length: chunkCount }, (_, i) =>
+      kv.get(`${metaKey}:events:${i}`, { type: "json" }).catch(() => [])
+    )
+  );
+  return chunks.flat().filter(Boolean);
+}
+
+async function appendEvents(kv, project, threadId, newEvents) {
+  if (!newEvents || newEvents.length === 0) return;
+
+  const metaKey = `${project}:thread:${threadId}`;
+  const meta = await kv.get(metaKey, { type: "json" }).catch(() => ({}));
+  const chunkCount = (meta && meta._event_chunks) || 0;
+
+  let currentChunkIdx = chunkCount === 0 ? 0 : chunkCount - 1;
+  let currentChunk = [];
+  if (chunkCount > 0) {
+    currentChunk =
+      (await kv.get(`${metaKey}:events:${currentChunkIdx}`, { type: "json" }).catch(() => [])) ||
+      [];
+  }
+
+  for (const event of newEvents) {
+    const eventBytes = new TextEncoder().encode(JSON.stringify(event)).length;
+    const chunkBytes = new TextEncoder().encode(JSON.stringify(currentChunk)).length;
+    if (chunkBytes + eventBytes > MAX_CHUNK_BYTES && currentChunk.length > 0) {
+      await kv.put(`${metaKey}:events:${currentChunkIdx}`, JSON.stringify(currentChunk));
+      currentChunkIdx++;
+      currentChunk = [];
+    }
+    currentChunk.push(event);
+  }
+  await kv.put(`${metaKey}:events:${currentChunkIdx}`, JSON.stringify(currentChunk));
+
+  // Update chunk count in thread metadata
+  const newMeta = { ...(meta || {}), _event_chunks: currentChunkIdx + 1 };
+  await kv.put(metaKey, JSON.stringify(newMeta));
+}
+
 // ── Config ───────────────────────────────────────────────
 
 async function getConfig(kv, project) {
@@ -200,4 +255,6 @@ export {
   deletePresence,
   getConfig,
   putConfig,
+  getEvents,
+  appendEvents,
 };

@@ -11,6 +11,8 @@
  *   GET    /threads/:id       — get thread
  *   PUT    /threads/:id       — update thread
  *   DELETE /threads/:id       — tombstone thread
+ *   POST   /threads/:id/events — append event batch (local session push)
+ *   GET    /threads/:id/events — retrieve all stored events
  *   GET    /audit             — query audit (?file=, ?user=, ?since=, ?tool=)
  *   POST   /audit             — append audit record
  *   GET    /presence          — list active developers
@@ -51,6 +53,14 @@ function matchRoute(method, pathname) {
   // Thread routes
   if (method === "POST" && pathname === "/threads") return { handler: "createThread" };
   if (method === "GET" && pathname === "/threads") return { handler: "listThreads" };
+  if (method === "POST" && pathname.match(/^\/threads\/[^/]+\/events$/)) {
+    const id = pathname.split("/")[2];
+    return { handler: "appendThreadEvents", id };
+  }
+  if (method === "GET" && pathname.match(/^\/threads\/[^/]+\/events$/)) {
+    const id = pathname.split("/")[2];
+    return { handler: "getThreadEvents", id };
+  }
   if (method === "GET" && pathname.startsWith("/threads/")) {
     return { handler: "getThread", id: pathname.slice("/threads/".length) };
   }
@@ -124,6 +134,20 @@ const handlers = {
   async deleteThread(_request, kv, project, { id }) {
     await adapter.deleteThread(kv, project, id);
     return json({ deleted: id });
+  },
+
+  // ── Thread Events ──
+
+  async appendThreadEvents(request, kv, project, { id }) {
+    const body = await request.json().catch(() => ({}));
+    const events = Array.isArray(body.events) ? body.events : [];
+    await adapter.appendEvents(kv, project, id, events);
+    return json({ ok: true, appended: events.length });
+  },
+
+  async getThreadEvents(_request, kv, project, { id }) {
+    const events = await adapter.getEvents(kv, project, id);
+    return json({ events });
   },
 
   // ── Audit ──
