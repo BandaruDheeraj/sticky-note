@@ -101,4 +101,4 @@ function capResult(result) {
   return result.slice(0, cutoff) + `...[truncated, ${bytes} bytes total]`;
 }
 
-module.exports = { EVENT_TYPES, buildEvent, sanitizeToolArgs, capResult, MAX_RESULT_BYTES, MAX_ARG_INLINE_BYTES };
+module.exports = { EVENT_TYPES, WRITE_TOOLS, buildEvent, sanitizeToolArgs, capResult, MAX_RESULT_BYTES, MAX_ARG_INLINE_BYTES };

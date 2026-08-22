@@ -8,8 +8,6 @@
  * Appends JSONL audit line.
  */
 
-const crypto = require("crypto");
-
 function _safeExit() {
   try {
     process.stdout.write(JSON.stringify({ output: "" }) + "\n");

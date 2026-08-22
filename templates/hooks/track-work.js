@@ -35,6 +35,9 @@ try {
   gitNotes = null;
 }
 
+let eventWriter = null;
+try { eventWriter = require("./event-writer.js"); } catch (_) {}
+
 const {
   getConfigPath,
   getMemoryPath,
@@ -53,7 +56,8 @@ const {
 } = utils;
 
 const WRITE_TOOLS = new Set([
-  "edit", "Edit", "create", "Create", "Write", "write", "MultiEdit", "multi_edit",
+  ...(eventWriter && eventWriter.WRITE_TOOLS ? eventWriter.WRITE_TOOLS : ["Edit", "edit", "Write", "write", "MultiEdit", "multi_edit"]),
+  "create", "Create",
 ]);
 
 function _debugPath() {
@@ -147,7 +151,7 @@ function autoDetectMcp(toolName) {
   return null;
 }
 
-// ── V2.5: Line-level change tracking ─────────────────────
+// ── Line-level change tracking ───────────────────────────
 
 /**
  * After a write tool completes, capture exact line ranges changed.
@@ -257,14 +261,10 @@ function main() {
   }
 
   const user = getUser();
-  const now = new Date().toISOString();
   const isWriteTool = WRITE_TOOLS.has(toolName);
 
-  // Load event-writer (best-effort — don't break if missing)
-  let eventWriter = null;
-  try { eventWriter = require("./event-writer.js"); } catch (_) {}
-
-  // V2.5: Capture line-level changes for write tools
+  // Capture line-level changes for write tools before timestamping the entry,
+  // so the ts reflects when the audit record is actually written.
   let lineRanges = null;
   let checkpoint = null;
   if (isWriteTool && filePath) {
@@ -274,13 +274,13 @@ function main() {
     }
   }
 
-  const now2 = new Date().toISOString();
+  const now = new Date().toISOString();
 
   // Legacy entry — kept for backward compat with existing audit queries
   const entry = {
     type: "tool_use",
     user,
-    ts: now2,
+    ts: now,
     tool: toolName,
     session_id: sessionId,
   };
@@ -339,7 +339,6 @@ function main() {
     }).catch(() => {});
   }
 
-  // V2.5: Write Git Note for write tools
   if (isWriteTool && filePath) {
     writeEditNote(sessionId, user, filePath, lineRanges, checkpoint);
   }

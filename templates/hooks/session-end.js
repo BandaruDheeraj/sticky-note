@@ -76,9 +76,14 @@ const {
   syncStickyNote,
 } = utils;
 
+// ── AI event writer ───────────────────────────────────────
+
+let eventWriter = null;
+try { eventWriter = require("./event-writer.js"); } catch (_) {}
+
 // ── Constants ─────────────────────────────────────────────
 
-const WRITE_TOOLS = new Set([
+const WRITE_TOOLS = (eventWriter && eventWriter.WRITE_TOOLS) || new Set([
   "Write", "Edit", "MultiEdit",
   "write", "edit", "multi_edit",
 ]);
@@ -380,16 +385,13 @@ function extractFailedApproaches(hookInput) {
 
 // ── AI event extraction for AI blame ─────────────────────
 
-let _eventWriter = null;
-try { _eventWriter = require("./event-writer.js"); } catch (_) {}
-
 /**
  * Parse Claude Code's transcript JSONL to extract ai_thinking,
  * ai_response, and context_compressed events for the AI blame stream.
  * Returns an array of structured events ordered by their appearance.
  */
 function extractAiEventsFromTranscript(transcriptPath, sessionId) {
-  if (!_eventWriter) return [];
+  if (!eventWriter) return [];
   if (!transcriptPath || !fs.existsSync(transcriptPath)) return [];
 
   const events = [];
@@ -409,8 +411,8 @@ function extractAiEventsFromTranscript(transcriptPath, sessionId) {
     // Context compression: Claude Code emits entries with a summary field
     // when the context window is compacted.
     if (entry.type === "summary" && entry.summary) {
-      events.push(_eventWriter.buildEvent(
-        _eventWriter.EVENT_TYPES.CONTEXT_COMPRESSED,
+      events.push(eventWriter.buildEvent(
+        eventWriter.EVENT_TYPES.CONTEXT_COMPRESSED,
         {
           summary: String(entry.summary).substring(0, 1000),
           tokens_before: entry.tokens_before || null,
@@ -433,16 +435,16 @@ function extractAiEventsFromTranscript(transcriptPath, sessionId) {
       if (!block || typeof block !== "object") continue;
 
       if (block.type === "thinking" && block.thinking) {
-        events.push(_eventWriter.buildEvent(
-          _eventWriter.EVENT_TYPES.AI_THINKING,
+        events.push(eventWriter.buildEvent(
+          eventWriter.EVENT_TYPES.AI_THINKING,
           { content: block.thinking },
           sessionId
         ));
       }
 
       if (block.type === "text" && block.text && block.text.trim()) {
-        events.push(_eventWriter.buildEvent(
-          _eventWriter.EVENT_TYPES.AI_RESPONSE,
+        events.push(eventWriter.buildEvent(
+          eventWriter.EVENT_TYPES.AI_RESPONSE,
           { content: block.text },
           sessionId
         ));
@@ -450,9 +452,9 @@ function extractAiEventsFromTranscript(transcriptPath, sessionId) {
     }
 
     // Token usage may appear on the entry itself (Claude Code's format)
-    if (entry.usage && _eventWriter) {
+    if (entry.usage && eventWriter) {
       const last = events[events.length - 1];
-      if (last && last.type === _eventWriter.EVENT_TYPES.AI_RESPONSE) {
+      if (last && last.type === eventWriter.EVENT_TYPES.AI_RESPONSE) {
         last.data.input_tokens = entry.usage.input_tokens || null;
         last.data.output_tokens = entry.usage.output_tokens || null;
         last.data.cache_read_tokens = entry.usage.cache_read_input_tokens || null;
@@ -466,10 +468,14 @@ function extractAiEventsFromTranscript(transcriptPath, sessionId) {
 /**
  * Collect all events for this session from the audit JSONL files
  * (tool_call, tool_result, tool_error, tool_denied, user_prompt, session_open)
- * plus the AI events extracted from the transcript.
+ * plus the provided pre-extracted AI events.
  * Sort by ts. Returns an array ready to push to the Worker.
+ *
+ * Callers must extract AI events separately (via extractAiEventsFromTranscript)
+ * so the same extraction can be reused for local audit writes — avoiding a
+ * second transcript parse.
  */
-function collectSessionEvents(sessionId, hookInput) {
+function collectSessionEvents(sessionId, aiEvents) {
   const events = [];
 
   // Gather structured events from audit (written by hooks during the session)
@@ -495,11 +501,7 @@ function collectSessionEvents(sessionId, hookInput) {
     }
   }
 
-  // Add AI events from transcript
-  const transcriptEvents = extractAiEventsFromTranscript(
-    hookInput.transcript_path || "", sessionId
-  );
-  events.push(...transcriptEvents);
+  events.push(...aiEvents);
 
   // Sort by ts ascending
   events.sort((a, b) => {
@@ -512,16 +514,9 @@ function collectSessionEvents(sessionId, hookInput) {
 }
 
 // ── Transcript capture ────────────────────────────────────
-// Persists the full verbatim session transcript (Claude Code's native
-// transcript_path JSONL file) into sticky-note/data storage, keyed by
-// thread ID rather than commit SHA — a thread's transcript belongs to the
-// whole session, which may span zero, one, or many commits. Appended as
-// one entry per contributing session so resumed threads accumulate their
-// full history rather than overwriting it.
-//
-// Opt-out: set "capture_transcripts": false in sticky-note-config.json.
-// Secrets are redacted (best-effort — see redactSecrets in sticky-utils.js)
-// before anything is written to disk or committed.
+// Keyed by thread ID rather than commit SHA — a session may span zero or many
+// commits. Appended (not overwritten) so resumed threads accumulate history.
+// Opt-out: "capture_transcripts": false in sticky-note-config.json.
 
 function captureTranscript(hookInput, threadId, sessionId, aiTool, user, now, config) {
   if (!threadId) return false;
@@ -933,6 +928,19 @@ function clearPresence(user) {
   try { fs.unlinkSync(presencePath); } catch (_) {}
 }
 
+// ── Cloud helpers ─────────────────────────────────────────
+
+function _makeCloudHeaders() {
+  const { url, apiKey } = getCloudConfig();
+  const projectName = getProjectName();
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Sticky-Project": projectName,
+  };
+  if (apiKey) headers["X-Sticky-API-Key"] = apiKey;
+  return { url, headers };
+}
+
 // ── Data-branch commit/push ───────────────────────────────
 
 /** Collect files from a directory matching an extension into fileMap. */
@@ -1053,7 +1061,7 @@ async function main() {
   memory.threads = threads;
   let existing = null;
 
-  // V2.5: Check for active resumed thread (set by resume-thread command)
+  // Check for active resumed thread (set by resume-thread command)
   const activeResumeId = getActiveResumeThreadId();
 
   // Check for resumed thread (V2 resume signal or V2.5 active resume)
@@ -1085,7 +1093,7 @@ async function main() {
         });
       }
 
-      // V2.5: Update contributors and resume metadata
+      // Update contributors and resume metadata
       const contributors = existing.contributors || [];
       if (!contributors.includes(user)) {
         contributors.push(user);
@@ -1202,13 +1210,7 @@ async function main() {
           .filter(Boolean)
           .find(e => e.session_id === sessionId);
         if (entry) {
-          const { url: stickyUrl, apiKey: stickyApiKey } = getCloudConfig();
-          const projectName = getProjectName();
-          const headers = {
-            "Content-Type": "application/json",
-            "X-Sticky-Project": projectName,
-          };
-          if (stickyApiKey) headers["X-Sticky-API-Key"] = stickyApiKey;
+          const { url: stickyUrl, headers } = _makeCloudHeaders();
           fetch(`${stickyUrl}/transcripts/${existing.id}`, {
             method: "POST",
             headers,
@@ -1219,11 +1221,10 @@ async function main() {
     } catch (_) {} // transcript cloud sync is non-fatal
   }
 
-  // Extract AI events from transcript and write to audit for local AI blame
+  // Extract AI events once — used for both local audit writes and the Worker push.
+  let aiEvents = [];
   try {
-    const aiEvents = extractAiEventsFromTranscript(
-      hookInput.transcript_path || "", sessionId
-    );
+    aiEvents = extractAiEventsFromTranscript(hookInput.transcript_path || "", sessionId);
     for (const ev of aiEvents) {
       try { appendAuditLineBoth(ev, cloud); } catch (_) {}
     }
@@ -1231,19 +1232,13 @@ async function main() {
     // non-fatal — AI event extraction must never interrupt session-end
   }
 
-  // Push complete event stream to Worker for team-wide AI blame
+  // Push complete event stream to Worker for team-wide AI blame.
   // This is a no-op if cloud is not configured or the endpoint doesn't exist yet.
   if (cloud && existing && existing.id) {
     try {
-      const allEvents = collectSessionEvents(sessionId, hookInput);
+      const allEvents = collectSessionEvents(sessionId, aiEvents);
       if (allEvents.length > 0) {
-        const { url: stickyUrl, apiKey: stickyApiKey } = getCloudConfig();
-        const projectName = getProjectName();
-        const headers = {
-          "Content-Type": "application/json",
-          "X-Sticky-Project": projectName,
-        };
-        if (stickyApiKey) headers["X-Sticky-API-Key"] = stickyApiKey;
+        const { url: stickyUrl, headers } = _makeCloudHeaders();
         fetch(`${stickyUrl}/threads/${existing.id}/events`, {
           method: "POST",
           headers,
@@ -1256,7 +1251,7 @@ async function main() {
     }
   }
 
-  // V2.5: Capture commit SHAs for attribution engine
+  // Capture commit SHAs for attribution engine
   const commitShas = getSessionCommitShas();
 
   // Housekeeping
@@ -1276,7 +1271,7 @@ async function main() {
   }
   appendAuditLineBoth(auditEntry, cloud);
 
-  // V2.5: Also write individual commit_sha audit entries for bridge lookup
+  // Also write individual commit_sha audit entries for bridge lookup
   for (const sha of commitShas) {
     const commitEntry = {
       type: "commit",
