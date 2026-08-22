@@ -1,4 +1,6 @@
 // sticky-server/sticky-thread-do.js
+import { appendEvents } from "./adapters/cf-kv.js";
+
 export class StickyThread {
   constructor(state, env) {
     this.state = state;
@@ -77,34 +79,7 @@ export class StickyThread {
     if (this.buffer.length === 0 || !this.threadId) return;
     const toFlush = this.buffer.splice(0);
     try {
-      const kv = this.env.STICKY_KV;
-      const metaKey = `${this.project}:thread:${this.threadId}`;
-      const MAX_CHUNK_BYTES = 2 * 1024 * 1024;
-
-      const meta = await kv.get(metaKey, { type: "json" }).catch(() => ({})) || {};
-      let chunkCount = meta._event_chunks || 0;
-      let currentChunkIdx = chunkCount === 0 ? 0 : chunkCount - 1;
-      let currentChunk = chunkCount > 0
-        ? (await kv.get(`${metaKey}:events:${currentChunkIdx}`, { type: "json" }).catch(() => []) || [])
-        : [];
-
-      const enc = new TextEncoder();
-      let chunkBytes = enc.encode(JSON.stringify(currentChunk)).length;
-
-      for (const event of toFlush) {
-        const eventBytes = enc.encode(JSON.stringify(event)).length;
-        if (chunkBytes + eventBytes > MAX_CHUNK_BYTES && currentChunk.length > 0) {
-          await kv.put(`${metaKey}:events:${currentChunkIdx}`, JSON.stringify(currentChunk));
-          currentChunkIdx++;
-          currentChunk = [];
-          chunkBytes = 0;
-        }
-        currentChunk.push(event);
-        chunkBytes += eventBytes;
-      }
-      await kv.put(`${metaKey}:events:${currentChunkIdx}`, JSON.stringify(currentChunk));
-      meta._event_chunks = currentChunkIdx + 1;
-      await kv.put(metaKey, JSON.stringify(meta));
+      await appendEvents(this.env.STICKY_KV, this.project, this.threadId, toFlush);
     } catch (err) {
       // Put unwritten events back at front of buffer for retry
       this.buffer.unshift(...toFlush);

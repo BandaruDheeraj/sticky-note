@@ -3,6 +3,13 @@
 // crypto.randomUUID() is a Workers global — no import needed unless nodejs_compat is set.
 // We use the global directly to avoid a hard dep on node:crypto when that flag isn't active.
 
+export const EVENT_TYPES = Object.freeze({
+  SESSION_OPEN:  "session_open",
+  SESSION_CLOSE: "session_close",
+  USER_PROMPT:   "user_prompt",
+  CHECKPOINT:    "checkpoint",
+});
+
 export const MCP_TOOL_DEFINITIONS = [
   {
     name: "open_thread",
@@ -63,17 +70,17 @@ export const MCP_TOOL_DEFINITIONS = [
   },
 ];
 
-export async function handleMcpTool(toolName, input, env, project) {
+export async function handleMcpTool(toolName, input, env, project, getOrCreateDO) {
   switch (toolName) {
-    case "open_thread":    return handleOpenThread(input, env, project);
-    case "append_event":   return handleAppendEvent(input, env, project);
-    case "set_checkpoint": return handleSetCheckpoint(input, env, project);
-    case "close_thread":   return handleCloseThread(input, env, project);
+    case "open_thread":    return handleOpenThread(input, env, project, getOrCreateDO);
+    case "append_event":   return handleAppendEvent(input, env, project, getOrCreateDO);
+    case "set_checkpoint": return handleSetCheckpoint(input, env, project, getOrCreateDO);
+    case "close_thread":   return handleCloseThread(input, env, project, getOrCreateDO);
     default: throw new Error(`Unknown tool: ${toolName}`);
   }
 }
 
-async function handleOpenThread(input, env, project) {
+async function handleOpenThread(input, env, project, getOrCreateDO) {
   const threadId = crypto.randomUUID();
   const now = new Date().toISOString();
 
@@ -95,7 +102,7 @@ async function handleOpenThread(input, env, project) {
   await env.STICKY_KV.put(metaKey, JSON.stringify(threadMeta));
 
   const openEvent = {
-    ts: now, type: "session_open", session_id: null,
+    ts: now, type: EVENT_TYPES.SESSION_OPEN, session_id: null,
     data: {
       model: input.model || null,
       branch: input.branch || null,
@@ -105,11 +112,11 @@ async function handleOpenThread(input, env, project) {
     },
   };
   const promptEvent = {
-    ts: now, type: "user_prompt", session_id: null,
+    ts: now, type: EVENT_TYPES.USER_PROMPT, session_id: null,
     data: { content: input.prompt },
   };
 
-  const do_stub = getOrCreateDO_internal(env, threadId);
+  const do_stub = getOrCreateDO(env, threadId);
   await do_stub.fetch(new Request("http://do/do/open", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -117,12 +124,12 @@ async function handleOpenThread(input, env, project) {
   }));
 
   // Async GitHub commit — fire and forget
-  _commitThreadToGit(env, project, threadId).catch(() => {});
+  _commitThreadToGit(env, project, threadId, getOrCreateDO).catch(() => {});
 
   return { thread_id: threadId };
 }
 
-async function handleAppendEvent(input, env, project) {
+async function handleAppendEvent(input, env, project, getOrCreateDO) {
   const { thread_id, type, data } = input;
 
   const metaKey = `${project}:thread:${thread_id}`;
@@ -131,7 +138,7 @@ async function handleAppendEvent(input, env, project) {
 
   const event = { ts: new Date().toISOString(), type, session_id: null, data: data || {} };
 
-  const do_stub = getOrCreateDO_internal(env, thread_id);
+  const do_stub = getOrCreateDO(env, thread_id);
   await do_stub.fetch(new Request("http://do/do/append", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -141,19 +148,19 @@ async function handleAppendEvent(input, env, project) {
   return { ok: true };
 }
 
-async function handleSetCheckpoint(input, env, project) {
+async function handleSetCheckpoint(input, env, project, getOrCreateDO) {
   return handleAppendEvent(
-    { thread_id: input.thread_id, type: "checkpoint", data: { topic: input.topic } },
-    env, project
+    { thread_id: input.thread_id, type: EVENT_TYPES.CHECKPOINT, data: { topic: input.topic } },
+    env, project, getOrCreateDO
   );
 }
 
-async function handleCloseThread(input, env, project) {
+async function handleCloseThread(input, env, project, getOrCreateDO) {
   const { thread_id, narrative, work_type, handoff_summary, failed_approaches, files_touched } = input;
   const now = new Date().toISOString();
 
   const closeEvent = {
-    ts: now, type: "session_close", session_id: null,
+    ts: now, type: EVENT_TYPES.SESSION_CLOSE, session_id: null,
     data: {
       narrative,
       work_type: work_type || "general",
@@ -163,7 +170,7 @@ async function handleCloseThread(input, env, project) {
     },
   };
 
-  const do_stub = getOrCreateDO_internal(env, thread_id);
+  const do_stub = getOrCreateDO(env, thread_id);
   await do_stub.fetch(new Request("http://do/do/close", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -185,13 +192,13 @@ async function handleCloseThread(input, env, project) {
   await env.STICKY_KV.put(metaKey, JSON.stringify(meta));
 
   // GitHub commit — synchronous (awaited) for close_thread
-  await _commitThreadToGit(env, project, thread_id);
+  await _commitThreadToGit(env, project, thread_id, getOrCreateDO);
 
   return { ok: true };
 }
 
 // Internal helper — used by open_thread (fire-and-forget), close_thread (awaited), and crash recovery
-export async function _commitThreadToGit(env, project, threadId) {
+export async function _commitThreadToGit(env, project, threadId, getOrCreateDO) {
   const kv = env.STICKY_KV;
 
   // Always maintain the threads index (even without GitHub creds).
@@ -227,7 +234,7 @@ export async function _commitThreadToGit(env, project, threadId) {
   const newContent = JSON.stringify({ version: "2", project, threads }, null, 2) + "\n";
 
   // Use StickyThread DO for serialized GitHub commit (avoids race conditions)
-  const do_stub = getOrCreateDO_internal(env, threadId);
+  const do_stub = getOrCreateDO(env, threadId);
   await do_stub.fetch(new Request("http://do/do/github-commit", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -239,12 +246,4 @@ export async function _commitThreadToGit(env, project, threadId) {
       pat,
     }),
   }));
-}
-
-// Module-level DO accessor (set by worker.js at the top of fetch() so env is always fresh)
-let _getOrCreateDO = null;
-export function setDOAccessor(fn) { _getOrCreateDO = fn; }
-function getOrCreateDO_internal(env, threadId) {
-  if (_getOrCreateDO) return _getOrCreateDO(env, threadId);
-  throw new Error("DO accessor not initialized — call setDOAccessor(getOrCreateDO) in worker.js fetch()");
 }

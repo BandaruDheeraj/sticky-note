@@ -23,7 +23,7 @@
  */
 
 import * as adapter from "./adapters/cf-kv.js";
-import { MCP_TOOL_DEFINITIONS, handleMcpTool, setDOAccessor, _commitThreadToGit } from "./mcp-tools.js";
+import { MCP_TOOL_DEFINITIONS, handleMcpTool, _commitThreadToGit, EVENT_TYPES } from "./mcp-tools.js";
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -206,7 +206,7 @@ const handlers = {
     const toolInput = body.input || body.arguments || {};
     if (!toolName) return error("tool name required");
     try {
-      const result = await handleMcpTool(toolName, toolInput, env, project);
+      const result = await handleMcpTool(toolName, toolInput, env, project, getOrCreateDO);
       return json({ content: [{ type: "text", text: JSON.stringify(result) }] });
     } catch (err) {
       return error(err.message, 400);
@@ -239,9 +239,6 @@ function getOrCreateDO(env, threadId) {
 
 export default {
   async fetch(request, env) {
-    // Wire DO accessor so mcp-tools.js can call getOrCreateDO with the current env
-    setDOAccessor(getOrCreateDO);
-
     // CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
@@ -297,9 +294,6 @@ async function runCrashRecovery(env) {
   const staleThresholdMs = 30 * 60 * 1000; // 30 minutes
   const now = Date.now();
 
-  // Wire DO accessor for mcp-tools.js calls inside the cron handler
-  setDOAccessor(getOrCreateDO);
-
   for (const project of projects) {
     const threadsListKey = `${project}:threads_index`;
     const threadIds = await env.STICKY_KV.get(threadsListKey, { type: "json" })
@@ -326,7 +320,7 @@ async function runCrashRecovery(env) {
       try {
         const do_stub = getOrCreateDO(env, threadId);
         const recovery_event = {
-          ts: new Date().toISOString(), type: "session_close", session_id: null,
+          ts: new Date().toISOString(), type: EVENT_TYPES.SESSION_CLOSE, session_id: null,
           data: { narrative: "[recovered by cron]", work_type: "unknown", handoff_summary: "", failed_approaches: [], files_touched: [] },
         };
 
@@ -344,7 +338,7 @@ async function runCrashRecovery(env) {
         await env.STICKY_KV.put(metaKey, JSON.stringify(meta));
 
         // GitHub commit for stale thread — commit the already-written stale metadata directly
-        await _commitThreadToGit(env, project, threadId).catch(() => {});
+        await _commitThreadToGit(env, project, threadId, getOrCreateDO).catch(() => {});
       } catch (_) {
         // best-effort — log to console for observability
         console.error(`[sticky-note] crash recovery failed for thread ${threadId}`);
