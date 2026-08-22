@@ -117,7 +117,7 @@ async function handleOpenThread(input, env, project) {
   }));
 
   // Async GitHub commit — fire and forget
-  _commitThreadToGit(env, project, threadId, threadMeta).catch(() => {});
+  _commitThreadToGit(env, project, threadId).catch(() => {});
 
   return { thread_id: threadId };
 }
@@ -193,28 +193,34 @@ async function handleCloseThread(input, env, project) {
   await env.STICKY_KV.put(metaKey, JSON.stringify(meta));
 
   // GitHub commit — synchronous (awaited) for close_thread
-  await _commitThreadToGit(env, project, thread_id, meta);
+  await _commitThreadToGit(env, project, thread_id);
 
   return { ok: true };
 }
 
 // Internal helper — used by open_thread (fire-and-forget) and close_thread (awaited)
-async function _commitThreadToGit(env, project, threadId, threadMeta) {
-  const pat = env.GITHUB_PAT;
-  const repoFull = env.GITHUB_REPO; // format: "owner/repo"
-  if (!pat || !repoFull) return;
-  const [owner, repo] = repoFull.split("/");
-  if (!owner || !repo) return;
-
+async function _commitThreadToGit(env, project, threadId) {
   const kv = env.STICKY_KV;
 
-  // Maintain threads index in KV
+  // Always maintain the threads index (even without GitHub creds).
+  // NOTE: There is a known read-modify-write race when two open_thread calls run
+  // concurrently — both may read the same list before either writes back. This is
+  // self-healing: the next close_thread call will re-add any dropped ID, and the
+  // list is always capped at 500, so no corruption accumulates. A separate "index DO"
+  // would be required to eliminate the race entirely, which is out of scope here.
   const threadsListKey = `${project}:threads_index`;
   let threadIds = await kv.get(threadsListKey, { type: "json" }).catch(() => []) || [];
   if (!threadIds.includes(threadId)) {
     threadIds = [threadId, ...threadIds].slice(0, 500); // cap at 500
     await kv.put(threadsListKey, JSON.stringify(threadIds));
   }
+
+  // GitHub commit requires credentials — skip if not configured
+  const pat = env.GITHUB_PAT;
+  const repoFull = env.GITHUB_REPO; // format: "owner/repo"
+  if (!pat || !repoFull) return;
+  const [owner, repo] = repoFull.split("/");
+  if (!owner || !repo) return;
 
   const allMeta = await Promise.all(
     threadIds.map(id => kv.get(`${project}:thread:${id}`, { type: "json" }).catch(() => null))
