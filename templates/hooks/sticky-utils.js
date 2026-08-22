@@ -82,10 +82,10 @@ let _cachedStickyDir = null;
 function _stickyDir() {
   if (_cachedStickyDir) return _cachedStickyDir;
   try {
-    const gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
+    const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
       encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
     }).trim();
-    _cachedStickyDir = path.resolve(gitDir, "sticky-note");
+    _cachedStickyDir = path.join(root, ".sticky-note");
     return _cachedStickyDir;
   } catch (_) {
     // Fallback for non-git environments (e.g., unit tests without git init)
@@ -1341,6 +1341,15 @@ async function cloudFetch(method, endpoint, body) {
   try {
     const resp = await fetch(`${url}${endpoint}`, opts);
     if (!resp.ok) {
+      if (!_cloudWarned) {
+        _cloudWarned = true;
+        const hint = resp.status === 401
+          ? " (check STICKY_API_KEY in .env.sticky)"
+          : ` (HTTP ${resp.status})`;
+        process.stderr.write(
+          `[STICKY-NOTE] Cloud sync failed${hint} — using local/git fallback\n`
+        );
+      }
       return null;
     }
     const text = await resp.text();
@@ -1349,7 +1358,7 @@ async function cloudFetch(method, endpoint, body) {
     if (!_cloudWarned) {
       _cloudWarned = true;
       process.stderr.write(
-        "[STICKY-NOTE] Cloud unreachable, using local fallback\n"
+        "[STICKY-NOTE] Cloud unreachable, using local/git fallback\n"
       );
     }
     return null;

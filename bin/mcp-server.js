@@ -508,17 +508,19 @@ function toolCheckOverlaps(params) {
   };
 }
 
-function toolGetEnvironmentStatus() {
+async function toolGetEnvironmentStatus() {
   const envDir = path.join(stickyDir(), "environment");
   const mcpPath = path.join(PROJECT_ROOT, ".mcp.json");
 
-  // No environment directory — feature not set up
+  // No environment directory — feature not set up, but still check cloud health
   if (!fs.existsSync(envDir)) {
-    return {
+    const result = {
       status: "not_configured",
       message: "No .sticky-note/environment/ directory found. Environment sync is not set up for this repo.",
       action: "none",
     };
+    result.cloud = await _checkCloudHealth();
+    return result;
   }
 
   const manifest = readJsonSafe(path.join(envDir, "manifest.json"), {});
@@ -604,7 +606,40 @@ function toolGetEnvironmentStatus() {
     }
   }
 
+  result.cloud = await _checkCloudHealth();
+  if (result.cloud.status === "auth_error" && result.status === "complete") {
+    result.status = "incomplete";
+  }
+
   return result;
+}
+
+async function _checkCloudHealth() {
+  const { url: cloudUrl, apiKey } = getCloudConfig();
+  if (!cloudUrl) return { status: "not_configured" };
+  try {
+    const headers = {};
+    if (apiKey) headers["X-Sticky-API-Key"] = apiKey;
+    const resp = await fetch(`${cloudUrl}/health`, { method: "GET", headers, signal: AbortSignal.timeout(5000) });
+    if (resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      return { status: "ok", url: cloudUrl, version: body.version || null };
+    } else if (resp.status === 401) {
+      return {
+        status: "auth_error",
+        url: cloudUrl,
+        message: "Cloud reachable but API key rejected — check STICKY_API_KEY in .env.sticky",
+        action: "fix_api_key",
+      };
+    }
+    return { status: "error", url: cloudUrl, message: `HTTP ${resp.status}` };
+  } catch (err) {
+    return {
+      status: "unreachable",
+      url: cloudUrl,
+      message: err.name === "TimeoutError" ? "Cloud timed out (5s)" : err.message,
+    };
+  }
 }
 
 function toolGetThreadContextForFiles(params) {
@@ -819,7 +854,7 @@ const CAPABILITIES = {
   tools: {},
 };
 
-function handleRequest(msg) {
+async function handleRequest(msg) {
   const { method, params, id } = msg;
 
   switch (method) {
@@ -872,7 +907,7 @@ function handleRequest(msg) {
       }
 
       try {
-        const result = tool.handler(toolArgs);
+        const result = await tool.handler(toolArgs);
         return {
           jsonrpc: "2.0",
           id,
@@ -953,10 +988,17 @@ function handleRequest(msg) {
         continue;
       }
 
-      const response = handleRequest(msg);
-      if (response) {
-        process.stdout.write(JSON.stringify(response) + "\n");
-      }
+      handleRequest(msg).then((response) => {
+        if (response) {
+          process.stdout.write(JSON.stringify(response) + "\n");
+        }
+      }).catch((err) => {
+        process.stdout.write(JSON.stringify({
+          jsonrpc: "2.0",
+          id: msg.id,
+          error: { code: -32603, message: `Internal error: ${err.message}` },
+        }) + "\n");
+      });
     }
   });
 

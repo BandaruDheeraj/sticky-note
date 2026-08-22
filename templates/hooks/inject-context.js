@@ -411,28 +411,22 @@ async function main() {
   }
 
   // Capture user_prompt event for AI blame
-  let eventWriter2 = null;
-  try { eventWriter2 = require("./event-writer.js"); } catch (_) {}
+  let eventWriter = null;
+  try { eventWriter = require("./event-writer.js"); } catch (_) {}
 
-  try {
-    const promptEntry = eventWriter2
-      ? eventWriter2.buildEvent(
-          eventWriter2.EVENT_TYPES.USER_PROMPT,
-          { content: prompt },       // verbatim, no truncation
-          sessionId
-        )
-      : {
-          type: "user_prompt",
-          user: getUser(),
-          ts: new Date().toISOString(),
-          session_id: sessionId,
-          data: { content: prompt },
-        };
-    // Keep legacy `prompt` field for backward compat with existing audit queries
-    promptEntry.prompt = prompt.substring(0, 500);
-    appendAuditLineBoth(promptEntry, cloud);
-  } catch (_) {
-    // ignore
+  if (eventWriter) {
+    try {
+      const promptEntry = eventWriter.buildEvent(
+        eventWriter.EVENT_TYPES.USER_PROMPT,
+        { content: prompt },       // verbatim, no truncation
+        sessionId
+      );
+      // Keep legacy `prompt` field for backward compat with existing audit queries
+      promptEntry.prompt = prompt.substring(0, 500);
+      appendAuditLineBoth(promptEntry, cloud);
+    } catch (_) {
+      // ignore
+    }
   }
 
   // Auto-checkpoint: tag subsequent edits with what the user asked for
