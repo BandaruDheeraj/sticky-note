@@ -23,6 +23,7 @@
  */
 
 import * as adapter from "./adapters/cf-kv.js";
+import { MCP_TOOL_DEFINITIONS, handleMcpTool, setDOAccessor } from "./mcp-tools.js";
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -85,6 +86,10 @@ function matchRoute(method, pathname) {
   // Config routes
   if (method === "GET" && pathname === "/config") return { handler: "getConfig" };
   if (method === "PUT" && pathname === "/config") return { handler: "putConfig" };
+
+  // MCP routes
+  if (method === "GET" && pathname === "/mcp") return { handler: "mcpListTools" };
+  if (method === "POST" && pathname === "/mcp") return { handler: "mcpCallTool" };
 
   // Health
   if (method === "GET" && pathname === "/health") return { handler: "health" };
@@ -189,6 +194,25 @@ const handlers = {
     return json({ deleted: user });
   },
 
+  // ── MCP ──
+
+  async mcpListTools() {
+    return json({ tools: MCP_TOOL_DEFINITIONS });
+  },
+
+  async mcpCallTool(request, _kv, project, _route, env) {
+    const body = await request.json().catch(() => ({}));
+    const toolName = body.tool || body.name;
+    const toolInput = body.input || body.arguments || {};
+    if (!toolName) return error("tool name required");
+    try {
+      const result = await handleMcpTool(toolName, toolInput, env, project);
+      return json({ content: [{ type: "text", text: JSON.stringify(result) }] });
+    } catch (err) {
+      return error(err.message, 400);
+    }
+  },
+
   // ── Config ──
 
   async getConfig(_request, kv, project) {
@@ -215,6 +239,9 @@ function getOrCreateDO(env, threadId) {
 
 export default {
   async fetch(request, env) {
+    // Wire DO accessor so mcp-tools.js can call getOrCreateDO with the current env
+    setDOAccessor(getOrCreateDO);
+
     // CORS preflight
     if (request.method === "OPTIONS") {
       return new Response(null, {
@@ -244,7 +271,7 @@ export default {
 
     try {
       const handler = handlers[route.handler];
-      const response = await handler(request, kv, project, route);
+      const response = await handler(request, kv, project, route, env);
 
       // Add CORS headers to all responses
       const headers = new Headers(response.headers);
