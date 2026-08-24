@@ -82,10 +82,10 @@ let _cachedStickyDir = null;
 function _stickyDir() {
   if (_cachedStickyDir) return _cachedStickyDir;
   try {
-    const gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
+    const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
       encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
     }).trim();
-    _cachedStickyDir = path.resolve(gitDir, "sticky-note");
+    _cachedStickyDir = path.join(root, ".sticky-note");
     return _cachedStickyDir;
   } catch (_) {
     // Fallback for non-git environments (e.g., unit tests without git init)
