@@ -168,6 +168,65 @@ To disable: set `"capture_transcripts": false` in `.sticky-note/sticky-note-conf
 
 ---
 
+## claude.ai Cowork (V3.2)
+
+To capture sessions from claude.ai (cowork or projects), you need the cloud backend running
+and a remote MCP connector configured in your claude.ai project settings.
+
+### 1. GitHub PAT (optional but recommended)
+
+After the cloud backend step, `npx sticky-note init` asks:
+
+```
+Optional: GitHub PAT for Worker → git commits (enables remote cowork session tracking).
+Create at https://github.com/settings/tokens/new (fine-grained, Contents read+write).
+PAT (leave blank to skip):
+```
+
+Enter a PAT to let the Worker commit thread metadata to `sticky-note.json` after each session.
+The init wizard stores it as `GITHUB_PAT` Worker secret automatically.
+
+If you skip this, cowork events still land in KV — they just won't appear in git history.
+
+### 2. Connector URL
+
+After the PAT step (or after skipping), the wizard prints:
+
+```
+── claude.ai Cowork MCP Connector ──────────────────────────
+To track cowork sessions, add this connector in claude.ai project settings:
+  URL:    https://sticky-{owner}-{repo}.workers.dev/mcp
+  Header: X-Sticky-API-Key: <your-key>
+
+The CLAUDE.md project system prompt (paste into claude.ai project instructions):
+  1. Call open_thread at session start with the verbatim first user prompt
+  2. Call append_event for every action: ai_thinking, ai_response, tool_call,
+     tool_result, tool_error, tool_denied, context_compressed, git_commit,
+     subagent_spawn, subagent_result, checkpoint
+  3. Call set_checkpoint when the user switches topics
+  4. Call close_thread at session end with narrative and work_type
+```
+
+### 3. Configure claude.ai
+
+1. Open your claude.ai project → **Settings** → **Integrations** → **Add MCP Server**
+2. Enter the URL and header from step 2
+3. Paste the system prompt block into your project instructions
+
+The next cowork session will open a thread, stream events live, and commit thread metadata to git.
+
+### Manual Worker secrets
+
+If you need to set secrets without the wizard:
+
+```bash
+cd sticky-server
+wrangler secret put GITHUB_PAT     # fine-grained PAT, Contents read+write
+wrangler secret put GITHUB_REPO    # value: owner/repo  e.g. acme/frontend
+```
+
+---
+
 ## Troubleshooting
 
 **MCP tools not available after init**

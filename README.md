@@ -50,6 +50,23 @@ their next session by relevance.
 
 ---
 
+## What's New in V3.2
+
+- **claude.ai cowork session tracking**: Sessions in claude.ai (cowork, projects) are now
+  captured with full fidelity — every tool call, AI response, thinking block, and user
+  prompt — matching the richness of local Claude Code sessions. Connect the remote MCP
+  endpoint once in your claude.ai project settings and capture happens automatically.
+- **AI blame**: Trace any line of code back to the prompt, reasoning chain, and tool calls
+  that produced it. Every session event is stored in KV keyed by thread ID. `get-line-attribution`
+  maps file lines to thread IDs; from there you can fetch the full event stream and walk back
+  to the `user_prompt` → `ai_thinking` → `tool_call` → `tool_result` chain.
+- **Enriched local event stream**: Claude Code hook sessions now emit structured events
+  (not just audit entries) — full tool args, results capped at 10 KB, AI thinking and
+  response blocks extracted from transcript at session end, all pushed to KV for team access.
+- **Init wizard cowork setup**: After cloud backend provisioning, `npx sticky-note init`
+  now prompts for a GitHub PAT (for Worker→git commits) and prints the remote MCP connector
+  URL + project system prompt to paste into claude.ai. See [Setup: claude.ai Cowork](#setup-claudeai-cowork).
+
 ## What's New in V3.1
 
 - **Full transcript capture**: Every session's complete verbatim transcript
@@ -157,6 +174,66 @@ in the background via hooks — capturing threads and surfacing context.
 **First thing to try** — ask your AI agent:
 
 > "Show me the active sticky note threads"
+
+---
+
+## Setup: claude.ai Cowork
+
+To capture sessions from claude.ai (cowork, projects), you need the cloud backend running
+and a remote MCP connector configured in your claude.ai project settings.
+
+### Prerequisites
+
+Cloud backend must be set up first (`npx sticky-note init` → answer **y** to cloud backend).
+
+### Step 1: Run init with GitHub PAT (optional but recommended)
+
+After cloud provisioning, `npx sticky-note init` prompts:
+
+```
+Optional: GitHub PAT for Worker → git commits (enables remote cowork session tracking).
+Create at https://github.com/settings/tokens/new (fine-grained, Contents read+write).
+PAT (leave blank to skip):
+```
+
+Enter a PAT to enable the Worker to commit thread metadata to `sticky-note.json` after each session.
+Leave blank if you only want KV event storage (metadata won't appear in git history).
+
+The wizard then prints your connector details:
+
+```
+── claude.ai Cowork MCP Connector ──────────────────────────
+To track cowork sessions, add this connector in claude.ai project settings:
+  URL:    https://sticky-{owner}-{repo}.workers.dev/mcp
+  Header: X-Sticky-API-Key: <your-key>
+
+The CLAUDE.md project system prompt (paste into claude.ai project instructions):
+  1. Call open_thread at session start with the verbatim first user prompt
+  2. Call append_event for every action: ai_thinking, ai_response, tool_call,
+     tool_result, tool_error, tool_denied, context_compressed, git_commit,
+     subagent_spawn, subagent_result, checkpoint
+  3. Call set_checkpoint when the user switches topics
+  4. Call close_thread at session end with narrative and work_type
+```
+
+### Step 2: Configure claude.ai project
+
+1. Open your claude.ai project → **Settings** → **Integrations** → **Add MCP Server**
+2. Enter the URL and header from the wizard output
+3. Paste the system prompt block into your project instructions
+
+That's it. The next cowork session in that project will open a thread, stream events live,
+and commit thread metadata to git when the session ends.
+
+### Worker secrets (manual / CI)
+
+If you need to set secrets without the wizard:
+
+```bash
+cd sticky-server
+wrangler secret put GITHUB_PAT     # fine-grained PAT, Contents read+write
+wrangler secret put GITHUB_REPO    # value: owner/repo (e.g. acme/frontend)
+```
 
 ---
 
