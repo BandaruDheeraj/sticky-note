@@ -198,6 +198,14 @@ function makeExecutable(filePath) {
   }
 }
 
+// Markers used by older sticky-note versions to wrap blocks in .git/hooks/pre-commit
+// and .git/hooks/post-commit. These were removed in V3 (data branch handles persistence),
+// but cmdUpdate() and cmdMigrateDataBranch() still need to strip them from old repos.
+const STICKY_PRE_COMMIT_MARKER = "# [sticky-note:auto-stage]";
+const STICKY_PRE_COMMIT_END    = "# [/sticky-note:auto-stage]";
+const STICKY_POST_COMMIT_MARKER = "# [sticky-note:auto-sync]";
+const STICKY_POST_COMMIT_END    = "# [/sticky-note:auto-sync]";
+
 function installGitHook(hookName) {
   try {
     const gitDir = path.join(process.cwd(), ".git");
