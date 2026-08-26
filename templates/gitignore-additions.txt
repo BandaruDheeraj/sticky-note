@@ -1,5 +1,6 @@
 # Sticky Note - local overrides (never commit these)
 .claude/settings.local.json
+.claude/worktrees/
 .env.sticky
 
 # Sticky Note - transient session/resume signals
