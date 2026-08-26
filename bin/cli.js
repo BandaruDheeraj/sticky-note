@@ -3078,20 +3078,47 @@ function provisionCloudBackend() {
     return { error: "sticky-server/worker.js not found. Make sure you have the full sticky-note package." };
   }
 
+  // Helper: run wrangler login interactively. Returns true on success.
+  function wranglerLogin() {
+    print("\n  Authenticating with Cloudflare (this will open your browser)...\n");
+    try {
+      execSync("wrangler login", {
+        stdio: ["pipe", "inherit", "inherit"],
+        input: "y\n",
+        encoding: "utf-8",
+      });
+      print("\n  [OK] Logged in to Cloudflare");
+      return true;
+    } catch (loginErr) {
+      print("  [ERR] wrangler login failed: " + (loginErr.message || loginErr));
+      print("        Run `wrangler login` manually, then `npx sticky-note deploy-backend`.\n");
+      return false;
+    }
+  }
+
   // Step 1: KV namespace — create or reuse existing
   print("  Step 1: Creating KV namespace...");
   let namespaceId = null;
-  try {
-    const kvResult = execSync("wrangler kv namespace create STICKY_KV", {
-      cwd: serverDir,
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    const idMatch = kvResult.match(/id\s*=\s*"([^"]+)"/);
-    if (idMatch) namespaceId = idMatch[1];
-    print("  [OK] KV namespace created");
-  } catch (err) {
-    if (err.message && err.message.includes("already exists")) {
+  function tryCreateKv() {
+    try {
+      const kvResult = execSync("wrangler kv namespace create STICKY_KV", {
+        cwd: serverDir,
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      const idMatch = kvResult.match(/id\s*=\s*"([^"]+)"/);
+      if (idMatch) namespaceId = idMatch[1];
+      print("  [OK] KV namespace created");
+      return null; // success
+    } catch (err) {
+      return err;
+    }
+  }
+
+  let kvErr = tryCreateKv();
+  if (kvErr) {
+    const msg = kvErr.message || "";
+    if (msg.includes("already exists")) {
       print("  [OK] KV namespace already exists — retrieving ID...");
       try {
         const listResult = execSync("wrangler kv namespace list", {
@@ -3105,8 +3132,16 @@ function provisionCloudBackend() {
       } catch (listErr) {
         return { error: "KV namespace exists but could not retrieve ID: " + (listErr.message || listErr) };
       }
+    } else if (msg.includes("Authentication error") || msg.includes("code: 10000") || msg.includes("unauthenticated")) {
+      // Wrangler is installed but not logged in — run login and retry once
+      print("  [WARN] Not logged in to Cloudflare.");
+      if (!wranglerLogin()) return { error: "Cloudflare authentication failed" };
+      kvErr = tryCreateKv();
+      if (kvErr) {
+        return { error: "Failed to create KV namespace after login: " + (kvErr.message || kvErr) };
+      }
     } else {
-      return { error: "Failed to create KV namespace: " + (err.message || err) + "\n        Make sure you're logged in: wrangler login" };
+      return { error: "Failed to create KV namespace: " + msg + "\n        Make sure you're logged in: wrangler login" };
     }
   }
 
