@@ -3797,16 +3797,10 @@ function cmdMcpServer() {
     print("  [ERR] mcp-server.js not found");
     process.exit(1);
   }
-  // Forward to the MCP server script, passing remaining args + --project
-  const args = ["--project", process.cwd(), ...process.argv.slice(3)];
-  const { execFileSync } = require("child_process");
-  try {
-    execFileSync(process.execPath, [mcpServerPath, ...args], {
-      stdio: "inherit",
-    });
-  } catch (err) {
-    if (err.status) process.exit(err.status);
-  }
+  // Run mcp-server.js in-process to avoid stdio pipe inheritance issues on Windows.
+  // Inject --project <cwd> so the server knows which project to serve.
+  process.argv = [process.argv[0], mcpServerPath, "--project", process.cwd(), ...process.argv.slice(3)];
+  require(mcpServerPath);
 }
 
 // ──────────────────────────────────────────────
