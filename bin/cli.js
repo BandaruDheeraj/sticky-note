@@ -1365,14 +1365,29 @@ function cmdUpdate() {
   }
 
   // Fix stale MCP entry in ~/.claude/settings.json (old -p flag broke Windows)
+  const correctMcpArgs = ["-y", "sticky-note-cli", "mcp-server"];
   try {
     const globalSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
     const globalSettings = readJsonSafe(globalSettingsPath, {});
     const mcpEntry = globalSettings.mcpServers && globalSettings.mcpServers["sticky-note"];
     if (mcpEntry && JSON.stringify(mcpEntry.args).includes("-p")) {
-      globalSettings.mcpServers["sticky-note"].args = ["-y", "sticky-note-cli", "mcp-server"];
+      globalSettings.mcpServers["sticky-note"].args = correctMcpArgs;
       fs.writeFileSync(globalSettingsPath, JSON.stringify(globalSettings, null, 2) + "\n");
       print("  [OK] ~/.claude/settings.json: fixed sticky-note MCP args (Windows compat)");
+    }
+  } catch (_) { /* non-fatal */ }
+
+  // Fix stale MCP entry in project .mcp.json (same -p flag issue)
+  try {
+    const mcpJsonPath = path.join(process.cwd(), ".mcp.json");
+    if (fs.existsSync(mcpJsonPath)) {
+      const mcpJson = readJsonSafe(mcpJsonPath, {});
+      const projectEntry = mcpJson.mcpServers && mcpJson.mcpServers["sticky-note"];
+      if (projectEntry && JSON.stringify(projectEntry.args).includes("-p")) {
+        mcpJson.mcpServers["sticky-note"].args = correctMcpArgs;
+        fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2) + "\n");
+        print("  [OK] .mcp.json: fixed sticky-note MCP args (Windows compat)");
+      }
     }
   } catch (_) { /* non-fatal */ }
 
