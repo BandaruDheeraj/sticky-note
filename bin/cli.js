@@ -1149,7 +1149,7 @@ async function cmdInit() {
   const stickyMcpEntry = {
     type: "stdio",
     command: "npx",
-    args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
+    args: ["-y", "sticky-note-cli", "mcp-server"],
     tools: ["*"],
   };
   if (ensureMcpInCopilotCliConfig("sticky-note", stickyMcpEntry)) {
@@ -1168,14 +1168,15 @@ async function cmdInit() {
   try {
     const claudeGlobal = readJsonSafe(claudeGlobalSettingsPath, {});
     if (!claudeGlobal.mcpServers) claudeGlobal.mcpServers = {};
-    if (!claudeGlobal.mcpServers["sticky-note"]) {
-      claudeGlobal.mcpServers["sticky-note"] = {
-        type: "stdio",
-        command: "npx",
-        args: ["-y", "-p", "sticky-note-cli", "sticky-note", "mcp-server"],
-      };
+    const correctMcpEntry = { type: "stdio", command: "npx", args: ["-y", "sticky-note-cli", "mcp-server"] };
+    const existing = claudeGlobal.mcpServers["sticky-note"];
+    const isStale = existing && JSON.stringify(existing.args) !== JSON.stringify(correctMcpEntry.args);
+    if (!existing || isStale) {
+      claudeGlobal.mcpServers["sticky-note"] = correctMcpEntry;
       fs.writeFileSync(claudeGlobalSettingsPath, JSON.stringify(claudeGlobal, null, 2) + "\n");
-      print("  [OK] Registered sticky-note MCP server in ~/.claude/settings.json (Claude Code)");
+      print(isStale
+        ? "  [OK] Updated sticky-note MCP entry in ~/.claude/settings.json (fixed args)"
+        : "  [OK] Registered sticky-note MCP server in ~/.claude/settings.json (Claude Code)");
     } else {
       print("  ⏭️  sticky-note already registered in ~/.claude/settings.json");
     }
@@ -1362,6 +1363,18 @@ function cmdUpdate() {
   } catch (_) {
     // non-fatal
   }
+
+  // Fix stale MCP entry in ~/.claude/settings.json (old -p flag broke Windows)
+  try {
+    const globalSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
+    const globalSettings = readJsonSafe(globalSettingsPath, {});
+    const mcpEntry = globalSettings.mcpServers && globalSettings.mcpServers["sticky-note"];
+    if (mcpEntry && JSON.stringify(mcpEntry.args).includes("-p")) {
+      globalSettings.mcpServers["sticky-note"].args = ["-y", "sticky-note-cli", "mcp-server"];
+      fs.writeFileSync(globalSettingsPath, JSON.stringify(globalSettings, null, 2) + "\n");
+      print("  [OK] ~/.claude/settings.json: fixed sticky-note MCP args (Windows compat)");
+    }
+  } catch (_) { /* non-fatal */ }
 
   print(`\n  ✨ Scripts updated to v${VERSION}`);
 
