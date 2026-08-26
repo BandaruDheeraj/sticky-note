@@ -118,6 +118,12 @@ function findStaleHookPaths(settings) {
         if (/^npx\s+sticky-note\s+run-hook\s+\S+/.test(cmd)) {
           stale.push(cmd);
         }
+        // Old `node ".claude/hooks/X.js"` — relative to CWD, breaks in subdirectories
+        // and agent worktrees. Replaced by `npx --no sticky-note-cli run-hook X`
+        // which walks up the tree to find the hooks directory.
+        if (/^node\s+"?\.claude\/hooks\//.test(cmd)) {
+          stale.push(cmd);
+        }
       }
     }
   }
