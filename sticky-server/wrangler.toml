@@ -21,7 +21,7 @@ bindings = [
 
 [[migrations]]
 tag = "v1"
-new_classes = ["StickyThread"]
+new_sqlite_classes = ["StickyThread"]
 
 [triggers]
 crons = ["*/5 * * * *"]

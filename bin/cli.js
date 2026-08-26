@@ -725,8 +725,11 @@ async function cmdInit() {
     }
 
     if (cloudResult && cloudResult.error) {
-      print("  [WARN] Cloud setup failed: " + cloudResult.error);
-      print("         Run `npx sticky-note deploy-backend` to retry.\n");
+      print("  [ERR] Cloud setup failed: " + cloudResult.error);
+      print("\n  Fix the issue above, then run:\n");
+      print("    npx sticky-note deploy-backend\n");
+      print("  Then re-run `npx sticky-note init` to complete setup.\n");
+      process.exit(1);
     } else if (cloudResult && !cloudResult.error) {
       cloudProvisionedUrl = cloudResult.workerUrl;
       print("\n  ┌─────────────────────────────────────────────────────────────┐");
