@@ -370,6 +370,30 @@ function ensureMcpInCopilotCliConfig(serverName, serverConfig) {
 }
 
 // ──────────────────────────────────────────────
+// Sticky dir resolution (mirrors mcp-server.js stickyDir())
+// ──────────────────────────────────────────────
+
+// Returns the active sticky-note data directory for the current project.
+// Mirrors the same logic as stickyDir() in mcp-server.js: prefers the
+// data-branch worktree at <git-dir>/sticky-note/ if it has sticky-note.json,
+// falls back to the in-tree .sticky-note/ directory.
+function getActiveStickyDir(cwd) {
+  const root = cwd || process.cwd();
+  try {
+    const gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"], cwd: root,
+    }).trim();
+    const dataBranchDir = path.join(gitDir, "sticky-note");
+    if (fs.existsSync(path.join(dataBranchDir, "sticky-note.json"))) {
+      return dataBranchDir;
+    }
+  } catch (_) {
+    // not a git repo or git unavailable — fall through
+  }
+  return path.join(root, ".sticky-note");
+}
+
+// ──────────────────────────────────────────────
 // Auto-detection
 // ──────────────────────────────────────────────
 
@@ -1088,8 +1112,9 @@ async function cmdInit() {
   print("  [OK] Skipping git pre/post-commit hooks (data branch sync handles this now)");
   print("       Run `npx sticky-note migrate` to migrate existing .sticky-note/ data.");
 
-  // Create environment directory structure
-  const envDir = path.join(stickyNoteDir, "environment");
+  // Create environment directory structure.
+  // Uses getActiveStickyDir() so re-runs on repos with a data branch write to the right place.
+  const envDir = path.join(getActiveStickyDir(), "environment");
   const envManifestDest = path.join(envDir, "manifest.json");
   mkdirSafe(path.join(envDir, "skills"));
   mkdirSafe(path.join(envDir, "agents"));
@@ -1132,7 +1157,7 @@ async function cmdInit() {
       print(`  [OK] Copied ${skills.length} detected skill(s) to environment/skills/`);
     }
   }
-  print("  [OK] Created environment directory (.sticky-note/environment/)");
+  print(`  [OK] Created environment directory (${envDir})`);
 
   // Force-add .claude/hooks/ and .claude/settings.json so git tracks them
   // (needed if .claude/ was previously in .gitignore)
@@ -1426,8 +1451,10 @@ function cmdUpdate() {
     }
   } catch (_) { /* non-fatal */ }
 
-  // Create environment directory if missing (idempotent — skips if manifest already exists)
-  const envDir = path.join(stickyDir, "environment");
+  // Create environment directory if missing (idempotent — skips if manifest already exists).
+  // Uses getActiveStickyDir() to resolve the data-branch worktree path when applicable,
+  // so it matches the same path the MCP server's stickyDir() resolves.
+  const envDir = path.join(getActiveStickyDir(), "environment");
   const envManifestDest = path.join(envDir, "manifest.json");
   mkdirSafe(path.join(envDir, "skills"));
   mkdirSafe(path.join(envDir, "agents"));
@@ -1463,7 +1490,7 @@ function cmdUpdate() {
       }
     }
     fs.writeFileSync(envManifestDest, JSON.stringify(manifestData, null, 2) + "\n");
-    print(`  [OK] Created .sticky-note/environment/ (${detectedServers.length} MCP server(s) detected)`);
+    print(`  [OK] Created environment/ in ${envDir} (${detectedServers.length} MCP server(s) detected)`);
   }
 
   print(`\n  ✨ Scripts updated to v${VERSION}`);
