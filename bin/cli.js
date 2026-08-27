@@ -1286,7 +1286,7 @@ async function cmdInit() {
 // UPDATE command
 // ──────────────────────────────────────────────
 
-function cmdUpdate() {
+async function cmdUpdate() {
   printBanner();
 
   const claudeHooksDir = path.join(process.cwd(), ".claude", "hooks");
@@ -1557,7 +1557,9 @@ function cmdUpdate() {
     print("  [OK] .github/copilot-instructions.md (sticky-note section updated)");
   }
 
-  print("  ⚠️  Thread data was NOT modified.\n");
+  // ── Auto-migration: upgrade to data branch + push to cloud if needed ────────
+  // Runs silently as part of update so the user doesn't need manual follow-up.
+  await _autoMigrateIfNeeded();
 }
 
 // ──────────────────────────────────────────────
@@ -4556,6 +4558,100 @@ async function cmdMigrate() {
 }
 
 /**
+ * Called automatically at the end of cmdUpdate(). Detects two cases and
+ * handles them without requiring manual follow-up commands:
+ *
+ * 1. Data-branch is empty but in-tree .sticky-note/ has threads
+ *    → runs _cmdMigrateDataBranch() automatically.
+ *
+ * 2. Cloud (STICKY_URL) is configured and cloud has fewer threads than local
+ *    → pushes all local threads to the cloud Worker.
+ */
+async function _autoMigrateIfNeeded() {
+  const cwd = process.cwd();
+
+  // ── 1. Data branch migration ─────────────────────────────────────────────
+  try {
+    const gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"], cwd,
+    }).trim();
+    const dataBranchMemory = path.join(gitDir, "sticky-note", "sticky-note.json");
+    const inTreeMemory = path.join(cwd, ".sticky-note", "sticky-note.json");
+    const dataBranchCount = fs.existsSync(dataBranchMemory)
+      ? (readJsonSafe(dataBranchMemory, { threads: [] }).threads || []).length
+      : 0;
+    const inTreeCount = fs.existsSync(inTreeMemory)
+      ? (readJsonSafe(inTreeMemory, { threads: [] }).threads || []).length
+      : 0;
+    if (dataBranchCount === 0 && inTreeCount > 0) {
+      print(`\n  🔄 Found ${inTreeCount} thread(s) in .sticky-note/ — migrating to data branch...\n`);
+      await _cmdMigrateDataBranch();
+    }
+  } catch (_) { /* non-fatal — skip if not a git repo or migration fails */ }
+
+  // ── 2. Cloud push ─────────────────────────────────────────────────────────
+  // Read STICKY_URL from .env.sticky (project root).
+  const envStickyPath = path.join(cwd, ".env.sticky");
+  if (!fs.existsSync(envStickyPath)) return;
+
+  let stickyUrl = "";
+  let stickyApiKey = "";
+  for (const line of fs.readFileSync(envStickyPath, "utf-8").split(/\r?\n/)) {
+    const t = line.trim();
+    if (t.startsWith("STICKY_URL=")) stickyUrl = t.slice("STICKY_URL=".length).trim();
+    if (t.startsWith("STICKY_API_KEY=")) stickyApiKey = t.slice("STICKY_API_KEY=".length).trim();
+  }
+  if (!stickyUrl) return;
+
+  // Detect project name from git remote
+  let projectName = "default";
+  try {
+    const remote = execFileSync("git", ["remote", "get-url", "origin"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"], cwd,
+    }).trim();
+    const match = remote.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+    if (match) projectName = match[1];
+  } catch (_) {}
+
+  const headers = { "Content-Type": "application/json", "X-Sticky-Project": projectName };
+  if (stickyApiKey) headers["X-Sticky-API-Key"] = stickyApiKey;
+
+  // Compare local vs cloud thread counts
+  let cloudCount = 0;
+  try {
+    const resp = await fetch(`${stickyUrl}/threads`, { method: "GET", headers });
+    if (resp.ok) {
+      const data = await resp.json();
+      cloudCount = (data.threads || []).length;
+    }
+  } catch (_) { return; } // Cloud unreachable — skip silently
+
+  const localMemoryPath = path.join(getActiveStickyDir(), "sticky-note.json");
+  const localMemory = readJsonSafe(localMemoryPath, { threads: [] });
+  const localThreads = localMemory.threads || [];
+  if (localThreads.length <= cloudCount) return; // Cloud already up to date
+
+  print(`\n  ☁️  Auto-pushing ${localThreads.length} thread(s) to cloud (cloud has ${cloudCount})...\n`);
+  let pushed = 0;
+  let failed = 0;
+  for (const thread of localThreads) {
+    try {
+      const r = await fetch(`${stickyUrl}/threads/${thread.id}`, {
+        method: "PUT", headers, body: JSON.stringify(thread),
+      });
+      if (r.ok) pushed++;
+      else failed++;
+    } catch (_) { failed++; }
+  }
+  if (failed > 0) {
+    print(`  [WARN] Cloud push: ${pushed} succeeded, ${failed} failed.`);
+    print(`         Run \`npx sticky-note migrate --to cloud\` to retry.\n`);
+  } else {
+    print(`  [OK] ${pushed} thread(s) synced to cloud.\n`);
+  }
+}
+
+/**
  * One-time migration from .sticky-note/ (feature-branch storage) to
  * .git/sticky-note/ (data-branch storage).
  *
@@ -4816,7 +4912,7 @@ async function main() {
       await cmdInit();
       break;
     case "update":
-      cmdUpdate();
+      await cmdUpdate();
       break;
     case "status":
       cmdStatus();
