@@ -745,6 +745,7 @@ function ensureEnvironmentProvisioned() {
     let mcpChanged = false;
     for (const [name, serverDef] of Object.entries(mcpServers)) {
       if (mcpConfig.mcpServers[name]) continue; // already present
+      if (serverDef.type === "permission-detected") continue; // not a real server config
       if (hasEnvPlaceholders(serverDef)) {
         if (debug) process.stderr.write(`[sticky-note] skipping MCP server "${name}" (has placeholders)\n`);
         continue;

@@ -1120,9 +1120,11 @@ async function cmdInit() {
   mkdirSafe(path.join(envDir, "agents"));
   mkdirSafe(path.join(envDir, "commands"));
   if (!fs.existsSync(envManifestDest)) {
-    // Build manifest from detected MCP servers and skills
+    // Build manifest from detected MCP servers and skills.
+    // Skip permission-detected entries — they are not real server configs and would
+    // be synced back into .mcp.json by session-start.js, breaking Claude Code.
     const manifestData = { version: "1", mcp_servers: {}, permissions: [], env_vars: {} };
-    for (const server of mcpServers) {
+    for (const server of mcpServers.filter((s) => s.type !== "permission-detected")) {
       const entry = { type: server.type || "stdio", description: server.name, required: false };
       if (server.command) entry.command = server.command;
       if (server.args) entry.args = server.args;
@@ -1460,7 +1462,9 @@ function cmdUpdate() {
   mkdirSafe(path.join(envDir, "agents"));
   mkdirSafe(path.join(envDir, "commands"));
   if (!fs.existsSync(envManifestDest)) {
-    const detectedServers = Array.from(detectMcpServers().values());
+    // Skip permission-detected entries — they are not real server configs and would
+    // be synced back into .mcp.json by session-start.js, breaking Claude Code.
+    const detectedServers = Array.from(detectMcpServers().values()).filter((s) => s.type !== "permission-detected");
     const manifestData = { version: "1", mcp_servers: {}, permissions: [], env_vars: {} };
     for (const server of detectedServers) {
       const entry = { type: server.type || "stdio", description: server.name, required: false };
