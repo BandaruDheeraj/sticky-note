@@ -1,6 +1,5 @@
 {
   "active_files": [
-    "..\\..\\..\\..\\.claude\\settings.json",
     "..\\MOBA\\MOBA\\.sticky-note\\sticky-note-config.json",
     "..\\MOBA\\MOBA\\.git\\hooks\\post-rewrite",
     ".claude\\sticky-note-mcp.js",
@@ -9,7 +8,8 @@
     "package.json",
     "..\\MOBA\\MOBA\\.claude\\hooks",
     "templates\\hooks\\session-start.js",
-    "..\\MOBA\\MOBA\\.mcp.json"
+    "..\\MOBA\\MOBA\\.mcp.json",
+    "bin\\mcp-server.js"
   ],
-  "last_seen": "2026-08-27T20:51:23.362Z"
+  "last_seen": "2026-08-27T21:06:55.199Z"
 }

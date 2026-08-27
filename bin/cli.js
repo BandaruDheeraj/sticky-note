@@ -442,6 +442,35 @@ function detectMcpServers() {
     } catch (err) { debugLog("detectMcpServers copilot mcp-config: " + (err.message || err)); }
   }
 
+  // Also detect from ~/.claude/settings.json (global Claude Code settings).
+  // This captures servers like Render that users configure globally rather than per-project.
+  const globalClaudeSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
+  if (fs.existsSync(globalClaudeSettingsPath)) {
+    try {
+      const globalSettings = JSON.parse(fs.readFileSync(globalClaudeSettingsPath, "utf-8"));
+      const globalMcp = globalSettings.mcpServers || {};
+      for (const [name, config] of Object.entries(globalMcp)) {
+        if (servers.has(name)) continue; // project-level takes precedence
+        if (config.type === "permission-detected") continue;
+        const entry = {
+          name,
+          type: config.type || config.transport || "stdio",
+          source: "~/.claude/settings.json",
+        };
+        if (config.command) entry.command = config.command;
+        if (config.args) entry.args = config.args;
+        if (config.env) entry.env = config.env;
+        if (config.url) entry.url = config.url;
+        servers.set(name, entry);
+      }
+    } catch (err) { debugLog("detectMcpServers global settings: " + (err.message || err)); }
+  }
+
+  // Detect servers known only from allow-list permissions (settings.local.json).
+  // These are servers Claude Code has permission to call but whose config isn't in
+  // any local file — typically account-level cloud MCPs (Figma, Sentry via claude.ai).
+  // We mark them "account-mcp" so the manifest records them without treating them
+  // as locally-provisionable servers.
   const localSettingsPath = path.join(process.cwd(), ".claude", "settings.local.json");
   if (fs.existsSync(localSettingsPath)) {
     try {
@@ -456,7 +485,7 @@ function detectMcpServers() {
           if (serverName && !servers.has(serverName)) {
             servers.set(serverName, {
               name: serverName,
-              type: "permission-detected",
+              type: "account-mcp",
               source: "settings.local.json",
             });
           }
@@ -1121,8 +1150,8 @@ async function cmdInit() {
   mkdirSafe(path.join(envDir, "commands"));
   if (!fs.existsSync(envManifestDest)) {
     // Build manifest from detected MCP servers and skills.
-    // Skip permission-detected entries — they are not real server configs and would
-    // be synced back into .mcp.json by session-start.js, breaking Claude Code.
+    // Skip permission-detected (legacy marker with no real config).
+    // account-mcp entries are included — they're real cloud MCPs the team uses.
     const manifestData = { version: "1", mcp_servers: {}, permissions: [], env_vars: {} };
     for (const server of mcpServers.filter((s) => s.type !== "permission-detected")) {
       const entry = { type: server.type || "stdio", description: server.name, required: false };
@@ -1462,7 +1491,8 @@ function cmdUpdate() {
   mkdirSafe(path.join(envDir, "agents"));
   mkdirSafe(path.join(envDir, "commands"));
   if (!fs.existsSync(envManifestDest)) {
-    // Create manifest from scratch, skipping permission-detected entries.
+    // Create manifest from scratch, skipping permission-detected (legacy marker with no real config).
+    // account-mcp entries are included — they're real cloud MCPs the team uses.
     const detectedServers = Array.from(detectMcpServers().values()).filter((s) => s.type !== "permission-detected");
     const manifestData = { version: "1", mcp_servers: {}, permissions: [], env_vars: {} };
     for (const server of detectedServers) {
@@ -1502,10 +1532,13 @@ function cmdUpdate() {
     const servers = manifest.mcp_servers || {};
     const stale = Object.keys(servers).filter((k) => servers[k].type === "permission-detected");
     if (stale.length > 0) {
-      for (const k of stale) delete servers[k];
+      // Convert permission-detected → account-mcp rather than deleting.
+      // These are real servers the team uses (e.g. Figma, Sentry via claude.ai account);
+      // they can't be locally provisioned but should still be documented in the manifest.
+      for (const k of stale) servers[k].type = "account-mcp";
       manifest.mcp_servers = servers;
       fs.writeFileSync(envManifestDest, JSON.stringify(manifest, null, 2) + "\n");
-      print(`  [OK] environment/manifest.json: removed ${stale.length} stale permission-detected entry(s)`);
+      print(`  [OK] environment/manifest.json: upgraded ${stale.length} entry(s) from permission-detected to account-mcp`);
     }
   }
 

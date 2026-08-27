@@ -529,10 +529,18 @@ async function toolGetEnvironmentStatus() {
 
   const provisioned = { mcp_servers: [], skills: [], agents: [], commands: [] };
   const missing = { mcp_servers: [] };
+  const accountMcp = []; // account-level cloud MCPs — connect via claude.ai, not locally provisioned
 
   // Check MCP servers
   if (manifest.mcp_servers) {
     for (const [name, config] of Object.entries(manifest.mcp_servers)) {
+      // Account-level cloud MCPs (Figma, Sentry, etc.) are managed by the claude.ai
+      // account, not local config. Report them separately — not as missing.
+      if (config.type === "account-mcp") {
+        accountMcp.push({ name, description: config.description || name });
+        continue;
+      }
+
       if (registeredServers.includes(name)) {
         provisioned.mcp_servers.push(name);
       } else {
@@ -597,6 +605,11 @@ async function toolGetEnvironmentStatus() {
     provisioned,
     action: hasMissing ? "inform_user_of_missing" : "none",
   };
+
+  if (accountMcp.length > 0) {
+    result.account_mcp = accountMcp;
+    result.account_mcp_note = "These MCP servers are managed by the claude.ai account. Each team member connects them via their own claude.ai account — no local provisioning needed.";
+  }
 
   if (hasMissing) {
     result.missing = missing;
