@@ -1145,11 +1145,39 @@ async function cmdInit() {
     debugLog("git add --force .claude/ failed: " + (err.message || err));
   }
 
+  // Copy the sticky-note-mcp.js wrapper to .claude/ so Claude Code can launch it
+  // without npx/cmd-shim chains that break on Windows.
+  const mcpWrapperSrc = path.join(TEMPLATES_DIR, "sticky-note-mcp.js");
+  const mcpWrapperDest = path.join(process.cwd(), ".claude", "sticky-note-mcp.js");
+  if (fs.existsSync(mcpWrapperSrc)) {
+    fs.copyFileSync(mcpWrapperSrc, mcpWrapperDest);
+    print("  [OK] Copied .claude/sticky-note-mcp.js (MCP server entry point)");
+  }
+
+  // Ensure sticky-note entry in .mcp.json uses the direct node invocation
+  const initMcpEntry = { type: "stdio", command: "node", args: [".claude/sticky-note-mcp.js"] };
+  try {
+    const initMcpJsonPath = path.join(process.cwd(), ".mcp.json");
+    let initMcpJson = { mcpServers: {} };
+    if (fs.existsSync(initMcpJsonPath)) {
+      initMcpJson = readJsonSafe(initMcpJsonPath, { mcpServers: {} });
+      initMcpJson.mcpServers = initMcpJson.mcpServers || {};
+    }
+    const existing = initMcpJson.mcpServers["sticky-note"];
+    if (!existing || existing.command !== "node" || JSON.stringify(existing.args) !== JSON.stringify(initMcpEntry.args)) {
+      initMcpJson.mcpServers["sticky-note"] = initMcpEntry;
+      fs.writeFileSync(initMcpJsonPath, JSON.stringify(initMcpJson, null, 2) + "\n");
+      print("  [OK] .mcp.json: sticky-note MCP server configured");
+    }
+  } catch (err) {
+    debugLog("Could not update .mcp.json: " + (err.message || err));
+  }
+
   // Register sticky-note MCP server in Copilot CLI's ~/.copilot/mcp-config.json
   const stickyMcpEntry = {
     type: "stdio",
-    command: "npx",
-    args: ["-y", "sticky-note-cli", "mcp-server"],
+    command: "node",
+    args: [".claude/sticky-note-mcp.js"],
     tools: ["*"],
   };
   if (ensureMcpInCopilotCliConfig("sticky-note", stickyMcpEntry)) {
@@ -1163,25 +1191,19 @@ async function cmdInit() {
     }
   }
 
-  // Register sticky-note MCP server in Claude Code's global settings (~/.claude/settings.json)
+  // Remove sticky-note from ~/.claude/settings.json — the project-level .mcp.json
+  // is the right home for project-specific MCP servers on Claude Code. A duplicate
+  // global entry can cause Claude Code to skip the server entirely on Windows.
   const claudeGlobalSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
   try {
     const claudeGlobal = readJsonSafe(claudeGlobalSettingsPath, {});
-    if (!claudeGlobal.mcpServers) claudeGlobal.mcpServers = {};
-    const correctMcpEntry = { type: "stdio", command: "npx", args: ["-y", "sticky-note-cli", "mcp-server"] };
-    const existing = claudeGlobal.mcpServers["sticky-note"];
-    const isStale = existing && JSON.stringify(existing.args) !== JSON.stringify(correctMcpEntry.args);
-    if (!existing || isStale) {
-      claudeGlobal.mcpServers["sticky-note"] = correctMcpEntry;
+    if (claudeGlobal.mcpServers && claudeGlobal.mcpServers["sticky-note"]) {
+      delete claudeGlobal.mcpServers["sticky-note"];
       fs.writeFileSync(claudeGlobalSettingsPath, JSON.stringify(claudeGlobal, null, 2) + "\n");
-      print(isStale
-        ? "  [OK] Updated sticky-note MCP entry in ~/.claude/settings.json (fixed args)"
-        : "  [OK] Registered sticky-note MCP server in ~/.claude/settings.json (Claude Code)");
-    } else {
-      print("  ⏭️  sticky-note already registered in ~/.claude/settings.json");
+      print("  [OK] Removed sticky-note from ~/.claude/settings.json (now project-local via .mcp.json)");
     }
   } catch (err) {
-    print("  ⏭️  Could not update ~/.claude/settings.json: " + (err.message || err));
+    debugLog("Could not update ~/.claude/settings.json: " + (err.message || err));
   }
 
   // Done!
@@ -1364,30 +1386,40 @@ function cmdUpdate() {
     // non-fatal
   }
 
-  // Fix stale MCP entry in ~/.claude/settings.json (old -p flag broke Windows)
-  const correctMcpArgs = ["-y", "sticky-note-cli", "mcp-server"];
-  try {
-    const globalSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
-    const globalSettings = readJsonSafe(globalSettingsPath, {});
-    const mcpEntry = globalSettings.mcpServers && globalSettings.mcpServers["sticky-note"];
-    if (mcpEntry && JSON.stringify(mcpEntry.args).includes("-p")) {
-      globalSettings.mcpServers["sticky-note"].args = correctMcpArgs;
-      fs.writeFileSync(globalSettingsPath, JSON.stringify(globalSettings, null, 2) + "\n");
-      print("  [OK] ~/.claude/settings.json: fixed sticky-note MCP args (Windows compat)");
-    }
-  } catch (_) { /* non-fatal */ }
+  // Copy sticky-note-mcp.js wrapper (or update it to latest)
+  const mcpWrapperSrc = path.join(TEMPLATES_DIR, "sticky-note-mcp.js");
+  const mcpWrapperDest = path.join(process.cwd(), ".claude", "sticky-note-mcp.js");
+  if (fs.existsSync(mcpWrapperSrc)) {
+    fs.copyFileSync(mcpWrapperSrc, mcpWrapperDest);
+    print("  [OK] .claude/sticky-note-mcp.js (MCP entry point updated)");
+  }
 
-  // Fix stale MCP entry in project .mcp.json (same -p flag issue)
+  // Migrate .mcp.json to use "node .claude/sticky-note-mcp.js" instead of npx subcommand.
+  // The old npx approach goes through multiple .cmd shim layers on Windows, causing
+  // Claude Code to silently skip the server. The node approach is a direct single process.
+  const correctMcpEntry = { type: "stdio", command: "node", args: [".claude/sticky-note-mcp.js"] };
   try {
     const mcpJsonPath = path.join(process.cwd(), ".mcp.json");
     if (fs.existsSync(mcpJsonPath)) {
       const mcpJson = readJsonSafe(mcpJsonPath, {});
       const projectEntry = mcpJson.mcpServers && mcpJson.mcpServers["sticky-note"];
-      if (projectEntry && JSON.stringify(projectEntry.args).includes("-p")) {
-        mcpJson.mcpServers["sticky-note"].args = correctMcpArgs;
+      if (projectEntry && (projectEntry.command !== "node" || JSON.stringify(projectEntry.args) !== JSON.stringify(correctMcpEntry.args))) {
+        mcpJson.mcpServers["sticky-note"] = correctMcpEntry;
         fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2) + "\n");
-        print("  [OK] .mcp.json: fixed sticky-note MCP args (Windows compat)");
+        print("  [OK] .mcp.json: migrated sticky-note to direct node invocation (Windows MCP fix)");
       }
+    }
+  } catch (_) { /* non-fatal */ }
+
+  // Remove sticky-note from ~/.claude/settings.json — it belongs in .mcp.json only.
+  // A duplicate global entry causes Claude Code to silently skip the server on Windows.
+  try {
+    const globalSettingsPath = path.join(os.homedir(), ".claude", "settings.json");
+    const globalSettings = readJsonSafe(globalSettingsPath, {});
+    if (globalSettings.mcpServers && globalSettings.mcpServers["sticky-note"]) {
+      delete globalSettings.mcpServers["sticky-note"];
+      fs.writeFileSync(globalSettingsPath, JSON.stringify(globalSettings, null, 2) + "\n");
+      print("  [OK] ~/.claude/settings.json: removed sticky-note (now project-local via .mcp.json)");
     }
   } catch (_) { /* non-fatal */ }
 
