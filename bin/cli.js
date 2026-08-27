@@ -1462,8 +1462,7 @@ function cmdUpdate() {
   mkdirSafe(path.join(envDir, "agents"));
   mkdirSafe(path.join(envDir, "commands"));
   if (!fs.existsSync(envManifestDest)) {
-    // Skip permission-detected entries — they are not real server configs and would
-    // be synced back into .mcp.json by session-start.js, breaking Claude Code.
+    // Create manifest from scratch, skipping permission-detected entries.
     const detectedServers = Array.from(detectMcpServers().values()).filter((s) => s.type !== "permission-detected");
     const manifestData = { version: "1", mcp_servers: {}, permissions: [], env_vars: {} };
     for (const server of detectedServers) {
@@ -1495,6 +1494,19 @@ function cmdUpdate() {
     }
     fs.writeFileSync(envManifestDest, JSON.stringify(manifestData, null, 2) + "\n");
     print(`  [OK] Created environment/ in ${envDir} (${detectedServers.length} MCP server(s) detected)`);
+  } else {
+    // Manifest already exists — strip any permission-detected entries that may have
+    // been written by an older version of sticky-note. These are not real server
+    // configs and cause get_environment_status to report false "missing" servers.
+    const manifest = readJsonSafe(envManifestDest, {});
+    const servers = manifest.mcp_servers || {};
+    const stale = Object.keys(servers).filter((k) => servers[k].type === "permission-detected");
+    if (stale.length > 0) {
+      for (const k of stale) delete servers[k];
+      manifest.mcp_servers = servers;
+      fs.writeFileSync(envManifestDest, JSON.stringify(manifest, null, 2) + "\n");
+      print(`  [OK] environment/manifest.json: removed ${stale.length} stale permission-detected entry(s)`);
+    }
   }
 
   print(`\n  ✨ Scripts updated to v${VERSION}`);
