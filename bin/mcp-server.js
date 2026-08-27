@@ -959,54 +959,57 @@ async function handleRequest(msg) {
 // stdio transport
 // ──────────────────────────────────────────────
 
-(async () => {
-  await initCloudCache();
+// Set up stdin listeners immediately so Claude Code's initialize handshake
+// is answered right away — before any async cloud pre-warming, which can
+// block for up to 5 s and cause the MCP client to time out the connection.
+let buffer = "";
 
-  let buffer = "";
+process.stdin.setEncoding("utf-8");
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
 
-  process.stdin.setEncoding("utf-8");
-  process.stdin.on("data", (chunk) => {
-    buffer += chunk;
+  let newlineIdx;
+  while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
+    const line = buffer.slice(0, newlineIdx).trim();
+    buffer = buffer.slice(newlineIdx + 1);
 
-    let newlineIdx;
-    while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
-      const line = buffer.slice(0, newlineIdx).trim();
-      buffer = buffer.slice(newlineIdx + 1);
+    if (!line) continue;
 
-      if (!line) continue;
-
-      let msg;
-      try {
-        msg = JSON.parse(line);
-      } catch {
-        const errResp = {
-          jsonrpc: "2.0",
-          id: null,
-          error: { code: -32700, message: "Parse error" },
-        };
-        process.stdout.write(JSON.stringify(errResp) + "\n");
-        continue;
-      }
-
-      handleRequest(msg).then((response) => {
-        if (response) {
-          process.stdout.write(JSON.stringify(response) + "\n");
-        }
-      }).catch((err) => {
-        process.stdout.write(JSON.stringify({
-          jsonrpc: "2.0",
-          id: msg.id,
-          error: { code: -32603, message: `Internal error: ${err.message}` },
-        }) + "\n");
-      });
+    let msg;
+    try {
+      msg = JSON.parse(line);
+    } catch {
+      const errResp = {
+        jsonrpc: "2.0",
+        id: null,
+        error: { code: -32700, message: "Parse error" },
+      };
+      process.stdout.write(JSON.stringify(errResp) + "\n");
+      continue;
     }
-  });
 
-  process.stdin.on("end", () => {
-    process.exit(0);
-  });
+    handleRequest(msg).then((response) => {
+      if (response) {
+        process.stdout.write(JSON.stringify(response) + "\n");
+      }
+    }).catch((err) => {
+      process.stdout.write(JSON.stringify({
+        jsonrpc: "2.0",
+        id: msg.id,
+        error: { code: -32603, message: `Internal error: ${err.message}` },
+      }) + "\n");
+    });
+  }
+});
 
-  process.on("uncaughtException", (err) => {
-    process.stderr.write(`sticky-note MCP server error: ${err.message}\n`);
-  });
-})();
+process.stdin.on("end", () => {
+  process.exit(0);
+});
+
+process.on("uncaughtException", (err) => {
+  process.stderr.write(`sticky-note MCP server error: ${err.message}\n`);
+});
+
+// Pre-warm cloud cache in the background; tool handlers fall back to local
+// data if this hasn't finished yet when the first call arrives.
+initCloudCache().catch(() => {});
