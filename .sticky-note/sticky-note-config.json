@@ -37,11 +37,16 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
       }
+    },
+    {
+      "name": "plugin_cloudflare_cloudflare-api",
+      "source": "auto-detected"
     }
   ],
   "skills": [],
   "conventions": [],
   "hook_version": "3.1.5",
   "min_version": "3.1.5",
-  "sticky_url": "https://sticky-note-server.sticky-server.workers.dev"
+  "sticky_url": "https://sticky-note-server.sticky-server.workers.dev",
+  "environment_version": "1"
 }

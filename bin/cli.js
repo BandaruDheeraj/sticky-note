@@ -1394,20 +1394,23 @@ function cmdUpdate() {
     print("  [OK] .claude/sticky-note-mcp.js (MCP entry point updated)");
   }
 
-  // Migrate .mcp.json to use "node .claude/sticky-note-mcp.js" instead of npx subcommand.
+  // Ensure .mcp.json has a correct sticky-note entry using "node .claude/sticky-note-mcp.js".
   // The old npx approach goes through multiple .cmd shim layers on Windows, causing
   // Claude Code to silently skip the server. The node approach is a direct single process.
   const correctMcpEntry = { type: "stdio", command: "node", args: [".claude/sticky-note-mcp.js"] };
   try {
     const mcpJsonPath = path.join(process.cwd(), ".mcp.json");
-    if (fs.existsSync(mcpJsonPath)) {
-      const mcpJson = readJsonSafe(mcpJsonPath, {});
-      const projectEntry = mcpJson.mcpServers && mcpJson.mcpServers["sticky-note"];
-      if (projectEntry && (projectEntry.command !== "node" || JSON.stringify(projectEntry.args) !== JSON.stringify(correctMcpEntry.args))) {
-        mcpJson.mcpServers["sticky-note"] = correctMcpEntry;
-        fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2) + "\n");
-        print("  [OK] .mcp.json: migrated sticky-note to direct node invocation (Windows MCP fix)");
-      }
+    const mcpJson = fs.existsSync(mcpJsonPath) ? readJsonSafe(mcpJsonPath, {}) : {};
+    if (!mcpJson.mcpServers) mcpJson.mcpServers = {};
+    const projectEntry = mcpJson.mcpServers["sticky-note"];
+    if (!projectEntry) {
+      mcpJson.mcpServers["sticky-note"] = correctMcpEntry;
+      fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2) + "\n");
+      print("  [OK] .mcp.json: added sticky-note MCP entry");
+    } else if (projectEntry.command !== "node" || JSON.stringify(projectEntry.args) !== JSON.stringify(correctMcpEntry.args)) {
+      mcpJson.mcpServers["sticky-note"] = correctMcpEntry;
+      fs.writeFileSync(mcpJsonPath, JSON.stringify(mcpJson, null, 2) + "\n");
+      print("  [OK] .mcp.json: migrated sticky-note to direct node invocation (Windows MCP fix)");
     }
   } catch (_) { /* non-fatal */ }
 
@@ -1422,6 +1425,46 @@ function cmdUpdate() {
       print("  [OK] ~/.claude/settings.json: removed sticky-note (now project-local via .mcp.json)");
     }
   } catch (_) { /* non-fatal */ }
+
+  // Create environment directory if missing (idempotent — skips if manifest already exists)
+  const envDir = path.join(stickyDir, "environment");
+  const envManifestDest = path.join(envDir, "manifest.json");
+  mkdirSafe(path.join(envDir, "skills"));
+  mkdirSafe(path.join(envDir, "agents"));
+  mkdirSafe(path.join(envDir, "commands"));
+  if (!fs.existsSync(envManifestDest)) {
+    const detectedServers = Array.from(detectMcpServers().values());
+    const manifestData = { version: "1", mcp_servers: {}, permissions: [], env_vars: {} };
+    for (const server of detectedServers) {
+      const entry = { type: server.type || "stdio", description: server.name, required: false };
+      if (server.command) entry.command = server.command;
+      if (server.args) entry.args = server.args;
+      if (server.env) {
+        entry.env = {};
+        for (const [k] of Object.entries(server.env)) {
+          entry.env[k] = `\${${k}}`;
+          manifestData.env_vars[k] = { description: k, required: true };
+        }
+      }
+      manifestData.mcp_servers[server.name] = entry;
+    }
+    const detectedSkills = Array.from(detectSkills());
+    for (const skillName of detectedSkills) {
+      const claudeSkillPath = path.join(process.cwd(), ".claude", "plugins");
+      const possibleSkillPaths = [
+        path.join(claudeSkillPath, skillName, "SKILL.md"),
+        path.join(claudeSkillPath, skillName, "skills", skillName, "SKILL.md"),
+      ];
+      for (const sp of possibleSkillPaths) {
+        if (fs.existsSync(sp)) {
+          fs.copyFileSync(sp, path.join(envDir, "skills", skillName + ".md"));
+          break;
+        }
+      }
+    }
+    fs.writeFileSync(envManifestDest, JSON.stringify(manifestData, null, 2) + "\n");
+    print(`  [OK] Created .sticky-note/environment/ (${detectedServers.length} MCP server(s) detected)`);
+  }
 
   print(`\n  ✨ Scripts updated to v${VERSION}`);
 

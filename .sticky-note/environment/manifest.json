@@ -1,31 +1,46 @@
 {
   "version": "1",
-
   "mcp_servers": {
     "context7": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp@latest"],
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
       "description": "Fetch up-to-date docs for any library",
       "required": true
     },
     "github": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
       },
       "description": "GitHub API access",
       "required": true
+    },
+    "claude_ai_Exa": {},
+    "sticky-note": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "-p",
+        "sticky-note-cli",
+        "sticky-note",
+        "mcp-server"
+      ]
     }
   },
-
   "permissions": [
     "Bash(npx sticky-note:*)",
     "Bash(npm test:*)"
   ],
-
   "env_vars": {
     "GITHUB_TOKEN": {
       "description": "GitHub PAT with repo scope",

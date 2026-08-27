@@ -2,13 +2,9 @@
   "mcpServers": {
     "sticky-note": {
       "type": "stdio",
-      "command": "npx",
+      "command": "node",
       "args": [
-        "-y",
-        "-p",
-        "sticky-note-cli",
-        "sticky-note",
-        "mcp-server"
+        ".claude/sticky-note-mcp.js"
       ]
     },
     "context7": {
@@ -29,6 +25,7 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
       }
-    }
+    },
+    "claude_ai_Exa": {}
   }
 }

@@ -1,15 +1,15 @@
 {
   "active_files": [
-    "test\\smoke.test.js",
-    "templates\\hooks",
-    "templates\\hooks\\data-branch.js",
-    "bin\\cli.js",
-    ".superpowers\\sdd\\task-5-brief.md",
-    ".superpowers\\sdd\\task-5-report.md",
-    ".superpowers\\sdd\\review-b70a942..b2497ed.diff",
-    ".superpowers\\sdd\\task-6-brief.md",
-    "templates\\gitignore-additions.txt",
-    "package.json"
+    "..\\MOBA\\MOBA\\.mcp.json",
+    "bin\\mcp-server.js",
+    ".mcp.json",
+    "..\\MOBA\\MOBA\\.claude\\hooks\\sticky-utils.js",
+    "..\\MOBA\\MOBA\\.claude\\settings.json",
+    "..\\..\\..\\..\\.claude\\settings.json",
+    "..\\MOBA\\MOBA\\.sticky-note\\sticky-note-config.json",
+    "..\\MOBA\\MOBA\\.git\\hooks\\post-rewrite",
+    ".claude\\sticky-note-mcp.js",
+    "bin"
   ],
-  "last_seen": "2026-07-18T20:44:30.988Z"
+  "last_seen": "2026-08-27T20:09:36.537Z"
 }
