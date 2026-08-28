@@ -25,6 +25,7 @@ cat .sticky-note/sticky-note.json
 | `narrative`        | Summary of what happened                   |
 | `failed_approaches`| What was tried and didn't work             |
 | `handoff_summary`  | Handoff notes for teammates                |
+| `goal_achieved`    | true if Claude explicitly completed the stated goal (via close_thread) |
 | `last_note`        | Most recent status note                    |
 | `work_type`        | bug-fix, feature, debugging, refactor, etc.|
 | `prompts`          | User prompts from the session (for cross-tool resume) |
@@ -267,6 +268,13 @@ You have access to a `sticky-note` MCP server. Use it:
 5. **For the full conversation, not just the summary**: Call
    `get_full_transcript(id)` to get the verbatim session transcript(s) for
    a thread, when `narrative` or `prompts` aren't enough detail.
+
+6. **When you have fully completed the user's stated goal**: Call
+   `close_thread(summary)` with a specific description of what was accomplished.
+   This is the most important signal sticky-note collects — it distinguishes
+   sessions where the goal was actually achieved from sessions that merely ended.
+   Be specific: what was built/fixed, which files changed, what the outcome was.
+   Do NOT call this if the task is only partially done or if you are unsure.
 
 These tools are the primary way sticky-note communicates with you.
 Hook-injected context supplements but does not replace MCP tool calls.

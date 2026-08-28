@@ -707,6 +707,81 @@ function toolGetThreadContextForFiles(params) {
 }
 
 // ──────────────────────────────────────────────
+// close_thread — explicit goal completion signal
+// ──────────────────────────────────────────────
+
+async function toolCloseThread(params) {
+  const { summary } = params;
+  if (!summary || !summary.trim()) {
+    return { error: "summary is required" };
+  }
+
+  // Find current session ID from .sticky-session file
+  const sessionFile = path.join(stickyDir(), ".sticky-session");
+  let sessionId = null;
+  if (fs.existsSync(sessionFile)) {
+    sessionId = fs.readFileSync(sessionFile, "utf-8").trim();
+  }
+  if (!sessionId) {
+    return { error: "No active session found — .sticky-note/.sticky-session missing or empty" };
+  }
+
+  // Find thread by session_id in local memory
+  const memoryPath = path.join(stickyDir(), "sticky-note.json");
+  const memory = readJsonSafe(memoryPath, { version: "2", threads: [] });
+  const threads = memory.threads || [];
+  const thread = threads.find(t => t.session_id === sessionId);
+
+  if (!thread) {
+    return { error: `No thread found for session ${sessionId}` };
+  }
+
+  const now = new Date().toISOString();
+  thread.status = "closed";
+  thread.goal_achieved = true;
+  thread.handoff_summary = summary.trim();
+  thread.closed_at = now;
+  thread.last_activity_at = now;
+  thread.last_note = summary.trim().substring(0, 200);
+
+  // Save locally
+  memory.threads = threads;
+  try {
+    fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2) + "\n");
+  } catch (err) {
+    return { error: "Failed to save: " + err.message };
+  }
+
+  // Push to cloud if configured
+  const { url, apiKey } = getCloudConfig();
+  if (url) {
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+        "X-Sticky-Project": getProjectName(),
+      };
+      if (apiKey) headers["X-Sticky-API-Key"] = apiKey;
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 8000);
+      await fetch(`${url}/threads/${thread.id}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(thread),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(t));
+    } catch (_) { /* non-fatal — local save already succeeded */ }
+  }
+
+  return {
+    status: "closed",
+    goal_achieved: true,
+    thread_id: thread.id,
+    summary: summary.trim(),
+    message: "Thread marked complete. Thank you — this signal helps improve future sessions.",
+  };
+}
+
+// ──────────────────────────────────────────────
 // Tool registry
 // ──────────────────────────────────────────────
 
@@ -851,6 +926,22 @@ const TOOLS = {
       required: ["files"],
     },
     handler: toolGetThreadContextForFiles,
+  },
+  close_thread: {
+    description:
+      "Mark the current session's thread as explicitly completed by Claude. Sets goal_achieved=true and records a handoff summary. Call this when you have fully completed the user's stated goal — not just when the session ends. This is the signal used to measure whether AI sessions actually succeed.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        summary: {
+          type: "string",
+          description:
+            "What was accomplished. Be specific: what was built/fixed/answered, what files were changed, what the outcome was. This becomes the handoff_summary for teammates.",
+        },
+      },
+      required: ["summary"],
+    },
+    handler: toolCloseThread,
   },
 };
 

@@ -1141,7 +1141,9 @@ async function main() {
     existing.last_activity_at = now;
     // Copilot CLI fires SessionEnd per-turn, not per-session.
     // Keep thread open so it isn't prematurely closed between turns.
-    if (!isCopilotCli) {
+    // If goal_achieved is already set (via close_thread MCP or CLI), the
+    // thread was explicitly completed — preserve that signal, don't overwrite.
+    if (!isCopilotCli && !existing.goal_achieved) {
       existing.status = "closed";
       existing.closed_at = now;
     }

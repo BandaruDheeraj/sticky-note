@@ -3462,6 +3462,84 @@ function cmdDeployBackend() {
 }
 
 // ──────────────────────────────────────────────
+// CLOSE command — explicit goal completion signal
+// ──────────────────────────────────────────────
+
+async function cmdClose() {
+  const summary = process.argv.slice(3).join(" ").trim();
+  if (!summary) {
+    print("  Usage: npx sticky-note close \"what was accomplished\"");
+    print("  Also:  npx sticky-note done \"what was accomplished\"");
+    process.exit(1);
+  }
+
+  const stickyDir = getActiveStickyDir();
+  const sessionFile = path.join(stickyDir, ".sticky-session");
+  if (!fs.existsSync(sessionFile)) {
+    print("  [ERR] No active session found (.sticky-session missing).");
+    print("        This command is meant to be called during an active Claude Code session.");
+    process.exit(1);
+  }
+  const sessionId = fs.readFileSync(sessionFile, "utf-8").trim();
+  if (!sessionId) {
+    print("  [ERR] .sticky-session is empty.");
+    process.exit(1);
+  }
+
+  const memoryPath = path.join(stickyDir, "sticky-note.json");
+  const memory = readJsonSafe(memoryPath, { version: "2", threads: [] });
+  const threads = memory.threads || [];
+  const thread = threads.find(t => t.session_id === sessionId);
+
+  if (!thread) {
+    print(`  [ERR] No thread found for session ${sessionId}.`);
+    process.exit(1);
+  }
+
+  const now = new Date().toISOString();
+  thread.status = "closed";
+  thread.goal_achieved = true;
+  thread.handoff_summary = summary;
+  thread.closed_at = now;
+  thread.last_activity_at = now;
+  thread.last_note = summary.substring(0, 200);
+
+  memory.threads = threads;
+  fs.writeFileSync(memoryPath, JSON.stringify(memory, null, 2) + "\n");
+  print(`  [OK] Thread ${thread.id.slice(0, 8)} marked complete.`);
+  print(`  [OK] goal_achieved = true`);
+  print(`  [OK] Handoff: ${summary.substring(0, 120)}`);
+
+  // Push to cloud
+  const envStickyPath = path.join(process.cwd(), ".env.sticky");
+  if (fs.existsSync(envStickyPath)) {
+    let stickyUrl = "", stickyApiKey = "";
+    for (const line of fs.readFileSync(envStickyPath, "utf-8").split(/\r?\n/)) {
+      const t = line.trim();
+      if (t.startsWith("STICKY_URL=")) stickyUrl = t.slice("STICKY_URL=".length);
+      if (t.startsWith("STICKY_API_KEY=")) stickyApiKey = t.slice("STICKY_API_KEY=".length);
+    }
+    if (stickyUrl) {
+      try {
+        let projectName = "default";
+        try {
+          const remote = execFileSync("git", ["remote", "get-url", "origin"], {
+            encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+          }).trim();
+          const match = remote.match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+          if (match) projectName = match[1];
+        } catch (_) {}
+        const headers = { "Content-Type": "application/json", "X-Sticky-Project": projectName };
+        if (stickyApiKey) headers["X-Sticky-API-Key"] = stickyApiKey;
+        await fetch(`${stickyUrl}/threads/${thread.id}`, {
+          method: "PUT", headers, body: JSON.stringify(thread),
+        });
+        print(`  [OK] Pushed to cloud.`);
+      } catch (_) { /* non-fatal */ }
+    }
+  }
+}
+
 // MIGRATE --to cloud command (V3 cloud migration)
 // ──────────────────────────────────────────────
 
@@ -4994,6 +5072,10 @@ async function main() {
       break;
     case "migrate":
       await cmdMigrate();
+      break;
+    case "close":
+    case "done":
+      await cmdClose();
       break;
     case "--version":
     case "-v":
