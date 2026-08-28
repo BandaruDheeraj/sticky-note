@@ -1,5 +1,165 @@
 # Changelog
 
+## V3.1.34
+
+### New: Explicit Goal Completion Signal (`close_thread`)
+
+Previously `stuck` fired on any tool failure and `closed` just meant the
+session ended — neither signal indicated whether the actual goal was achieved.
+
+- **New MCP tool: `close_thread(summary)`** — Claude calls this when the
+  user's stated goal is fully complete. Sets `goal_achieved: true` and
+  records a specific handoff summary. This is the primary interface; no
+  bash command needed.
+- **New CLI: `npx sticky-note close "message"`** (alias: `done`) — manual
+  fallback for calling outside Claude Code.
+- **New thread field: `goal_achieved: boolean`** — only set by explicit
+  close, never inferred from session end. Enables filtering threads by
+  whether Claude actually succeeded.
+- **`session-end.js`**: preserves `goal_achieved` when already set —
+  session teardown no longer overwrites an explicit completion signal.
+- **`CLAUDE.md` template**: instructs Claude to call `close_thread` when
+  done, with guidance on what makes a good summary.
+
+---
+
+## V3.1.33
+
+### Fix: Teammate Init Flow Broken by Overly Broad `.gitignore`
+
+The data branch migration added `.sticky-note/` to `.gitignore`, which also
+hid `sticky-note-config.json` from teammates on `git pull`. Without the
+config, `init` couldn't detect `sticky_url` and never prompted for the API
+key — teammates silently ended up in local-only mode with no cloud sync.
+
+- Migration now ignores only the data files:
+  `.sticky-note/sticky-note.json`, `.sticky-note/audit/`,
+  `.sticky-note/presence/`
+- `sticky-note-config.json` stays committed so the teammate init flow
+  detects the cloud URL and prompts for the API key correctly.
+- `update` replaces any existing broad `.sticky-note/` ignore with the
+  specific lines automatically.
+
+---
+
+## V3.1.32
+
+### New: Auto-Migration on `npx sticky-note update`
+
+Previously, moving from in-tree `.sticky-note/` storage to the git data
+branch, and pushing existing threads to cloud, required separate manual
+commands. `update` now handles both automatically.
+
+- **Auto data branch migration**: if the data branch is empty but
+  `.sticky-note/sticky-note.json` has threads, `update` runs the full
+  migration inline (copy files, commit to `sticky-note/data`, push to
+  remote, update `.gitignore`).
+- **Auto cloud push**: if `STICKY_URL` is configured and the cloud has
+  fewer threads than local, `update` pushes all local threads to the
+  cloud Worker.
+- Both checks are idempotent — no-ops if already up to date.
+- `cmdUpdate` is now async to support these operations.
+
+---
+
+## V3.1.31
+
+### Fix: MCP Server Not Loading on Windows (Claude Code)
+
+The `npx` invocation for the MCP server goes through multiple `.cmd` shim
+layers on Windows, breaking stdin pipe inheritance and causing Claude Code
+to silently skip the server.
+
+- **`update` now writes `node .claude/sticky-note-mcp.js`** to `.mcp.json`
+  instead of the npx chain — a direct single-process invocation that works
+  reliably on Windows.
+- **`templates/sticky-note-mcp.js`**: new MCP entry point template that
+  injects `--project` so the server always resolves from the correct project
+  root regardless of Claude Code's working directory.
+- **`update` removes sticky-note from `~/.claude/settings.json`**: a
+  duplicate global entry causes Claude Code to skip the project-local server;
+  `update` now cleans this up automatically.
+- **`update` fills missing `.mcp.json` entry**: if sticky-note is absent
+  from `.mcp.json` entirely, `update` adds the correct entry.
+
+### New: Account-Level MCP Type (`account-mcp`)
+
+MCP servers connected through a claude.ai account (Figma, Sentry, Render)
+were being written to `environment/manifest.json` as `permission-detected`
+— a legacy marker that caused `get_environment_status` to report them as
+missing servers requiring local provisioning.
+
+- New `account-mcp` type for servers managed by the claude.ai account.
+  Each teammate connects these via their own claude.ai account — no local
+  provisioning needed.
+- `get_environment_status` now reports `account-mcp` servers in a separate
+  section with a clear explanation.
+- `update` converts any existing `permission-detected` entries to `account-mcp`
+  in the manifest automatically.
+- `session-start.js` skips `permission-detected` entries when syncing the
+  manifest back to `.mcp.json`.
+
+### Fix: Environment Directory Written to Wrong Path
+
+`cmdInit` and `cmdUpdate` hardcoded `.sticky-note/environment/` but the MCP
+server resolves data from `.git/sticky-note/` on migrated repos. The manifest
+was being written to a path the MCP server never read.
+
+- New `getActiveStickyDir()` helper mirrors the MCP server's `stickyDir()`
+  resolution logic: prefers `.git/sticky-note/` if `sticky-note.json` exists
+  there, falls back to `.sticky-note/`.
+- `cmdInit` and `cmdUpdate` now use `getActiveStickyDir()` when creating
+  the environment directory.
+
+### New: Global MCP Server Detection
+
+`detectMcpServers()` now reads `~/.claude/settings.json` in addition to
+project-level config, capturing servers like Render that are registered
+globally rather than per-project.
+
+### New: `auto_push` Defaults to `true` When Cloud Is Configured
+
+When a cloud backend is provisioned during `init`, `auto_push` now defaults
+to `true` so threads reach GitHub even when Cloudflare KV hits its daily
+write limit.
+
+---
+
+## V3.1.29–V3.1.30
+
+### New: Full-Fidelity Event Capture
+
+- **`event-writer.js`**: shared utility for structured event emission.
+  Captures `session_open`, `user_prompt`, `tool_call`, `tool_result`,
+  `tool_denied`, `tool_error`, and AI response events.
+- All hook scripts updated to emit events via `event-writer`.
+- Events pushed to the Worker's `/threads/:id/events` endpoint when
+  `STICKY_URL` is configured.
+- `session-start.js` emits `session_open` event at session start.
+- `track-work.js` emits `tool_call`/`tool_result` events per tool use.
+- `on-error.js` emits `tool_denied`/`tool_error` events on failures.
+- AI response events extracted from transcript and included in stream.
+- `sanitizeToolArgs` applied to event args before storage.
+
+### New: Worker Durable Object + Batched KV Flush
+
+- `StickyThread` Durable Object for serialized GitHub commit path.
+- Batched KV flush with configurable interval.
+- 5-minute cron for stale thread crash recovery.
+- `/threads/:id/events` endpoint for local session event stream push.
+- `/mcp` endpoint with write tools: `open_thread`, `append_event`,
+  `set_checkpoint`, `close_thread`.
+
+### Fix: Worker Reliability
+
+- `threads_index` always updated on write; removed dead `threadMeta` param.
+- Crash recovery commits stale status (not closed) to avoid masking
+  active threads.
+- Internal KV fields stripped from git commits.
+- `new_sqlite_classes` migration for free-plan Durable Objects.
+
+---
+
 ## V3.1.3
 
 ### Improved: Init Wizard Auto-Installs and Authenticates Wrangler

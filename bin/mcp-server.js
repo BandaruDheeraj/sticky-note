@@ -359,10 +359,34 @@ function toolSearchThreads(params) {
     return q.split(/\s+/).every((word) => searchable.includes(word));
   });
 
+  // Return summarized thread objects — full objects can exceed token limits
+  // when failed_approaches accumulates dozens of entries per thread.
+  const summarized = matches.map((t) => ({
+    id: t.id,
+    status: t.status,
+    user: t.user,
+    tool: t.tool,
+    branch: t.branch,
+    work_type: t.work_type,
+    goal_achieved: t.goal_achieved || false,
+    created_at: t.created_at,
+    last_activity_at: t.last_activity_at,
+    narrative: (t.narrative || "").substring(0, 300),
+    last_note: (t.last_note || "").substring(0, 200),
+    handoff_summary: (t.handoff_summary || "").substring(0, 300),
+    files_touched: (t.files_touched || []).slice(0, 20),
+    failed_approaches: (t.failed_approaches || []).slice(-3).map((f) => ({
+      description: typeof f === "string"
+        ? f.substring(0, 150)
+        : (f.description || "").substring(0, 150),
+      error: typeof f === "string" ? "" : (f.error || "").substring(0, 100),
+    })),
+  }));
+
   return {
     query,
-    count: matches.length,
-    threads: matches,
+    count: summarized.length,
+    threads: summarized,
   };
 }
 
