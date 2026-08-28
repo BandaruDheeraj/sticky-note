@@ -4744,27 +4744,42 @@ async function _cmdMigrateDataBranch() {
     print("  [WARN] Could not commit to data branch: " + err.message);
   }
 
-  // Step 3: Add .sticky-note/ to .gitignore
+  // Step 3: Add data files to .gitignore — but NOT sticky-note-config.json.
+  // sticky-note-config.json must stay committed so teammates get sticky_url
+  // on git pull (which triggers the API key prompt in `npx sticky-note init`).
   print("");
   const gitignorePath = path.join(cwd, ".gitignore");
   const MARKER = "# sticky-note: data branch migration";
-  const IGNORE_LINE = ".sticky-note/";
+  // Ignore only the data files, not the whole directory.
+  const IGNORE_LINES = [
+    ".sticky-note/sticky-note.json",
+    ".sticky-note/audit/",
+    ".sticky-note/presence/",
+  ];
   let gitignoreUpdated = false;
   if (fs.existsSync(gitignorePath)) {
     const existing = fs.readFileSync(gitignorePath, "utf-8");
     const gitignoreLines = existing.split(/\r?\n/).map(l => l.trim());
-    if (!gitignoreLines.includes(IGNORE_LINE)) {
-      fs.appendFileSync(gitignorePath, "\n" + MARKER + "\n" + IGNORE_LINE + "\n");
+    // Also clean up the old broad ignore if present from a previous migration run
+    const hasBroad = gitignoreLines.includes(".sticky-note/");
+    const missingLines = IGNORE_LINES.filter(l => !gitignoreLines.includes(l));
+    if (hasBroad) {
+      // Replace the broad ignore with specific lines
+      const replaced = existing.replace(/\.sticky-note\/\n?/, IGNORE_LINES.join("\n") + "\n");
+      fs.writeFileSync(gitignorePath, replaced, "utf-8");
+      gitignoreUpdated = true;
+    } else if (missingLines.length > 0) {
+      fs.appendFileSync(gitignorePath, "\n" + MARKER + "\n" + missingLines.join("\n") + "\n");
       gitignoreUpdated = true;
     }
   } else {
-    fs.writeFileSync(gitignorePath, MARKER + "\n" + IGNORE_LINE + "\n");
+    fs.writeFileSync(gitignorePath, MARKER + "\n" + IGNORE_LINES.join("\n") + "\n");
     gitignoreUpdated = true;
   }
   if (gitignoreUpdated) {
-    print("  [OK] Added .sticky-note/ to .gitignore");
+    print("  [OK] .gitignore: ignoring data files only (sticky-note-config.json stays committed)");
   } else {
-    print("  [OK] .gitignore already contains .sticky-note/");
+    print("  [OK] .gitignore already up to date");
   }
 
   // Step 4: Remove sticky-note pre-commit and post-commit hooks
