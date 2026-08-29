@@ -1,5 +1,21 @@
 # Changelog
 
+## V3.1.36
+
+### Fix: Open threads orphaned when cloud is enabled
+
+When a cloud Worker is configured, `session-start.js` creates the new "open"
+thread locally but doesn't push it to cloud. `session-end.js` then reads cloud
+threads and replaces local state entirely — losing the new thread — so it creates
+a second "closed" thread instead of updating the existing one. Result: every
+session produced one orphaned "open" thread with no narrative and a separate
+"closed" thread.
+
+- **`session-end.js`**: merges cloud threads with local threads instead of
+  replacing. Cloud is the authority for shared threads; any local-only thread
+  (e.g. the open thread session-start just wrote) is preserved. The session's
+  thread is now found correctly and updated in place.
+
 ## V3.1.34
 
 ### New: Explicit Goal Completion Signal (`close_thread`)

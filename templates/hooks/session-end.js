@@ -1012,7 +1012,14 @@ async function main() {
   const memory = loadJson(memoryPath, { version: "2", project: "", threads: [] });
   if (cloud) {
     const cloudThreads = await cloudReadThreads();
-    if (cloudThreads) memory.threads = cloudThreads;
+    if (cloudThreads) {
+      // Merge: use cloud as the source of truth for shared threads, but preserve
+      // any local-only threads (e.g. the "open" thread session-start just created
+      // and saved locally but didn't push to cloud yet).
+      const cloudIds = new Set(cloudThreads.map((t) => t && t.id).filter(Boolean));
+      const localOnly = (memory.threads || []).filter((t) => t && !cloudIds.has(t.id));
+      memory.threads = [...cloudThreads, ...localOnly];
+    }
   }
   const config = loadJson(getConfigPath(), { stale_days: 14 });
   const staleDays = config.stale_days || 14;
