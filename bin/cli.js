@@ -615,7 +615,19 @@ async function cmdInit() {
   // Read existing sticky-note-config.json for teammate flow (cloud URL pre-set via git)
   const existingConfigPath = path.join(process.cwd(), ".sticky-note", "sticky-note-config.json");
   const existingConfig = readJsonSafe(existingConfigPath, {});
-  const configStickyUrl = existingConfig.sticky_url || "";
+  // Also check .env.sticky as fallback — handles case where URL was set locally but never
+  // committed to the config (e.g. set up via wrangler deploy rather than `init --v3`)
+  let envStickyUrlFallback = "";
+  try {
+    const envStickyRaw = fs.readFileSync(path.join(process.cwd(), ".env.sticky"), "utf-8");
+    for (const line of envStickyRaw.split(/\r?\n/)) {
+      if (line.trim().startsWith("STICKY_URL=")) {
+        envStickyUrlFallback = line.trim().slice("STICKY_URL=".length).trim();
+        break;
+      }
+    }
+  } catch (_) { /* no .env.sticky yet */ }
+  const configStickyUrl = existingConfig.sticky_url || envStickyUrlFallback || "";
 
   // Auto-detect MCP servers and skills
   print("  Scanning for existing configuration...");
@@ -984,7 +996,7 @@ async function cmdInit() {
     existing.inject_token_budget = injectTokenBudgetResolved;
     existing.hook_version = VERSION;
     existing.min_version = bumpMinVersion(existing.min_version, VERSION);
-    if (cloudProvisionedUrl) existing.sticky_url = cloudProvisionedUrl;
+    if (cloudProvisionedUrl || configStickyUrl) existing.sticky_url = cloudProvisionedUrl || configStickyUrl;
     // Enable auto_push when cloud is configured (if not already explicitly set)
     if ((cloudProvisionedUrl || configStickyUrl) && existing.auto_push === false) {
       existing.auto_push = true;
