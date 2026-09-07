@@ -260,6 +260,21 @@ function readJsonSafe(filePath, fallback) {
   }
 }
 
+function readEnvSticky(cwd) {
+  try {
+    const raw = fs.readFileSync(path.join(cwd, ".env.sticky"), "utf-8");
+    let url = "", key = "";
+    for (const line of raw.split(/\r?\n/)) {
+      const t = line.trim();
+      if (t.startsWith("STICKY_URL=")) url = t.slice("STICKY_URL=".length).trim();
+      else if (t.startsWith("STICKY_API_KEY=")) key = t.slice("STICKY_API_KEY=".length).trim();
+    }
+    return { url, key };
+  } catch (_) {
+    return { url: "", key: "" };
+  }
+}
+
 function parseIntOr(str, fallback) {
   const n = parseInt(str, 10);
   return Number.isNaN(n) ? fallback : n;
@@ -615,19 +630,9 @@ async function cmdInit() {
   // Read existing sticky-note-config.json for teammate flow (cloud URL pre-set via git)
   const existingConfigPath = path.join(process.cwd(), ".sticky-note", "sticky-note-config.json");
   const existingConfig = readJsonSafe(existingConfigPath, {});
-  // Also check .env.sticky as fallback — handles case where URL was set locally but never
-  // committed to the config (e.g. set up via wrangler deploy rather than `init --v3`)
-  let envStickyUrlFallback = "";
-  try {
-    const envStickyRaw = fs.readFileSync(path.join(process.cwd(), ".env.sticky"), "utf-8");
-    for (const line of envStickyRaw.split(/\r?\n/)) {
-      if (line.trim().startsWith("STICKY_URL=")) {
-        envStickyUrlFallback = line.trim().slice("STICKY_URL=".length).trim();
-        break;
-      }
-    }
-  } catch (_) { /* no .env.sticky yet */ }
-  const configStickyUrl = existingConfig.sticky_url || envStickyUrlFallback || "";
+  // Fall back to .env.sticky when sticky_url isn't committed yet — lets the URL
+  // get written into config on next init so teammates see the teammate flow on pull.
+  const configStickyUrl = existingConfig.sticky_url || readEnvSticky(process.cwd()).url;
 
   // Auto-detect MCP servers and skills
   print("  Scanning for existing configuration...");
@@ -996,7 +1001,8 @@ async function cmdInit() {
     existing.inject_token_budget = injectTokenBudgetResolved;
     existing.hook_version = VERSION;
     existing.min_version = bumpMinVersion(existing.min_version, VERSION);
-    if (cloudProvisionedUrl || configStickyUrl) existing.sticky_url = cloudProvisionedUrl || configStickyUrl;
+    if (cloudProvisionedUrl) existing.sticky_url = cloudProvisionedUrl;
+    else if (configStickyUrl && !existing.sticky_url) existing.sticky_url = configStickyUrl;
     // Enable auto_push when cloud is configured (if not already explicitly set)
     if ((cloudProvisionedUrl || configStickyUrl) && existing.auto_push === false) {
       existing.auto_push = true;
@@ -1741,17 +1747,9 @@ function cmdStatus() {
   // V3: Cloud backend health
   const envStickyPath = path.join(process.cwd(), ".env.sticky");
   print("\n  Cloud Backend (V3):");
-  if (fs.existsSync(envStickyPath)) {
-    try {
-      const envRaw = fs.readFileSync(envStickyPath, "utf-8");
-      let stickyUrl = "";
-      for (const line of envRaw.split(/\r?\n/)) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith("STICKY_URL=")) {
-          stickyUrl = trimmed.slice("STICKY_URL=".length).trim();
-        }
-      }
-      if (stickyUrl) {
+  {
+    const { url: stickyUrl } = readEnvSticky(process.cwd());
+    if (stickyUrl) {
         print(`    [OK] .env.sticky found (${stickyUrl})`);
         try {
           const http = require(stickyUrl.startsWith("https") ? "https" : "http");
@@ -1798,14 +1796,12 @@ function cmdStatus() {
         } catch (_) {
           print(`    [ERR] Backend health check failed`);
         }
-      } else {
-        print("    [--] .env.sticky found but STICKY_URL not set");
-      }
-    } catch (_) {
-      print("    [ERR] .env.sticky unreadable");
+    } else {
+      const exists = fs.existsSync(envStickyPath);
+      print(exists
+        ? "    [--] .env.sticky found but STICKY_URL not set"
+        : "    [--] No .env.sticky (local-only mode, V2.5 compatible)");
     }
-  } else {
-    print("    [--] No .env.sticky (local-only mode, V2.5 compatible)");
   }
 
   // V2.5: Attribution engine health
@@ -3567,14 +3563,10 @@ async function cmdMigrateToCloud() {
   // Try .env.sticky
   let envUrl = stickyUrl;
   let envKey = stickyApiKey;
-  const envStickyPath = path.join(process.cwd(), ".env.sticky");
-  if (!envUrl && fs.existsSync(envStickyPath)) {
-    const raw = fs.readFileSync(envStickyPath, "utf-8");
-    for (const line of raw.split(/\r?\n/)) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith("STICKY_URL=")) envUrl = trimmed.slice("STICKY_URL=".length);
-      if (trimmed.startsWith("STICKY_API_KEY=")) envKey = trimmed.slice("STICKY_API_KEY=".length);
-    }
+  if (!envUrl) {
+    const env = readEnvSticky(process.cwd());
+    envUrl = env.url;
+    envKey = envKey || env.key;
   }
 
   if (!envUrl) {
@@ -3713,14 +3705,10 @@ async function _cmdMcpServerInline() {
   // Try .env.sticky
   let envUrl = stickyUrl;
   let envKey = stickyApiKey;
-  const envStickyPath = path.join(process.cwd(), ".env.sticky");
-  if (!envUrl && fs.existsSync(envStickyPath)) {
-    const raw = fs.readFileSync(envStickyPath, "utf-8");
-    for (const line of raw.split(/\r?\n/)) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith("STICKY_URL=")) envUrl = trimmed.slice("STICKY_URL=".length);
-      if (trimmed.startsWith("STICKY_API_KEY=")) envKey = trimmed.slice("STICKY_API_KEY=".length);
-    }
+  if (!envUrl) {
+    const env = readEnvSticky(process.cwd());
+    envUrl = env.url;
+    envKey = envKey || env.key;
   }
 
   // Detect project
