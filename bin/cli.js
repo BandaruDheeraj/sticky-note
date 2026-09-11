@@ -624,7 +624,14 @@ async function cmdInit() {
     print("  [ERR] Not a git repository. Run `git init` first.");
     process.exit(1);
   }
-  print("  [OK] Git repository detected");
+  // Resolve git root and chdir there so init works from any subdirectory
+  const repoRoot = execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+  if (repoRoot !== process.cwd()) {
+    process.chdir(repoRoot);
+    print(`  [OK] Git repository detected (running from root: ${repoRoot})`);
+  } else {
+    print("  [OK] Git repository detected");
+  }
   print("");
 
   // Read existing sticky-note-config.json for teammate flow (cloud URL pre-set via git)
