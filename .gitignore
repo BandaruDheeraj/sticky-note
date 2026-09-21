@@ -33,3 +33,12 @@ __pycache__/
 .sticky-note/.sticky-injected
 .sticky-note/.sticky-active-resume
 .sticky-note/.sticky-checkpoint
+
+# Sticky Note
+.claude/worktrees/
+.sticky-note/.sticky-errors.log
+.sticky-note/.sticky-syncing
+.sticky-note/.env-provision-hash
+.sticky-note/.overlap-warned
+.sticky-note/.overlap-pending
+.sticky-note/.overlap-dismissed

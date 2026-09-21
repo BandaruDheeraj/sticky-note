@@ -6,13 +6,9 @@
       "name": "sticky-note",
       "type": "stdio",
       "source": ".mcp.json",
-      "command": "npx",
+      "command": "node",
       "args": [
-        "-y",
-        "-p",
-        "sticky-note-cli",
-        "sticky-note",
-        "mcp-server"
+        ".claude/sticky-note-mcp.js"
       ]
     },
     {
@@ -39,14 +35,15 @@
       }
     },
     {
-      "name": "plugin_cloudflare_cloudflare-api",
-      "source": "auto-detected"
+      "name": "claude_ai_Exa",
+      "type": "unknown",
+      "source": ".mcp.json"
     }
   ],
   "skills": [],
   "conventions": [],
-  "hook_version": "3.1.5",
-  "min_version": "3.1.5",
+  "hook_version": "3.1.38",
+  "min_version": "3.1.38",
   "sticky_url": "https://sticky-note-server.sticky-server.workers.dev",
   "environment_version": "1"
 }
