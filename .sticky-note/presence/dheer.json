@@ -1,15 +1,15 @@
 {
   "active_files": [
-    "..\\MOBA\\MOBA\\.sticky-note\\sticky-note-config.json",
-    "..\\MOBA\\MOBA\\.git\\hooks\\post-rewrite",
-    ".claude\\sticky-note-mcp.js",
-    "bin",
-    "bin\\cli.js",
+    "templates\\CLAUDE.md",
+    "CHANGELOG.md",
     "package.json",
-    "..\\MOBA\\MOBA\\.claude\\hooks",
-    "templates\\hooks\\session-start.js",
-    "..\\MOBA\\MOBA\\.mcp.json",
-    "bin\\mcp-server.js"
+    "sticky-server\\wrangler.toml",
+    "bin\\cli.js",
+    "..\\MOBA\\MOBA\\.sticky-note\\sticky-note-config.json",
+    "..\\MOBA\\MOBA\\backend\\.claude\\settings.json",
+    ".claude\\settings.json",
+    "..\\MOBA\\MOBA\\.claude\\settings.json",
+    "README.md"
   ],
-  "last_seen": "2026-08-27T21:06:55.199Z"
+  "last_seen": "2026-09-22T21:18:25.965Z"
 }
