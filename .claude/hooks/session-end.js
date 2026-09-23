@@ -76,9 +76,14 @@ const {
   syncStickyNote,
 } = utils;
 
+// ── AI event writer ───────────────────────────────────────
+
+let eventWriter = null;
+try { eventWriter = require("./event-writer.js"); } catch (_) {}
+
 // ── Constants ─────────────────────────────────────────────
 
-const WRITE_TOOLS = new Set([
+const WRITE_TOOLS = (eventWriter && eventWriter.WRITE_TOOLS) || new Set([
   "Write", "Edit", "MultiEdit",
   "write", "edit", "multi_edit",
 ]);
@@ -378,17 +383,140 @@ function extractFailedApproaches(hookInput) {
   return extractFailedFromEntries(entries);
 }
 
+// ── AI event extraction for AI blame ─────────────────────
+
+/**
+ * Parse Claude Code's transcript JSONL to extract ai_thinking,
+ * ai_response, and context_compressed events for the AI blame stream.
+ * Returns an array of structured events ordered by their appearance.
+ */
+function extractAiEventsFromTranscript(transcriptPath, sessionId) {
+  if (!eventWriter) return [];
+  if (!transcriptPath || !fs.existsSync(transcriptPath)) return [];
+
+  const events = [];
+  let raw;
+  try {
+    raw = fs.readFileSync(transcriptPath, "utf-8");
+  } catch (_) {
+    return [];
+  }
+
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let entry;
+    try { entry = JSON.parse(trimmed); } catch (_) { continue; }
+
+    // Context compression: Claude Code emits entries with a summary field
+    // when the context window is compacted.
+    if (entry.type === "summary" && entry.summary) {
+      events.push(eventWriter.buildEvent(
+        eventWriter.EVENT_TYPES.CONTEXT_COMPRESSED,
+        {
+          summary: String(entry.summary).substring(0, 1000),
+          tokens_before: entry.tokens_before || null,
+          tokens_after: entry.tokens_after || null,
+        },
+        sessionId
+      ));
+      continue;
+    }
+
+    const message = entry.message;
+    if (!message || typeof message !== "object") continue;
+    const role = message.role || entry.role || "";
+    if (role !== "assistant") continue;
+
+    const contentBlocks = _getContentBlocks(entry);
+    if (!Array.isArray(contentBlocks)) continue;
+
+    for (const block of contentBlocks) {
+      if (!block || typeof block !== "object") continue;
+
+      if (block.type === "thinking" && block.thinking) {
+        events.push(eventWriter.buildEvent(
+          eventWriter.EVENT_TYPES.AI_THINKING,
+          { content: block.thinking },
+          sessionId
+        ));
+      }
+
+      if (block.type === "text" && block.text && block.text.trim()) {
+        events.push(eventWriter.buildEvent(
+          eventWriter.EVENT_TYPES.AI_RESPONSE,
+          { content: block.text },
+          sessionId
+        ));
+      }
+    }
+
+    // Token usage may appear on the entry itself (Claude Code's format)
+    if (entry.usage && eventWriter) {
+      const last = events[events.length - 1];
+      if (last && last.type === eventWriter.EVENT_TYPES.AI_RESPONSE) {
+        last.data.input_tokens = entry.usage.input_tokens || null;
+        last.data.output_tokens = entry.usage.output_tokens || null;
+        last.data.cache_read_tokens = entry.usage.cache_read_input_tokens || null;
+      }
+    }
+  }
+
+  return events;
+}
+
+/**
+ * Collect all events for this session from the audit JSONL files
+ * (tool_call, tool_result, tool_error, tool_denied, user_prompt, session_open)
+ * plus the provided pre-extracted AI events.
+ * Sort by ts. Returns an array ready to push to the Worker.
+ *
+ * Callers must extract AI events separately (via extractAiEventsFromTranscript)
+ * so the same extraction can be reused for local audit writes — avoiding a
+ * second transcript parse.
+ */
+function collectSessionEvents(sessionId, aiEvents) {
+  const events = [];
+
+  // Gather structured events from audit (written by hooks during the session)
+  const typesForBlame = new Set([
+    "tool_call", "tool_result", "tool_error", "tool_denied",
+    "user_prompt", "session_open", "checkpoint",
+  ]);
+
+  for (const auditPath of getAllAuditPaths()) {
+    try {
+      const raw = fs.readFileSync(auditPath, "utf-8");
+      for (const line of raw.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        let entry;
+        try { entry = JSON.parse(trimmed); } catch (_) { continue; }
+        if (entry.session_id === sessionId && typesForBlame.has(entry.type)) {
+          events.push(entry);
+        }
+      }
+    } catch (_) {
+      // ignore unreadable audit file
+    }
+  }
+
+  events.push(...aiEvents);
+
+  // Sort by ts ascending
+  events.sort((a, b) => {
+    if (a.ts < b.ts) return -1;
+    if (a.ts > b.ts) return 1;
+    return 0;
+  });
+
+  return events;
+}
+
 // ── Transcript capture ────────────────────────────────────
-// Persists the full verbatim session transcript (Claude Code's native
-// transcript_path JSONL file) into sticky-note/data storage, keyed by
-// thread ID rather than commit SHA — a thread's transcript belongs to the
-// whole session, which may span zero, one, or many commits. Appended as
-// one entry per contributing session so resumed threads accumulate their
-// full history rather than overwriting it.
-//
-// Opt-out: set "capture_transcripts": false in sticky-note-config.json.
-// Secrets are redacted (best-effort — see redactSecrets in sticky-utils.js)
-// before anything is written to disk or committed.
+// Keyed by thread ID rather than commit SHA — a session may span zero or many
+// commits. Appended (not overwritten) so resumed threads accumulate history.
+// Opt-out: "capture_transcripts": false in sticky-note-config.json.
 
 function captureTranscript(hookInput, threadId, sessionId, aiTool, user, now, config) {
   if (!threadId) return false;
@@ -800,6 +928,19 @@ function clearPresence(user) {
   try { fs.unlinkSync(presencePath); } catch (_) {}
 }
 
+// ── Cloud helpers ─────────────────────────────────────────
+
+function _makeCloudHeaders() {
+  const { url, apiKey } = getCloudConfig();
+  const projectName = getProjectName();
+  const headers = {
+    "Content-Type": "application/json",
+    "X-Sticky-Project": projectName,
+  };
+  if (apiKey) headers["X-Sticky-API-Key"] = apiKey;
+  return { url, headers };
+}
+
 // ── Data-branch commit/push ───────────────────────────────
 
 /** Collect files from a directory matching an extension into fileMap. */
@@ -871,7 +1012,14 @@ async function main() {
   const memory = loadJson(memoryPath, { version: "2", project: "", threads: [] });
   if (cloud) {
     const cloudThreads = await cloudReadThreads();
-    if (cloudThreads) memory.threads = cloudThreads;
+    if (cloudThreads) {
+      // Merge: use cloud as the source of truth for shared threads, but preserve
+      // any local-only threads (e.g. the "open" thread session-start just created
+      // and saved locally but didn't push to cloud yet).
+      const cloudIds = new Set(cloudThreads.map((t) => t && t.id).filter(Boolean));
+      const localOnly = (memory.threads || []).filter((t) => t && !cloudIds.has(t.id));
+      memory.threads = [...cloudThreads, ...localOnly];
+    }
   }
   const config = loadJson(getConfigPath(), { stale_days: 14 });
   const staleDays = config.stale_days || 14;
@@ -920,7 +1068,7 @@ async function main() {
   memory.threads = threads;
   let existing = null;
 
-  // V2.5: Check for active resumed thread (set by resume-thread command)
+  // Check for active resumed thread (set by resume-thread command)
   const activeResumeId = getActiveResumeThreadId();
 
   // Check for resumed thread (V2 resume signal or V2.5 active resume)
@@ -952,7 +1100,7 @@ async function main() {
         });
       }
 
-      // V2.5: Update contributors and resume metadata
+      // Update contributors and resume metadata
       const contributors = existing.contributors || [];
       if (!contributors.includes(user)) {
         contributors.push(user);
@@ -1000,7 +1148,9 @@ async function main() {
     existing.last_activity_at = now;
     // Copilot CLI fires SessionEnd per-turn, not per-session.
     // Keep thread open so it isn't prematurely closed between turns.
-    if (!isCopilotCli) {
+    // If goal_achieved is already set (via close_thread MCP or CLI), the
+    // thread was explicitly completed — preserve that signal, don't overwrite.
+    if (!isCopilotCli && !existing.goal_achieved) {
       existing.status = "closed";
       existing.closed_at = now;
     }
@@ -1069,13 +1219,7 @@ async function main() {
           .filter(Boolean)
           .find(e => e.session_id === sessionId);
         if (entry) {
-          const { url: stickyUrl, apiKey: stickyApiKey } = getCloudConfig();
-          const projectName = getProjectName();
-          const headers = {
-            "Content-Type": "application/json",
-            "X-Sticky-Project": projectName,
-          };
-          if (stickyApiKey) headers["X-Sticky-API-Key"] = stickyApiKey;
+          const { url: stickyUrl, headers } = _makeCloudHeaders();
           fetch(`${stickyUrl}/transcripts/${existing.id}`, {
             method: "POST",
             headers,
@@ -1086,7 +1230,37 @@ async function main() {
     } catch (_) {} // transcript cloud sync is non-fatal
   }
 
-  // V2.5: Capture commit SHAs for attribution engine
+  // Extract AI events once — used for both local audit writes and the Worker push.
+  let aiEvents = [];
+  try {
+    aiEvents = extractAiEventsFromTranscript(hookInput.transcript_path || "", sessionId);
+    for (const ev of aiEvents) {
+      try { appendAuditLineBoth(ev, cloud); } catch (_) {}
+    }
+  } catch (_) {
+    // non-fatal — AI event extraction must never interrupt session-end
+  }
+
+  // Push complete event stream to Worker for team-wide AI blame.
+  // This is a no-op if cloud is not configured or the endpoint doesn't exist yet.
+  if (cloud && existing && existing.id) {
+    try {
+      const allEvents = collectSessionEvents(sessionId, aiEvents);
+      if (allEvents.length > 0) {
+        const { url: stickyUrl, headers } = _makeCloudHeaders();
+        fetch(`${stickyUrl}/threads/${existing.id}/events`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ events: allEvents }),
+          signal: AbortSignal.timeout(10000),
+        }).catch(() => {}); // non-fatal
+      }
+    } catch (_) {
+      // non-fatal — Worker endpoint may not exist until Plan 2 ships
+    }
+  }
+
+  // Capture commit SHAs for attribution engine
   const commitShas = getSessionCommitShas();
 
   // Housekeeping
@@ -1106,7 +1280,7 @@ async function main() {
   }
   appendAuditLineBoth(auditEntry, cloud);
 
-  // V2.5: Also write individual commit_sha audit entries for bridge lookup
+  // Also write individual commit_sha audit entries for bridge lookup
   for (const sha of commitShas) {
     const commitEntry = {
       type: "commit",

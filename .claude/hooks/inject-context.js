@@ -410,18 +410,23 @@ async function main() {
     }
   }
 
-  // Audit the user prompt
-  try {
-    const promptAudit = {
-      type: "user_prompt",
-      user: getUser(),
-      ts: new Date().toISOString(),
-      session_id: sessionId,
-      prompt: prompt.substring(0, 500),
-    };
-    appendAuditLineBoth(promptAudit, cloud);
-  } catch (_) {
-    // ignore
+  // Capture user_prompt event for AI blame
+  let eventWriter = null;
+  try { eventWriter = require("./event-writer.js"); } catch (_) {}
+
+  if (eventWriter) {
+    try {
+      const promptEntry = eventWriter.buildEvent(
+        eventWriter.EVENT_TYPES.USER_PROMPT,
+        { content: prompt },       // verbatim, no truncation
+        sessionId
+      );
+      // Keep legacy `prompt` field for backward compat with existing audit queries
+      promptEntry.prompt = prompt.substring(0, 500);
+      appendAuditLineBoth(promptEntry, cloud);
+    } catch (_) {
+      // ignore
+    }
   }
 
   // Auto-checkpoint: tag subsequent edits with what the user asked for
