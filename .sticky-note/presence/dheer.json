@@ -1,15 +1,15 @@
 {
   "active_files": [
-    "templates\\CLAUDE.md",
-    "CHANGELOG.md",
-    "package.json",
     "sticky-server\\wrangler.toml",
     "bin\\cli.js",
     "..\\MOBA\\MOBA\\.sticky-note\\sticky-note-config.json",
     "..\\MOBA\\MOBA\\backend\\.claude\\settings.json",
     ".claude\\settings.json",
     "..\\MOBA\\MOBA\\.claude\\settings.json",
-    "README.md"
+    "README.md",
+    "..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\templates\\hooks\\pre-tool-use.js",
+    "templates\\hooks\\pre-tool-use.js",
+    ".claude\\hooks\\pre-tool-use.js"
   ],
-  "last_seen": "2026-09-22T21:18:25.965Z"
+  "last_seen": "2026-09-23T00:48:22.615Z"
 }
