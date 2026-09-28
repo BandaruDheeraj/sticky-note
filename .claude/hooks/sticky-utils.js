@@ -1341,6 +1341,15 @@ async function cloudFetch(method, endpoint, body) {
   try {
     const resp = await fetch(`${url}${endpoint}`, opts);
     if (!resp.ok) {
+      if (!_cloudWarned) {
+        _cloudWarned = true;
+        const hint = resp.status === 401
+          ? " (check STICKY_API_KEY in .env.sticky)"
+          : ` (HTTP ${resp.status})`;
+        process.stderr.write(
+          `[STICKY-NOTE] Cloud sync failed${hint} — using local/git fallback\n`
+        );
+      }
       return null;
     }
     const text = await resp.text();
@@ -1349,7 +1358,7 @@ async function cloudFetch(method, endpoint, body) {
     if (!_cloudWarned) {
       _cloudWarned = true;
       process.stderr.write(
-        "[STICKY-NOTE] Cloud unreachable, using local fallback\n"
+        "[STICKY-NOTE] Cloud unreachable, using local/git fallback\n"
       );
     }
     return null;

@@ -8,8 +8,6 @@
  * Appends JSONL audit line.
  */
 
-const crypto = require("crypto");
-
 function _safeExit() {
   try {
     process.stdout.write(JSON.stringify({ output: "" }) + "\n");
@@ -37,6 +35,20 @@ try {
   } = require("./sticky-utils.js"));
 } catch (_) {
   _safeExit();
+}
+
+let eventWriter = null;
+try { eventWriter = require("./event-writer.js"); } catch (_) {}
+
+function _isDenial(hookInput) {
+  if (hookInput.blocked === true) return true;
+  const msg = (hookInput.error || hookInput.message || "").toLowerCase();
+  return (
+    msg.includes("blocked by the user") ||
+    msg.includes("user rejected") ||
+    msg.includes("permission denied by user") ||
+    msg.includes("tool was blocked")
+  );
 }
 
 async function main() {
@@ -112,6 +124,38 @@ async function main() {
     tool: toolName,
   };
   appendAuditLineBoth(auditEntry, cloud);
+
+  // Write structured event for AI blame
+  if (eventWriter) {
+    try {
+      const isDenial = _isDenial(hookInput);
+      if (isDenial) {
+        const denialEvent = eventWriter.buildEvent(
+          eventWriter.EVENT_TYPES.TOOL_DENIED,
+          {
+            tool: toolName,
+            args: eventWriter.sanitizeToolArgs(toolName, hookInput.tool_input || {}),
+            reason: errorMsg,
+          },
+          sessionId
+        );
+        appendAuditLineBoth(denialEvent, cloud);
+      } else {
+        const errorEvent = eventWriter.buildEvent(
+          eventWriter.EVENT_TYPES.TOOL_ERROR,
+          {
+            tool: toolName,
+            args: eventWriter.sanitizeToolArgs(toolName, hookInput.tool_input || {}),
+            error: errorMsg,
+          },
+          sessionId
+        );
+        appendAuditLineBoth(errorEvent, cloud);
+      }
+    } catch (_) {
+      // best-effort
+    }
+  }
 
   saveMemoryMerged(memoryPath, memory);
   if (cloud) {

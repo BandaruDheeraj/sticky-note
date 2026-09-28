@@ -35,6 +35,9 @@ try {
   gitNotes = null;
 }
 
+let eventWriter = null;
+try { eventWriter = require("./event-writer.js"); } catch (_) {}
+
 const {
   getConfigPath,
   getMemoryPath,
@@ -53,7 +56,8 @@ const {
 } = utils;
 
 const WRITE_TOOLS = new Set([
-  "edit", "Edit", "create", "Create", "Write", "write", "MultiEdit", "multi_edit",
+  ...(eventWriter && eventWriter.WRITE_TOOLS ? eventWriter.WRITE_TOOLS : ["Edit", "edit", "Write", "write", "MultiEdit", "multi_edit"]),
+  "create", "Create",
 ]);
 
 function _debugPath() {
@@ -147,7 +151,7 @@ function autoDetectMcp(toolName) {
   return null;
 }
 
-// ── V2.5: Line-level change tracking ─────────────────────
+// ── Line-level change tracking ───────────────────────────
 
 /**
  * After a write tool completes, capture exact line ranges changed.
@@ -257,10 +261,10 @@ function main() {
   }
 
   const user = getUser();
-  const now = new Date().toISOString();
   const isWriteTool = WRITE_TOOLS.has(toolName);
 
-  // V2.5: Capture line-level changes for write tools
+  // Capture line-level changes for write tools before timestamping the entry,
+  // so the ts reflects when the audit record is actually written.
   let lineRanges = null;
   let checkpoint = null;
   if (isWriteTool && filePath) {
@@ -270,6 +274,9 @@ function main() {
     }
   }
 
+  const now = new Date().toISOString();
+
+  // Legacy entry — kept for backward compat with existing audit queries
   const entry = {
     type: "tool_use",
     user,
@@ -277,16 +284,50 @@ function main() {
     tool: toolName,
     session_id: sessionId,
   };
-  if (filePath) {
-    entry.file = filePath;
-  }
-  if (lineRanges) {
-    entry.lines_changed = lineRanges.map((r) => `${r.start}-${r.end}`);
-  }
-  if (checkpoint) {
-    entry.checkpoint_topic = checkpoint.topic;
-  }
+  if (filePath) entry.file = filePath;
+  if (lineRanges) entry.lines_changed = lineRanges.map((r) => `${r.start}-${r.end}`);
+  if (checkpoint) entry.checkpoint_topic = checkpoint.topic;
   appendAuditLineBoth(entry, cloud);
+
+  // New enriched events for AI blame
+  if (eventWriter) {
+    try {
+      const rawArgs = hookInput.tool_input || {};
+      const sanitizedArgs = eventWriter.sanitizeToolArgs(toolName, rawArgs);
+      const callEvent = eventWriter.buildEvent(
+        eventWriter.EVENT_TYPES.TOOL_CALL,
+        { tool: toolName, args: sanitizedArgs },
+        sessionId
+      );
+      appendAuditLineBoth(callEvent, cloud);
+
+      // tool_response may be a string or object
+      let rawResult = hookInput.tool_response;
+      if (rawResult && typeof rawResult === "object" && "output" in rawResult) {
+        rawResult = rawResult.output;
+      } else if (rawResult && typeof rawResult === "object") {
+        rawResult = JSON.stringify(rawResult);
+      }
+      const cappedResult = eventWriter.capResult(
+        typeof rawResult === "string" ? rawResult : JSON.stringify(rawResult)
+      );
+      const resultData = {
+        tool: toolName,
+        result: cappedResult,
+      };
+      if (lineRanges) {
+        resultData.lines_changed = lineRanges.map((r) => `${r.start}-${r.end}`);
+      }
+      const resultEvent = eventWriter.buildEvent(
+        eventWriter.EVENT_TYPES.TOOL_RESULT,
+        resultData,
+        sessionId
+      );
+      appendAuditLineBoth(resultEvent, cloud);
+    } catch (_) {
+      // enrichment is best-effort — never break the hook
+    }
+  }
 
   updatePresence(user, filePath);
   if (cloud) {
@@ -298,7 +339,6 @@ function main() {
     }).catch(() => {});
   }
 
-  // V2.5: Write Git Note for write tools
   if (isWriteTool && filePath) {
     writeEditNote(sessionId, user, filePath, lineRanges, checkpoint);
   }

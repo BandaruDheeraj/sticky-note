@@ -25,6 +25,7 @@
   },
   "files": [
     "bin/",
+    "src/",
     "templates/",
     "sticky-server/"
   ],
@@ -35,6 +36,6 @@
     "test": "node test/smoke.test.js"
   },
   "devDependencies": {
-    "sticky-note-cli": "^3.1.5"
+    "sticky-note-cli": "^3.1.38"
   }
 }

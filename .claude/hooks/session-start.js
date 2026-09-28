@@ -745,6 +745,7 @@ function ensureEnvironmentProvisioned() {
     let mcpChanged = false;
     for (const [name, serverDef] of Object.entries(mcpServers)) {
       if (mcpConfig.mcpServers[name]) continue; // already present
+      if (serverDef.type === "permission-detected") continue; // not a real server config
       if (hasEnvPlaceholders(serverDef)) {
         if (debug) process.stderr.write(`[sticky-note] skipping MCP server "${name}" (has placeholders)\n`);
         continue;
@@ -1247,6 +1248,33 @@ async function main() {
   if (threadContext) parts.push(threadContext);
   if (configContext) parts.push(configContext);
   if (presenceContext) parts.push(presenceContext);
+
+  // Write session_open event for AI blame
+  let eventWriter = null;
+  try { eventWriter = require("./event-writer.js"); } catch (_) {}
+  if (eventWriter) {
+    try {
+      const pkg = (() => {
+        try { return require("../../package.json"); } catch (_) { return {}; }
+      })();
+      const openEvent = eventWriter.buildEvent(
+        eventWriter.EVENT_TYPES.SESSION_OPEN,
+        {
+          model: hookInput.model || (hookInput.api_info && hookInput.api_info.model) || null,
+          branch: getBranch(),
+          user: getUser(),
+          sticky_version: pkg.version || null,
+          mcp_servers: (config.mcp_servers || [])
+            .map(s => (typeof s === "object" ? s.name : s))
+            .filter(Boolean),
+        },
+        getSessionId(hookInput)
+      );
+      appendAuditLineBoth(openEvent, cloud);
+    } catch (_) {
+      // best-effort — never break the hook
+    }
+  }
 
   const output = parts.join("\n").trim();
   _emit(output);
