@@ -1,15 +1,15 @@
 {
   "active_files": [
-    "sticky-server\\wrangler.toml",
-    "bin\\cli.js",
-    "..\\MOBA\\MOBA\\.sticky-note\\sticky-note-config.json",
-    "..\\MOBA\\MOBA\\backend\\.claude\\settings.json",
-    ".claude\\settings.json",
-    "..\\MOBA\\MOBA\\.claude\\settings.json",
-    "README.md",
     "..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\templates\\hooks\\pre-tool-use.js",
     "templates\\hooks\\pre-tool-use.js",
-    ".claude\\hooks\\pre-tool-use.js"
+    ".claude\\hooks\\pre-tool-use.js",
+    "..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\templates\\hooks\\session-end.js",
+    "..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\templates\\hooks\\sticky-utils.js",
+    "..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\bin\\cli.js",
+    "bin\\cli.js",
+    "templates\\hooks\\sticky-utils.js",
+    "templates\\hooks\\data-branch.js",
+    "templates\\hooks\\session-end.js"
   ],
-  "last_seen": "2026-09-23T00:48:22.615Z"
+  "last_seen": "2026-09-28T22:36:21.230Z"
 }

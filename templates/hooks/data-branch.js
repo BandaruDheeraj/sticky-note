@@ -41,11 +41,23 @@ function readFileFromBranch(ref, filePath) {
   }
 }
 
+/** Returns all file paths in a git ref as an array. */
+function listFilesInBranch(ref) {
+  try {
+    const out = execFileSync("git", ["ls-tree", "-r", "--name-only", ref], GIT_OPTS);
+    return out.trim().split(/\r?\n/).filter(Boolean);
+  } catch (_) {
+    return [];
+  }
+}
+
 /**
  * Commit { relativePath: content } to a branch using git plumbing.
  * Does not touch the working tree or the main index. Returns the new commit SHA.
+ * explicitParentSha: if provided, use this SHA as the parent instead of the
+ * current local branch tip (used during retry to parent off the remote SHA).
  */
-function commitFilesToBranch(branchName, fileMap) {
+function commitFilesToBranch(branchName, fileMap, explicitParentSha) {
   const branchRef = "refs/heads/" + branchName;
   const tmpIndex = path.join(
     os.tmpdir(),
@@ -53,13 +65,15 @@ function commitFilesToBranch(branchName, fileMap) {
   );
 
   try {
-    let parentSha = null;
-    try {
-      parentSha = execFileSync("git", ["rev-parse", "--verify", branchRef], {
-        encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
-      }).trim();
-    } catch (_) {
-      // Branch doesn't exist yet — first commit creates it as orphan
+    let parentSha = explicitParentSha || null;
+    if (!parentSha) {
+      try {
+        parentSha = execFileSync("git", ["rev-parse", "--verify", branchRef], {
+          encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+        }).trim();
+      } catch (_) {
+        // Branch doesn't exist yet — first commit creates it as orphan
+      }
     }
 
     const indexEnv = { ...process.env, GIT_INDEX_FILE: tmpIndex };
@@ -162,15 +176,40 @@ function pushDataBranch(remote, branchName, maxRetries, localMemPath, loadJsonFn
         return { ok: false, error: err.message };
       }
 
-      // Fetch, merge, and re-commit so the next push attempt advances the ref
+      // Fetch remote, build a merged file map (local files + remote files +
+      // merged sticky-note.json), then re-commit parented off the remote SHA
+      // so the next push attempt is a fast-forward.
       try {
         const fetchResult = fetchDataBranch(remote, branchName);
-        if (fetchResult.ok && fetchResult.remoteRef && localMemPath) {
-          const remoteContent = readFileFromBranch(fetchResult.remoteRef, "sticky-note.json");
-          if (remoteContent) {
-            mergeAndSaveFromRemote(localMemPath, remoteContent, loadJsonFn, saveJsonFn);
-            const mergedContent = fs.readFileSync(localMemPath, "utf-8");
-            commitFilesToBranch(branchName, { "sticky-note.json": mergedContent });
+        if (fetchResult.ok && fetchResult.remoteRef) {
+          // Get the remote SHA to use as parent for the re-commit
+          const remoteSha = execFileSync(
+            "git", ["rev-parse", fetchResult.remoteRef], GIT_OPTS
+          ).trim();
+
+          // Build merged file map: start with remote files as base, then
+          // overlay local files so this user's audit/presence are preserved
+          const fileMap = {};
+          const localRef = "refs/heads/" + branchName;
+          for (const f of listFilesInBranch(fetchResult.remoteRef)) {
+            const content = readFileFromBranch(fetchResult.remoteRef, f);
+            if (content !== null) fileMap[f] = content;
+          }
+          for (const f of listFilesInBranch(localRef)) {
+            const content = readFileFromBranch(localRef, f);
+            if (content !== null) fileMap[f] = content;
+          }
+
+          // Merge sticky-note.json from both sides
+          if (localMemPath && fileMap["sticky-note.json"]) {
+            mergeAndSaveFromRemote(
+              localMemPath, fileMap["sticky-note.json"], loadJsonFn, saveJsonFn
+            );
+            fileMap["sticky-note.json"] = fs.readFileSync(localMemPath, "utf-8");
+          }
+
+          if (Object.keys(fileMap).length > 0) {
+            commitFilesToBranch(branchName, fileMap, remoteSha);
           }
         }
       } catch (_) {}

@@ -1996,3 +1996,136 @@
 {"type":"tool_use","user":"dheer","ts":"2026-09-22T21:28:56.444Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":".claude\\hooks\\pre-tool-use.js"}
 {"type":"tool_use","user":"dheer","ts":"2026-09-23T00:48:10.580Z","tool":"Edit","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":".claude\\hooks\\pre-tool-use.js","lines_changed":["196-200"],"checkpoint_topic":"let's fix it directly in sticky note and commit and push the fix"}
 {"type":"tool_use","user":"dheer","ts":"2026-09-23T00:48:22.459Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-23T00:48:35.894Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-23T00:48:48.755Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"stop","user":"dheer","ts":"2026-09-23T00:48:55.818Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-27T22:59:14.147Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"this committed and pushed and released?"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-27T22:59:15.905Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"this committed and pushed and released?","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"error","user":"dheer","ts":"2026-09-27T22:59:33.223Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","error":"Exit code 127\n  \"version\": \"3.1.39\",","tool":"Bash"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:00:02.327Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:00:29.426Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:00:51.548Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:01:15.402Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:01:31.469Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:01:51.093Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"stop","user":"dheer","ts":"2026-09-27T23:02:11.489Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-27T23:08:20.997Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"no I need you to connect to the live cloudflare and pull the real threads"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-27T23:08:22.176Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"no I need you to connect to the live cloudflare and pull the real threads","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:08:38.054Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:08:54.533Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:09:08.701Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:09:24.986Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"stop","user":"dheer","ts":"2026-09-27T23:09:41.917Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-27T23:17:59.965Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"yeah check the moba project C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\MOBA\\MOBA>\n its here don't make any changes just tell me why I don't see threads from myself recent or mhardmon1 who has clearly pushed code and made changes int his repo"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-27T23:18:03.832Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"yeah check the moba project C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\MOBA\\MOBA>\n its here don't make any changes just te","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"error","user":"dheer","ts":"2026-09-27T23:18:27.748Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","error":"Exit code 1\ncat: 'C:/Users/dheer/OneDrive/Desktop/Projects/MOBA/MOBA/.sticky-note/.env.sticky': No such file or directory","tool":"Bash"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:19:12.810Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:20:40.445Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:20:54.281Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:21:08.419Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:21:20.810Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\templates\\hooks\\session-end.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:21:34.161Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:21:50.439Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:22:03.939Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\templates\\hooks\\sticky-utils.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:22:17.119Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:22:31.225Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:22:44.396Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\templates\\hooks\\sticky-utils.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:22:58.527Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"stop","user":"dheer","ts":"2026-09-27T23:23:22.438Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-27T23:24:09.861Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"but when mhardon ran sticky init it asked for the api key ?"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-27T23:24:10.704Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"but when mhardon ran sticky init it asked for the api key ?","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:24:27.940Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-27T23:24:40.624Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\bin\\cli.js"}
+{"type":"stop","user":"dheer","ts":"2026-09-27T23:25:00.937Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-27T23:28:16.469Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"but I am not understanding if its not in our json why did it ask matt when he setup?"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-27T23:28:17.649Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"but I am not understanding if its not in our json why did it ask matt when he setup?","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"stop","user":"dheer","ts":"2026-09-27T23:28:45.215Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-28T00:08:10.532Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"ok we can't do that right now but can you tell me if 1 is a reall thing that can happen?"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-28T00:08:11.862Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"ok we can't do that right now but can you tell me if 1 is a reall thing that can happen?","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T00:08:31.092Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T00:08:44.904Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"stop","user":"dheer","ts":"2026-09-28T00:08:57.312Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-28T00:18:24.530Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"yeah figure out how to prevent issues like that"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-28T00:18:31.080Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"yeah figure out how to prevent issues like that","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T00:19:04.243Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T00:19:21.829Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T00:19:42.392Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T00:20:10.365Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T00:20:38.709Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T00:21:07.003Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T00:21:44.733Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T00:22:03.629Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T00:22:25.670Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T00:33:16.676Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T18:28:01.130Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T18:28:22.360Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T18:28:34.469Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T18:28:47.963Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"bin\\cli.js"}
+{"type":"stop","user":"dheer","ts":"2026-09-28T18:29:29.391Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-28T20:14:30.971Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"actually before oyu do that it looks like the threads aren't working on this repo either, neither the local or cloud changes are being detected"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-28T20:14:32.039Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"actually before oyu do that it looks like the threads aren't working on this repo either, neither the local or cloud cha","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T20:14:43.494Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T20:14:53.218Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"lazy_inject","user":"dheer","ts":"2026-09-28T20:15:17.934Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":".sticky-note/sticky-note.json","threads_injected":2,"thread_ids":["323d0bbf","546e2ec5"]}
+{"type":"error","user":"dheer","ts":"2026-09-28T20:15:23.803Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","error":"Exit code 1\nnode:fs:440\r\n    return binding.readFileUtf8(path, stringToFlags(options.flag));\r\n                   ^\r\n\r\nError: ENOENT: no such file or directory, open 'C:\\dev\\stdin'\r\n    at Object.readF","tool":"Bash"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T20:15:37.386Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T20:56:22.987Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T20:56:57.937Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T20:57:25.198Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T20:57:50.192Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T20:58:28.206Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"stop","user":"dheer","ts":"2026-09-28T20:59:18.188Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-28T21:37:08.743Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"but why are nore of keshav's threads being shown and why does he not have an audit file or threads, this seems to be a problem with sticky note as a whole not repo sepcific since we have two repos with this issue"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-28T21:37:10.050Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"but why are nore of keshav's threads being shown and why does he not have an audit file or threads, this seems to be a p","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:37:23.667Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:37:36.312Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:37:49.158Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:38:15.566Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:38:27.232Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:38:46.742Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:38:58.320Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:39:11.710Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"stop","user":"dheer","ts":"2026-09-28T21:39:34.025Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-28T21:51:12.426Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"that's not the real problem the real problem is that there are so many silent failures that everyone else threads aren't being pushed I need you to figure out why all other peoples threads are failing"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-28T21:51:13.609Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"that's not the real problem the real problem is that there are so many silent failures that everyone else threads aren't","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:51:27.460Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:51:39.499Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:51:53.676Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"templates\\hooks\\sticky-utils.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:52:07.464Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:52:18.666Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"templates\\hooks\\data-branch.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:52:30.183Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"templates\\hooks\\data-branch.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:52:42.300Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"templates\\hooks\\data-branch.js"}
+{"type":"lazy_inject","user":"dheer","ts":"2026-09-28T21:52:52.069Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\sticky-note\\templates\\hooks\\session-end.js","threads_injected":1,"thread_ids":["3c074e6a"]}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:52:57.389Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"templates\\hooks\\session-end.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:53:08.685Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:53:22.338Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"templates\\hooks\\session-end.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:53:33.799Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:53:47.528Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"templates\\hooks\\session-end.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:54:00.978Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"templates\\hooks\\session-end.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:54:13.228Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:54:25.296Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:54:38.825Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:55:10.480Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:55:22.650Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"bin\\cli.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:55:39.823Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"error","user":"dheer","ts":"2026-09-28T21:55:57.115Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","error":"Exit code 1","tool":"Bash"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:56:08.818Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T21:56:20.939Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"stop","user":"dheer","ts":"2026-09-28T21:56:41.577Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-28T21:57:31.751Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":" I have matt on call with me right now how can we confirm what exactly is going wrong since we have access to his environment"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-28T21:57:33.102Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":" I have matt on call with me right now how can we confirm what exactly is going wrong since we have access to his enviro","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"stop","user":"dheer","ts":"2026-09-28T21:57:47.216Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-28T22:27:33.034Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"1. output: \nUSER: matthewhardmon USERNAME: undefined 2. nothing came up completely empty 3. STICKY_URL=https://sticky-mhardmon1-moba.sticky-server.workers.dev\nSTICKY_API_KEY=ye_nhGWM9SsnIiQ0lpow8Xj2oVBmek1I"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-28T22:27:34.459Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"1. output: \nUSER: matthewhardmon USERNAME: undefined 2. nothing came up completely empty 3. STICKY_URL=https://sticky-mh","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"stop","user":"dheer","ts":"2026-09-28T22:27:50.411Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-28T22:29:37.962Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"the echo of session end on matt's machine gave me this [STICKY-NOTE] warning: failed to push data branch — Command failed: git push origin refs/heads/sticky-note/data:refs/heads/sticky-note/data\nTo https://github.com/mhardmon1/MOBA.git\n ! [rejected]        sticky-note/data -> sticky-note/data (non-fast-forward)\nerror: failed to push some refs to 'https://github.com/mhardmon1/MOBA.git'\nhint: Updates were rejected because a pushed branch tip is behind its remote\nhint: counterpart. If you want to i"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-28T22:29:39.155Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"the echo of session end on matt's machine gave me this [STICKY-NOTE] warning: failed to push data branch — Command faile","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"stop","user":"dheer","ts":"2026-09-28T22:30:17.621Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","reason":"stop_checkpoint"}
+{"type":"user_prompt","user":"dheer","ts":"2026-09-28T22:33:28.186Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"can we make the code fix and push that up so we can see if that fixes it"}
+{"type":"inject_result","user":"dheer","ts":"2026-09-28T22:33:29.527Z","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","prompt":"can we make the code fix and push that up so we can see if that fixes it","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T22:34:36.570Z","tool":"Read","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"templates\\hooks\\data-branch.js"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T22:35:00.197Z","tool":"Edit","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"templates\\hooks\\data-branch.js","lines_changed":["44-53"],"checkpoint_topic":"can we make the code fix and push that up so we can see if that fixes it"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T22:35:22.317Z","tool":"Edit","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"templates\\hooks\\data-branch.js","lines_changed":["44-53","57-58","60-60","68-76"],"checkpoint_topic":"can we make the code fix and push that up so we can see if that fixes it"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T22:35:46.775Z","tool":"Edit","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b","file":"templates\\hooks\\data-branch.js","lines_changed":["44-53","57-58","60-60","68-76","179-181","184-212"],"checkpoint_topic":"can we make the code fix and push that up so we can see if that fixes it"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T22:36:04.805Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
+{"type":"tool_use","user":"dheer","ts":"2026-09-28T22:36:20.968Z","tool":"Bash","session_id":"5d19387d-c865-42cd-ada0-2951465ae85b"}
