@@ -237,22 +237,28 @@ function pushDataBranch(remote, branchName, maxRetries, localMemPath, loadJsonFn
           ).trim();
 
           // Build merged file map: start with remote files as base, then
-          // overlay local files so this user's audit/presence are preserved
+          // overlay local files so this user's audit/presence are preserved.
+          // Capture remote sticky-note.json BEFORE the local overlay so we
+          // have the actual remote content to merge (not the local overwrite).
           const fileMap = {};
           const localRef = "refs/heads/" + branchName;
+          let remoteStickyContent = null;
           for (const f of listFilesInBranch(fetchResult.remoteRef)) {
             const content = readFileFromBranch(fetchResult.remoteRef, f);
-            if (content !== null) fileMap[f] = content;
+            if (content !== null) {
+              fileMap[f] = content;
+              if (f === "sticky-note.json") remoteStickyContent = content;
+            }
           }
           for (const f of listFilesInBranch(localRef)) {
             const content = readFileFromBranch(localRef, f);
             if (content !== null) fileMap[f] = content;
           }
 
-          // Merge sticky-note.json from both sides
-          if (localMemPath && fileMap["sticky-note.json"]) {
+          // Merge sticky-note.json from both sides using captured remote content
+          if (localMemPath && remoteStickyContent) {
             mergeAndSaveFromRemote(
-              localMemPath, fileMap["sticky-note.json"], loadJsonFn, saveJsonFn
+              localMemPath, remoteStickyContent, loadJsonFn, saveJsonFn
             );
             fileMap["sticky-note.json"] = fs.readFileSync(localMemPath, "utf-8");
           }
@@ -263,9 +269,12 @@ function pushDataBranch(remote, branchName, maxRetries, localMemPath, loadJsonFn
         }
       } catch (_) {}
 
-      // Brief exponential backoff (busy-wait — synchronous context)
-      const end = Date.now() + Math.pow(2, attempt) * 300;
-      while (Date.now() < end) {}
+      // Brief exponential backoff — use Atomics.wait to block without CPU spin
+      try {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.pow(2, attempt) * 300);
+      } catch (_) {
+        // Atomics.wait unavailable (e.g. SharedArrayBuffer disabled) — skip delay
+      }
     }
   }
   return { ok: false, error: "max retries exceeded" };
@@ -313,9 +322,16 @@ function mergeAndSaveFromRemote(localMemPath, remoteContent, loadJsonFn, saveJso
     return; // corrupt remote — skip
   }
 
-  const localMemory = loadJsonFn
-    ? loadJsonFn(localMemPath, { ...EMPTY_MEMORY })
-    : { ...EMPTY_MEMORY };
+  let localMemory;
+  if (loadJsonFn) {
+    localMemory = loadJsonFn(localMemPath, { ...EMPTY_MEMORY });
+  } else {
+    try {
+      localMemory = JSON.parse(fs.readFileSync(localMemPath, "utf-8"));
+    } catch (_) {
+      localMemory = { ...EMPTY_MEMORY };
+    }
+  }
 
   const localThreads = Array.isArray(localMemory.threads) ? localMemory.threads.filter(Boolean) : [];
   const remoteThreads = Array.isArray(remoteMemory.threads) ? remoteMemory.threads.filter(Boolean) : [];
