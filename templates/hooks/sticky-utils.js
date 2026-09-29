@@ -641,6 +641,15 @@ function appendAuditLineBoth(entry, cloud) {
 // ── Environment helpers ───────────────────────────────────
 
 function getUser() {
+  // Prefer git config user.name — consistent across machines regardless of OS login name.
+  // Fall back to OS env vars, then "unknown".
+  try {
+    const { execFileSync } = require("child_process");
+    const name = execFileSync("git", ["config", "user.name"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    if (name) return name;
+  } catch (_) {}
   return process.env.USER || process.env.USERNAME || "unknown";
 }
 

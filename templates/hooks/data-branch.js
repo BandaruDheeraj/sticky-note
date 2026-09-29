@@ -19,6 +19,52 @@ const DATA_REF = "refs/heads/" + DATA_BRANCH;
 
 const GIT_OPTS = { encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] };
 
+// ── Credential helpers ────────────────────────────────────
+
+/**
+ * Read STICKY_PUSH_TOKEN from env or .env.sticky file.
+ * Returns the token string or null.
+ */
+function _getPushToken() {
+  if (process.env.STICKY_PUSH_TOKEN) return process.env.STICKY_PUSH_TOKEN;
+  try {
+    // Walk up to find .env.sticky
+    let dir = process.cwd();
+    for (let i = 0; i < 20; i++) {
+      const envPath = path.join(dir, ".env.sticky");
+      if (fs.existsSync(envPath)) {
+        const content = fs.readFileSync(envPath, "utf-8");
+        const match = content.match(/^STICKY_PUSH_TOKEN=(.+)$/m);
+        if (match) return match[1].trim();
+        break;
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  } catch (_) {}
+  return null;
+}
+
+/**
+ * Given a remote name, return an authenticated push URL if STICKY_PUSH_TOKEN
+ * is configured. Embeds the token into the HTTPS URL so the push works from
+ * any process context without needing a credential helper.
+ * Returns null if no token or remote URL is not HTTPS.
+ */
+function _getAuthenticatedUrl(remote) {
+  const token = _getPushToken();
+  if (!token) return null;
+  try {
+    const url = execFileSync("git", ["remote", "get-url", remote], GIT_OPTS).trim();
+    if (!url.startsWith("https://")) return null;
+    // Insert token: https://TOKEN@github.com/...
+    return url.replace(/^https:\/\/([^@]*)@?/, `https://${token}@`);
+  } catch (_) {
+    return null;
+  }
+}
+
 // ── Git helpers ───────────────────────────────────────────
 
 function getDefaultRemote() {
@@ -164,10 +210,13 @@ function pushDataBranch(remote, branchName, maxRetries, localMemPath, loadJsonFn
   if (!remote) return { ok: false, error: "no remote configured" };
 
   const pushSpec = DATA_REF + ":" + DATA_REF;
+  // Use token-authenticated URL if available — bypasses credential helpers so
+  // pushes work from background hook processes (no keychain/credential-manager needed).
+  const pushTarget = _getAuthenticatedUrl(remote) || remote;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      execFileSync("git", ["push", remote, pushSpec], {
+      execFileSync("git", ["push", pushTarget, pushSpec], {
         timeout: 30000, stdio: ["pipe", "pipe", "pipe"],
       });
       return { ok: true, error: null };

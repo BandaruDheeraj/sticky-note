@@ -720,12 +720,22 @@ async function cmdInit() {
       // Teammate flow: URL already in committed config — just need their API key
       print(`\n  Cloud backend detected: ${configStickyUrl}`);
       const keyAnswer = await ask(rl, "Enter your STICKY_API_KEY (get it from your team lead)", "");
-      if (keyAnswer.trim()) {
+      // GitHub push token — needed so session-end can push the data branch from
+      // background hook processes that don't have keychain/credential-manager access.
+      print("\n  A GitHub Personal Access Token (PAT) is needed so sticky-note can push");
+      print("  thread data in the background without requiring interactive credential access.");
+      print("  Create one at https://github.com/settings/tokens with 'repo' scope (or");
+      print("  'contents: write' for fine-grained tokens). Your team lead may share one.");
+      const pushTokenAnswer = await ask(rl, "Enter your STICKY_PUSH_TOKEN (GitHub PAT)", "");
+      if (keyAnswer.trim() || pushTokenAnswer.trim()) {
         const envPath = path.join(process.cwd(), ".env.sticky");
-        fs.writeFileSync(envPath, `STICKY_URL=${configStickyUrl}\nSTICKY_API_KEY=${keyAnswer.trim()}\n`, "utf-8");
+        let envContent = `STICKY_URL=${configStickyUrl}\n`;
+        if (keyAnswer.trim()) envContent += `STICKY_API_KEY=${keyAnswer.trim()}\n`;
+        if (pushTokenAnswer.trim()) envContent += `STICKY_PUSH_TOKEN=${pushTokenAnswer.trim()}\n`;
+        fs.writeFileSync(envPath, envContent, "utf-8");
         print("  [OK] .env.sticky written");
       } else {
-        print("  ⏭️  No API key entered — skipping .env.sticky (local-only mode)");
+        print("  ⏭️  No keys entered — skipping .env.sticky (local-only mode)");
       }
     } else {
       const cloudAnswer = await ask(
