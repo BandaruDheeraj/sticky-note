@@ -6,22 +6,12 @@
     {
       "id": "6869e313-b4fa-4f20-b894-c72da6265c8e",
       "user": "dbandaru",
-      "project": "",
-      "status": "closed",
-      "branch": "master",
-      "created_at": "2026-04-10T23:14:20.995Z",
+      "status": "expired",
       "closed_at": "2026-04-13T21:25:13.814Z",
-      "last_activity_at": "2026-04-10T23:14:20.997Z",
       "files_touched": [],
-      "last_note": "",
-      "narrative": "",
       "failed_approaches": [],
-      "handoff_summary": "",
       "related_session_ids": [],
       "resume_chain": [],
-      "tool": "copilot-cli",
-      "session_id": "25f34572-e3a0-4983-b475-a49e9ea3ba5b",
-      "work_type": "",
       "activities": [],
       "tool_calls": {},
       "prompts": [],
@@ -114,26 +104,16 @@
     {
       "id": "demo-alice-docs-update",
       "user": "alice",
-      "project": "",
-      "status": "closed",
-      "branch": "feature/docs-refresh",
-      "created_at": "2026-04-10T14:00:00.000Z",
+      "status": "expired",
       "closed_at": "2026-04-14T00:36:05.724Z",
-      "last_activity_at": "2026-04-10T22:15:00.000Z",
       "files_touched": [
         "README.md",
         "CONTRIBUTING.md",
         "docs/branch-switching.md"
       ],
-      "last_note": "Updating docs to reflect v2.5 merge driver and bootstrap changes. README done, CONTRIBUTING in progress.",
-      "narrative": "Refreshing all documentation to cover the new merge driver, bootstrap secret handling, and rollback detection features. README has been updated with the new setup flow. CONTRIBUTING.md needs the section on how the merge driver works for contributors. Also updating branch-switching docs.",
       "failed_approaches": [],
-      "handoff_summary": "README.md is updated. CONTRIBUTING.md still needs a 'How the merge driver works' section. docs/branch-switching.md needs review — may be outdated after the v2 branch was deleted.",
       "related_session_ids": [],
       "resume_chain": [],
-      "tool": "copilot-cli",
-      "session_id": "demo-session-alice-docs",
-      "work_type": "documentation",
       "activities": [
         "edited 2 file(s)",
         "touched 3 file(s)",
@@ -885,11 +865,11 @@
       "id": "3c074e6a-36dc-4b04-a161-253077934cef",
       "user": "dheer",
       "project": "",
-      "status": "open",
+      "status": "stale",
       "branch": "main",
       "created_at": "2026-09-01T17:41:47.734Z",
       "closed_at": null,
-      "last_activity_at": "2026-09-12T01:22:30.467Z",
+      "last_activity_at": "2026-10-03T23:44:17.591Z",
       "files_touched": [
         "sticky-server/wrangler.toml",
         "bin/cli.js",
@@ -922,11 +902,11 @@
       "id": "14d0f7a4-4dd8-493f-b195-8b73e7a1f81e",
       "user": "dheer",
       "project": "",
-      "status": "open",
+      "status": "stale",
       "branch": "main",
       "created_at": "2026-08-27T22:12:37.717Z",
       "closed_at": null,
-      "last_activity_at": "2026-08-28T23:32:12.590Z",
+      "last_activity_at": "2026-10-03T23:44:17.591Z",
       "files_touched": [
         "bin/cli.js",
         "package.json",
@@ -960,11 +940,11 @@
       "id": "cc3dda10-4d2d-45cc-9762-1e81686609a4",
       "user": "dheer",
       "project": "",
-      "status": "open",
+      "status": "stale",
       "branch": "main",
       "created_at": "2026-08-27T01:57:17.253Z",
       "closed_at": null,
-      "last_activity_at": "2026-08-27T21:06:54.751Z",
+      "last_activity_at": "2026-10-03T23:44:17.591Z",
       "files_touched": [
         ".mcp.json",
         ".claude/sticky-note-mcp.js",
@@ -997,11 +977,11 @@
       "id": "e4d9492b-e89b-4e0e-b389-4976e71783c4",
       "user": "dheer",
       "project": "",
-      "status": "open",
+      "status": "stale",
       "branch": "main",
       "created_at": "2026-08-24T02:07:19.590Z",
       "closed_at": null,
-      "last_activity_at": "2026-08-26T23:28:17.405Z",
+      "last_activity_at": "2026-10-03T23:44:17.591Z",
       "files_touched": [
         "docs/setup.md",
         "README.md",
@@ -1038,11 +1018,11 @@
       "id": "eed2ae08-6846-4298-993a-1e58785b7a56",
       "user": "dheer",
       "project": "",
-      "status": "open",
+      "status": "stale",
       "branch": "main",
       "created_at": "2026-08-21T18:52:27.596Z",
       "closed_at": null,
-      "last_activity_at": "2026-08-22T02:50:52.078Z",
+      "last_activity_at": "2026-10-03T23:44:17.591Z",
       "files_touched": [
         "../../../../.claude/plugins/cache/claude-plugins-official/superpowers/6.0.3/skills/subagent-driven-development/scripts",
         ".superpowers/sdd/task-1-brief.md",
@@ -1135,11 +1115,11 @@
       "id": "87d90d67-6b08-450d-8e3a-8f0b9c8f75be",
       "user": "dheer",
       "project": "",
-      "status": "open",
+      "status": "stale",
       "branch": "main",
       "created_at": "2026-08-20T18:00:16.022Z",
       "closed_at": null,
-      "last_activity_at": "2026-08-21T18:43:33.757Z",
+      "last_activity_at": "2026-10-03T23:44:17.591Z",
       "files_touched": [
         "templates\\gitignore-additions.txt",
         "..\\pogo\\.gitignore",
@@ -1217,11 +1197,11 @@
       "id": "96c28c64-c1e5-432e-87f9-99a46030991e",
       "user": "dheer",
       "project": "",
-      "status": "open",
+      "status": "stale",
       "branch": "main",
       "created_at": "2026-08-20T17:39:02.479Z",
       "closed_at": null,
-      "last_activity_at": "2026-08-20T17:39:02.479Z",
+      "last_activity_at": "2026-10-03T23:44:17.591Z",
       "files_touched": [],
       "last_note": "",
       "narrative": "",
@@ -1243,12 +1223,8 @@
     {
       "id": "1efd5848-4ff7-4cfd-a740-a7f541cf4af7",
       "user": "dheer",
-      "project": "",
-      "status": "closed",
-      "branch": "main",
-      "created_at": "2026-08-07T19:47:33.799Z",
+      "status": "expired",
       "closed_at": "2026-08-08T03:10:40.992Z",
-      "last_activity_at": "2026-08-08T03:10:40.992Z",
       "files_touched": [
         ".sticky-note/sticky-note.json",
         "CHANGELOG.md",
@@ -1296,8 +1272,6 @@
         ".github/copilot-instructions.md",
         ".gitignore"
       ],
-      "last_note": "[debugging] Published as 3.1.5. Try again:\n\n```\n! cd /tmp/test-sticky && node \"C:/Users/dheer/OneDrive/Desktop/Projects/sticky-note/bin/cli.js\" init\n```",
-      "narrative": "Published as 3.1.5. Try again:\n\n```\n! cd /tmp/test-sticky && node \"C:/Users/dheer/OneDrive/Desktop/Projects/sticky-note/bin/cli.js\" init\n```",
       "failed_approaches": [
         {
           "description": "Here's where things stand:\n\n---\n\n**Your last thread (stuck, `2c636a72`)** — You were on `main` building the **data-branch** feature (storing threads i",
@@ -1316,12 +1290,8 @@
           "files_tried": []
         }
       ],
-      "handoff_summary": "What done: feature-development on .sticky-note/sticky-note.json, CHANGELOG.md, .sticky-note\\sticky-note.json, .claude/settings.json, .sticky-note/.sticky-checkpoint | What failed: Here's where things stand:\n\n---\n\n**Your last thread (stuck, ; # Simplify: Code Review and Cleanup\n\nReview all changed file | Status: ```\n! mkdir -p /tmp/test-sticky && cd /tmp/test-sticky && git init && git config user.email \"test@test.com\" && git config user.name \"Test\" && node \"C:",
       "related_session_ids": [],
       "resume_chain": [],
-      "tool": "claude-code",
-      "session_id": "ac0067cc-afd2-4520-9e48-5a62e3919012",
-      "work_type": "debugging",
       "activities": [
         "error: ✓ threads runs without error",
         "error: error: Your local changes to the following files would be overwritten by checkout:",
@@ -1363,15 +1333,13 @@
         "Set up Cloudflare cloud backend for real-time team sync? (y/N) (N): y\n\n  Cloud Backend Setup...\n\n  [ERR] `wrangler` CLI not found.\n        Install it: npm install -g wrangler\n        Then authenticate: wrangler login\n        And run `npx sticky-note deploy-backend` when ready. I want the setup wizar",
         "can't the wizard run those two commands for me?",
         "great how can I try it ?",
-        "I want to try it here what's the command",
         "the wizard got stuck here and I couldn't enter y or no \n ⛅️ wrangler 4.120.0\n────────────────────\nAttempting to login via OAuth...\nOpening a link in your default browser: https://dash.cloudflare.com/oauth2/auth?response_type=code&client_id=54d11594-84e4-41aa-b438-e81b8fa78ee7&redirect_uri=http%3A%2F",
         "actually let's auto install the skills"
       ],
       "contributors": [
         "dheer"
       ],
-      "resume_history": [],
-      "transcript_captured": true
+      "resume_history": []
     },
     {
       "id": "9c5418b6-c836-4718-a1bb-255c32258812",
@@ -1407,6 +1375,37 @@
       "prompts": [],
       "contributors": [
         "BandaruDheeraj"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "8ea86820-a484-47ff-b030-3078bce58255",
+      "user": "Keshav Ailaney",
+      "project": "",
+      "status": "closed",
+      "branch": "main",
+      "created_at": "2026-10-03T23:44:17.632Z",
+      "closed_at": "2026-10-03T23:45:36.566Z",
+      "last_activity_at": "2026-10-03T23:45:36.566Z",
+      "files_touched": [
+        ".claude/hooks/session-end.js",
+        ".claude/hooks/session-start.js",
+        "test-hooks.md"
+      ],
+      "last_note": "Session completed",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "unknown",
+      "session_id": "b3470221-11ee-4cc5-8ff1-b26e8a402134",
+      "work_type": "general",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": [],
+      "contributors": [
+        "Keshav Ailaney"
       ],
       "resume_history": []
     }
