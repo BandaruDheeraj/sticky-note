@@ -697,18 +697,18 @@
       "work_type": "feature-development",
       "activities": [],
       "tool_calls": {
-        "Bash": 62955698,
-        "Glob": 3403563,
-        "Read": 26660909,
-        "Grep": 4539239,
-        "Edit": 9081109,
-        "Write": 3404721,
-        "Skill": 566727,
-        "ToolSearch": 1133489,
-        "TaskCreate": 567808,
-        "TaskUpdate": 1135707,
-        "Agent": 679,
-        "AskUserQuestion": 91
+        "Bash": 71868282,
+        "Glob": 3885402,
+        "Read": 30435276,
+        "Grep": 5181856,
+        "Edit": 10366716,
+        "Write": 3886724,
+        "Skill": 646958,
+        "ToolSearch": 1293956,
+        "TaskCreate": 648192,
+        "TaskUpdate": 1296488,
+        "Agent": 776,
+        "AskUserQuestion": 104
       },
       "prompts": [
         "running into errors rn \n● Ran 1 stop hook (ctrl+o to expand)\n  ⎿  Stop hook error: Failed with non-blocking status code: node:internal/modules/cjs/loader:1459\n    throw err;\n    ^\n\n  Error: Cannot find module 'C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\MOBA\\MOBA\\backend\\.claude\\hooks\\on-stop.js'\n     "
@@ -758,7 +758,7 @@
       "branch": "main",
       "created_at": "2026-09-22T20:36:58.097Z",
       "closed_at": null,
-      "last_activity_at": "2026-10-03T23:40:49.035Z",
+      "last_activity_at": "2026-10-03T23:41:01.830Z",
       "files_touched": [
         "../MOBA/MOBA/node_modules/sticky-note-cli/templates/hooks/pre-tool-use.js",
         "templates/hooks/pre-tool-use.js",
@@ -792,9 +792,13 @@
         ".sticky-note/.sticky-checkpoint",
         "templates/hooks/session-start.js"
       ],
-      "last_note": "Exit code 1\ngit: 'credential-osxkeychain' is not a git command. See 'git --help'.\nTo https://github.com/BandaruDheeraj/sticky-note.git\n ! [rejected]        main -> main (fetch first)\nerror: failed to ",
+      "last_note": "Exit code 128\nerror: cannot pull with rebase: You have unstaged changes.\nerror: please commit or stash them.",
       "narrative": "",
       "failed_approaches": [
+        {
+          "description": "Exit code 128\nerror: cannot pull with rebase: You have unstaged changes.\nerror: please commit or stash them.",
+          "error": "Exit code 128\nerror: cannot pull with rebase: You have unstaged changes.\nerror: please commit or sta"
+        },
         {
           "description": "Exit code 1\ngit: 'credential-osxkeychain' is not a git command. See 'git --help'.\nTo https://github.com/BandaruDheeraj/sticky-note.git\n ! [rejected]  ",
           "error": "Exit code 1\ngit: 'credential-osxkeychain' is not a git command. See 'git --help'.\nTo https://github."
