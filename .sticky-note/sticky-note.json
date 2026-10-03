@@ -697,18 +697,18 @@
       "work_type": "feature-development",
       "activities": [],
       "tool_calls": {
-        "Bash": 36217946,
-        "Glob": 1958046,
-        "Read": 15337808,
-        "Grep": 2611388,
-        "Edit": 5224288,
-        "Write": 1958712,
-        "Skill": 326034,
-        "ToolSearch": 652088,
-        "TaskCreate": 326656,
-        "TaskUpdate": 653364,
-        "Agent": 388,
-        "AskUserQuestion": 52
+        "Bash": 54043114,
+        "Glob": 2921724,
+        "Read": 22886542,
+        "Grep": 3896622,
+        "Edit": 7795502,
+        "Write": 2922718,
+        "Skill": 486496,
+        "ToolSearch": 973022,
+        "TaskCreate": 487424,
+        "TaskUpdate": 974926,
+        "Agent": 582,
+        "AskUserQuestion": 78
       },
       "prompts": [
         "running into errors rn \n● Ran 1 stop hook (ctrl+o to expand)\n  ⎿  Stop hook error: Failed with non-blocking status code: node:internal/modules/cjs/loader:1459\n    throw err;\n    ^\n\n  Error: Cannot find module 'C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\MOBA\\MOBA\\backend\\.claude\\hooks\\on-stop.js'\n     "
@@ -758,7 +758,7 @@
       "branch": "main",
       "created_at": "2026-09-22T20:36:58.097Z",
       "closed_at": null,
-      "last_activity_at": "2026-10-03T23:17:31.108Z",
+      "last_activity_at": "2026-10-03T23:40:09.694Z",
       "files_touched": [
         "../MOBA/MOBA/node_modules/sticky-note-cli/templates/hooks/pre-tool-use.js",
         "templates/hooks/pre-tool-use.js",
@@ -779,6 +779,7 @@
         ".sticky-note\\sticky-note-config.json",
         ".env.sticky",
         "..\\MOBA\\MOBA\\.sticky-note\\sticky-note-config.json",
+        "templates\\hooks\\session-end.js",
         "..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\templates\\hooks\\pre-tool-use.js",
         "templates\\hooks\\pre-tool-use.js",
         ".claude\\hooks\\pre-tool-use.js",
@@ -786,10 +787,10 @@
         "..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\templates\\hooks\\sticky-utils.js",
         "..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\bin\\cli.js",
         "bin\\cli.js",
-        "templates\\hooks\\session-end.js",
         ".claude/hooks/data-branch.js",
         ".claude/hooks/sticky-utils.js",
-        ".sticky-note/.sticky-checkpoint"
+        ".sticky-note/.sticky-checkpoint",
+        "templates/hooks/session-start.js"
       ],
       "last_note": "",
       "narrative": "please check the sticky note for moba I got all these errors \n● Now commit and push:\n\n● Bash(cd \"C:/Users/dheer/OneDrive/Desktop/Projects/MOBA/MOBA\" & ... (19 prompts total) ... can we make the code fix and push that up so we can see if that fixes it",
@@ -811,13 +812,13 @@
       "work_type": "feature-development",
       "activities": [],
       "tool_calls": {
-        "Bash": 113,
-        "Edit": 22,
-        "Skill": 1,
-        "Read": 46,
-        "Glob": 3,
-        "Agent": 3,
-        "Write": 1
+        "Bash": 344,
+        "Edit": 66,
+        "Skill": 3,
+        "Read": 140,
+        "Glob": 9,
+        "Agent": 9,
+        "Write": 3
       },
       "prompts": [
         "please check the sticky note for moba I got all these errors \n● Now commit and push:\n\n● Bash(cd \"C:/Users/dheer/OneDrive/Desktop/Projects/MOBA/MOBA\" && git add lib/api.ts \"app/(tabs)/log-food.tsx\"\n      components/LogFood/ConfirmAndLogScreen.tsx && git commit…)\n  ⎿  [main 9976849] feat: tag meal-bui",

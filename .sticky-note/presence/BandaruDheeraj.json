@@ -1,14 +1,15 @@
 {
   "active_files": [
-    "package.json",
-    "templates\\hooks\\data-branch.js",
-    "templates\\hooks\\sticky-utils.js",
     ".claude\\hooks\\data-branch.js",
     ".claude\\hooks\\sticky-utils.js",
     ".sticky-note\\sticky-note.json",
     ".sticky-note\\sticky-note-config.json",
     ".env.sticky",
-    "..\\MOBA\\MOBA\\.sticky-note\\sticky-note-config.json"
+    "..\\MOBA\\MOBA\\.sticky-note\\sticky-note-config.json",
+    "templates\\hooks\\session-end.js",
+    "templates\\hooks\\session-start.js",
+    "bin\\cli.js",
+    "package.json"
   ],
-  "last_seen": "2026-10-03T23:17:08.688Z"
+  "last_seen": "2026-10-03T23:40:09.866Z"
 }
