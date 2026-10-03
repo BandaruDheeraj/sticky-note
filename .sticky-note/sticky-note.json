@@ -697,18 +697,18 @@
       "work_type": "feature-development",
       "activities": [],
       "tool_calls": {
-        "Bash": 54043114,
-        "Glob": 2921724,
-        "Read": 22886542,
-        "Grep": 3896622,
-        "Edit": 7795502,
-        "Write": 2922718,
-        "Skill": 486496,
-        "ToolSearch": 973022,
-        "TaskCreate": 487424,
-        "TaskUpdate": 974926,
-        "Agent": 582,
-        "AskUserQuestion": 78
+        "Bash": 62955698,
+        "Glob": 3403563,
+        "Read": 26660909,
+        "Grep": 4539239,
+        "Edit": 9081109,
+        "Write": 3404721,
+        "Skill": 566727,
+        "ToolSearch": 1133489,
+        "TaskCreate": 567808,
+        "TaskUpdate": 1135707,
+        "Agent": 679,
+        "AskUserQuestion": 91
       },
       "prompts": [
         "running into errors rn \n● Ran 1 stop hook (ctrl+o to expand)\n  ⎿  Stop hook error: Failed with non-blocking status code: node:internal/modules/cjs/loader:1459\n    throw err;\n    ^\n\n  Error: Cannot find module 'C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\MOBA\\MOBA\\backend\\.claude\\hooks\\on-stop.js'\n     "
@@ -754,11 +754,11 @@
       "id": "323d0bbf-1709-4446-880a-18478db3a929",
       "user": "dheer",
       "project": "",
-      "status": "open",
+      "status": "stuck",
       "branch": "main",
       "created_at": "2026-09-22T20:36:58.097Z",
       "closed_at": null,
-      "last_activity_at": "2026-10-03T23:40:09.694Z",
+      "last_activity_at": "2026-10-03T23:40:49.035Z",
       "files_touched": [
         "../MOBA/MOBA/node_modules/sticky-note-cli/templates/hooks/pre-tool-use.js",
         "templates/hooks/pre-tool-use.js",
@@ -792,9 +792,13 @@
         ".sticky-note/.sticky-checkpoint",
         "templates/hooks/session-start.js"
       ],
-      "last_note": "",
-      "narrative": "please check the sticky note for moba I got all these errors \n● Now commit and push:\n\n● Bash(cd \"C:/Users/dheer/OneDrive/Desktop/Projects/MOBA/MOBA\" & ... (19 prompts total) ... can we make the code fix and push that up so we can see if that fixes it",
+      "last_note": "Exit code 1\ngit: 'credential-osxkeychain' is not a git command. See 'git --help'.\nTo https://github.com/BandaruDheeraj/sticky-note.git\n ! [rejected]        main -> main (fetch first)\nerror: failed to ",
+      "narrative": "",
       "failed_approaches": [
+        {
+          "description": "Exit code 1\ngit: 'credential-osxkeychain' is not a git command. See 'git --help'.\nTo https://github.com/BandaruDheeraj/sticky-note.git\n ! [rejected]  ",
+          "error": "Exit code 1\ngit: 'credential-osxkeychain' is not a git command. See 'git --help'.\nTo https://github."
+        },
         {
           "description": "Exit code 1\nnpm warn exec The following package was not found and will be installed: sticky-note-cli@3.1.42\n  [ERR] Unknown command: update-hooks\n  Ru",
           "error": "Exit code 1\nnpm warn exec The following package was not found and will be installed: sticky-note-cli"
@@ -804,12 +808,12 @@
           "error": "Exit code 1\n  [ERR] Unknown command: update-hooks\n  Run 'npx sticky-note --help' for usage."
         }
       ],
-      "handoff_summary": "What done: feature-development on ../MOBA/MOBA/node_modules/sticky-note-cli/templates/hooks/pre-tool-use.js, templates/hooks/pre-tool-use.js, .claude/hooks/pre-tool-use.js, ../MOBA/MOBA/node_modules/sticky-note-cli/templates/hooks/session-end.js, ../MOBA/MOBA/node_modules/sticky-note-cli/templates/hooks/sticky-utils.js | Status: please check the sticky note for moba I got all these errors \n● Now commit and push:\n\n● Bash(cd \"C:/Users/dheer/OneDrive/Desktop/Projects/MOBA/MOBA\" &",
+      "handoff_summary": "",
       "related_session_ids": [],
       "resume_chain": [],
       "tool": "claude-code",
       "session_id": "5d19387d-c865-42cd-ada0-2951465ae85b",
-      "work_type": "feature-development",
+      "work_type": "",
       "activities": [],
       "tool_calls": {
         "Bash": 344,
