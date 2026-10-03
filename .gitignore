@@ -42,3 +42,8 @@ __pycache__/
 .sticky-note/.overlap-warned
 .sticky-note/.overlap-pending
 .sticky-note/.overlap-dismissed
+
+# sticky-note: data branch migration
+.sticky-note/sticky-note.json
+.sticky-note/audit/
+.sticky-note/presence/
