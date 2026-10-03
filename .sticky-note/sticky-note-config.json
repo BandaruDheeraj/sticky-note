@@ -42,7 +42,7 @@
   ],
   "skills": [],
   "conventions": [],
-  "hook_version": "3.1.42",
+  "hook_version": "3.1.43",
   "min_version": "3.1.38",
   "sticky_url": "https://sticky-note-server.sticky-server.workers.dev",
   "environment_version": "1"

@@ -9,3 +9,4 @@
 
 # Sticky Note - JSON-aware thread merge
 .sticky-note/sticky-note.json merge=sticky-note
+.sticky-note/sticky-note-config.json merge=sticky-note
