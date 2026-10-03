@@ -697,18 +697,18 @@
       "work_type": "feature-development",
       "activities": [],
       "tool_calls": {
-        "Bash": 9082867,
-        "Glob": 491046,
-        "Read": 3846469,
-        "Grep": 654893,
-        "Edit": 1310165,
-        "Write": 491213,
-        "Skill": 81764,
-        "ToolSearch": 163533,
-        "TaskCreate": 81920,
-        "TaskUpdate": 163853,
-        "Agent": 97,
-        "AskUserQuestion": 13
+        "Bash": 36217946,
+        "Glob": 1958046,
+        "Read": 15337808,
+        "Grep": 2611388,
+        "Edit": 5224288,
+        "Write": 1958712,
+        "Skill": 326034,
+        "ToolSearch": 652088,
+        "TaskCreate": 326656,
+        "TaskUpdate": 653364,
+        "Agent": 388,
+        "AskUserQuestion": 52
       },
       "prompts": [
         "running into errors rn \n● Ran 1 stop hook (ctrl+o to expand)\n  ⎿  Stop hook error: Failed with non-blocking status code: node:internal/modules/cjs/loader:1459\n    throw err;\n    ^\n\n  Error: Cannot find module 'C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\MOBA\\MOBA\\backend\\.claude\\hooks\\on-stop.js'\n     "
@@ -751,40 +751,6 @@
       "closed_at": "2026-08-08T14:36:33.489Z"
     },
     {
-      "id": "9c5418b6-c836-4718-a1bb-255c32258812",
-      "user": "BandaruDheeraj",
-      "project": "",
-      "status": "open",
-      "branch": "main",
-      "created_at": "2026-09-29T01:15:35.798Z",
-      "closed_at": null,
-      "last_activity_at": "2026-10-03T23:01:58.925Z",
-      "files_touched": [
-        "templates/hooks/sticky-utils.js",
-        "templates/hooks/data-branch.js",
-        ".claude/hooks/data-branch.js",
-        ".claude/hooks/sticky-utils.js",
-        "package.json",
-        ".sticky-note/sticky-note.json"
-      ],
-      "last_note": "",
-      "narrative": "",
-      "failed_approaches": [],
-      "handoff_summary": "",
-      "related_session_ids": [],
-      "resume_chain": [],
-      "tool": "claude-code",
-      "session_id": "5d19387d-c865-42cd-ada0-2951465ae85b",
-      "work_type": "",
-      "activities": [],
-      "tool_calls": {},
-      "prompts": [],
-      "contributors": [
-        "BandaruDheeraj"
-      ],
-      "resume_history": []
-    },
-    {
       "id": "323d0bbf-1709-4446-880a-18478db3a929",
       "user": "dheer",
       "project": "",
@@ -792,7 +758,7 @@
       "branch": "main",
       "created_at": "2026-09-22T20:36:58.097Z",
       "closed_at": null,
-      "last_activity_at": "2026-09-29T01:12:46.301Z",
+      "last_activity_at": "2026-10-03T23:17:31.108Z",
       "files_touched": [
         "../MOBA/MOBA/node_modules/sticky-note-cli/templates/hooks/pre-tool-use.js",
         "templates/hooks/pre-tool-use.js",
@@ -804,20 +770,76 @@
         "templates/hooks/sticky-utils.js",
         "templates/hooks/data-branch.js",
         "templates/hooks/session-end.js",
-        "package.json"
+        "package.json",
+        "templates\\hooks\\data-branch.js",
+        "templates\\hooks\\sticky-utils.js",
+        ".claude\\hooks\\data-branch.js",
+        ".claude\\hooks\\sticky-utils.js",
+        ".sticky-note\\sticky-note.json",
+        ".sticky-note\\sticky-note-config.json",
+        ".env.sticky",
+        "..\\MOBA\\MOBA\\.sticky-note\\sticky-note-config.json",
+        "..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\templates\\hooks\\pre-tool-use.js",
+        "templates\\hooks\\pre-tool-use.js",
+        ".claude\\hooks\\pre-tool-use.js",
+        "..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\templates\\hooks\\session-end.js",
+        "..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\templates\\hooks\\sticky-utils.js",
+        "..\\MOBA\\MOBA\\node_modules\\sticky-note-cli\\bin\\cli.js",
+        "bin\\cli.js",
+        "templates\\hooks\\session-end.js",
+        ".claude/hooks/data-branch.js",
+        ".claude/hooks/sticky-utils.js",
+        ".sticky-note/.sticky-checkpoint"
       ],
       "last_note": "",
-      "narrative": "",
-      "failed_approaches": [],
-      "handoff_summary": "",
+      "narrative": "please check the sticky note for moba I got all these errors \n● Now commit and push:\n\n● Bash(cd \"C:/Users/dheer/OneDrive/Desktop/Projects/MOBA/MOBA\" & ... (19 prompts total) ... can we make the code fix and push that up so we can see if that fixes it",
+      "failed_approaches": [
+        {
+          "description": "Exit code 1\nnpm warn exec The following package was not found and will be installed: sticky-note-cli@3.1.42\n  [ERR] Unknown command: update-hooks\n  Ru",
+          "error": "Exit code 1\nnpm warn exec The following package was not found and will be installed: sticky-note-cli"
+        },
+        {
+          "description": "Exit code 1\n  [ERR] Unknown command: update-hooks\n  Run 'npx sticky-note --help' for usage.",
+          "error": "Exit code 1\n  [ERR] Unknown command: update-hooks\n  Run 'npx sticky-note --help' for usage."
+        }
+      ],
+      "handoff_summary": "What done: feature-development on ../MOBA/MOBA/node_modules/sticky-note-cli/templates/hooks/pre-tool-use.js, templates/hooks/pre-tool-use.js, .claude/hooks/pre-tool-use.js, ../MOBA/MOBA/node_modules/sticky-note-cli/templates/hooks/session-end.js, ../MOBA/MOBA/node_modules/sticky-note-cli/templates/hooks/sticky-utils.js | Status: please check the sticky note for moba I got all these errors \n● Now commit and push:\n\n● Bash(cd \"C:/Users/dheer/OneDrive/Desktop/Projects/MOBA/MOBA\" &",
       "related_session_ids": [],
       "resume_chain": [],
       "tool": "claude-code",
       "session_id": "5d19387d-c865-42cd-ada0-2951465ae85b",
-      "work_type": "",
+      "work_type": "feature-development",
       "activities": [],
-      "tool_calls": {},
-      "prompts": [],
+      "tool_calls": {
+        "Bash": 113,
+        "Edit": 22,
+        "Skill": 1,
+        "Read": 46,
+        "Glob": 3,
+        "Agent": 3,
+        "Write": 1
+      },
+      "prompts": [
+        "please check the sticky note for moba I got all these errors \n● Now commit and push:\n\n● Bash(cd \"C:/Users/dheer/OneDrive/Desktop/Projects/MOBA/MOBA\" && git add lib/api.ts \"app/(tabs)/log-food.tsx\"\n      components/LogFood/ConfirmAndLogScreen.tsx && git commit…)\n  ⎿  [main 9976849] feat: tag meal-bui",
+        "continue",
+        "wait so why did sticky note cause all those issues?",
+        "but I thought we already changed the claude md or agents file to follow that command?",
+        "let's fix it directly in sticky note and commit and push the fix",
+        "this committed and pushed and released?",
+        "no I need you to connect to the live cloudflare and pull the real threads",
+        "yeah check the moba project C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\MOBA\\MOBA>\n its here don't make any changes just tell me why I don't see threads from myself recent or mhardmon1 who has clearly pushed code and made changes int his repo",
+        "but when mhardon ran sticky init it asked for the api key ?",
+        "but I am not understanding if its not in our json why did it ask matt when he setup?",
+        "ok we can't do that right now but can you tell me if 1 is a reall thing that can happen?",
+        "yeah figure out how to prevent issues like that",
+        "actually before oyu do that it looks like the threads aren't working on this repo either, neither the local or cloud changes are being detected",
+        "but why are nore of keshav's threads being shown and why does he not have an audit file or threads, this seems to be a problem with sticky note as a whole not repo sepcific since we have two repos with this issue",
+        "that's not the real problem the real problem is that there are so many silent failures that everyone else threads aren't being pushed I need you to figure out why all other peoples threads are failing",
+        "I have matt on call with me right now how can we confirm what exactly is going wrong since we have access to his environment",
+        "1. output: \nUSER: matthewhardmon USERNAME: undefined 2. nothing came up completely empty 3. STICKY_URL=https://sticky-mhardmon1-moba.sticky-server.workers.dev\nSTICKY_API_KEY=[REDACTED]",
+        "the echo of session end on matt's machine gave me this [STICKY-NOTE] warning: failed to push data branch — Command failed: git push origin refs/heads/sticky-note/data:refs/heads/sticky-note/data\nTo https://github.com/mhardmon1/MOBA.git\n ! [rejected]        sticky-note/data -> sticky-note/data (non-f",
+        "can we make the code fix and push that up so we can see if that fixes it"
+      ],
       "contributors": [
         "dheer"
       ],
@@ -1341,6 +1363,43 @@
       ],
       "resume_history": [],
       "transcript_captured": true
+    },
+    {
+      "id": "9c5418b6-c836-4718-a1bb-255c32258812",
+      "user": "BandaruDheeraj",
+      "project": "",
+      "status": "open",
+      "branch": "main",
+      "created_at": "2026-09-29T01:15:35.798Z",
+      "closed_at": null,
+      "last_activity_at": "2026-10-03T23:15:05.518Z",
+      "files_touched": [
+        "templates/hooks/sticky-utils.js",
+        "templates/hooks/data-branch.js",
+        ".claude/hooks/data-branch.js",
+        ".claude/hooks/sticky-utils.js",
+        "package.json",
+        ".sticky-note/sticky-note.json",
+        ".sticky-note/sticky-note-config.json",
+        ".env.sticky",
+        "../MOBA/MOBA/.sticky-note/sticky-note-config.json"
+      ],
+      "last_note": "",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "claude-code",
+      "session_id": "5d19387d-c865-42cd-ada0-2951465ae85b",
+      "work_type": "",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": [],
+      "contributors": [
+        "BandaruDheeraj"
+      ],
+      "resume_history": []
     }
   ]
 }

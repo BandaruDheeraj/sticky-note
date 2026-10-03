@@ -5,7 +5,10 @@
     "templates\\hooks\\sticky-utils.js",
     ".claude\\hooks\\data-branch.js",
     ".claude\\hooks\\sticky-utils.js",
-    ".sticky-note\\sticky-note.json"
+    ".sticky-note\\sticky-note.json",
+    ".sticky-note\\sticky-note-config.json",
+    ".env.sticky",
+    "..\\MOBA\\MOBA\\.sticky-note\\sticky-note-config.json"
   ],
-  "last_seen": "2026-10-03T23:01:59.092Z"
+  "last_seen": "2026-10-03T23:17:08.688Z"
 }
