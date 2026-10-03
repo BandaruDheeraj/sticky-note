@@ -1,0 +1,11 @@
+{
+  "active_files": [
+    "package.json",
+    "templates\\hooks\\data-branch.js",
+    "templates\\hooks\\sticky-utils.js",
+    ".claude\\hooks\\data-branch.js",
+    ".claude\\hooks\\sticky-utils.js",
+    ".sticky-note\\sticky-note.json"
+  ],
+  "last_seen": "2026-10-03T23:01:59.092Z"
+}
