@@ -641,14 +641,6 @@ function appendAuditLineBoth(entry, cloud) {
 // ── Environment helpers ───────────────────────────────────
 
 function getUser() {
-  // Prefer git config user.name — consistent across machines regardless of OS login name.
-  // Fall back to OS env vars, then "unknown".
-  try {
-    const name = execFileSync("git", ["config", "user.name"], {
-      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
-    if (name) return name;
-  } catch (_) {}
   return process.env.USER || process.env.USERNAME || "unknown";
 }
 
@@ -1280,7 +1272,6 @@ function getCloudConfig() {
   return {
     url: process.env.STICKY_URL || envFile.STICKY_URL || "",
     apiKey: process.env.STICKY_API_KEY || envFile.STICKY_API_KEY || "",
-    pushToken: process.env.STICKY_PUSH_TOKEN || envFile.STICKY_PUSH_TOKEN || "",
   };
 }
 

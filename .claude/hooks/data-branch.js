@@ -19,52 +19,6 @@ const DATA_REF = "refs/heads/" + DATA_BRANCH;
 
 const GIT_OPTS = { encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"] };
 
-// ── Credential helpers ────────────────────────────────────
-
-/**
- * Read STICKY_PUSH_TOKEN from env or .env.sticky file.
- * Returns the token string or null.
- */
-function _getPushToken() {
-  if (process.env.STICKY_PUSH_TOKEN) return process.env.STICKY_PUSH_TOKEN;
-  try {
-    // Walk up to find .env.sticky
-    let dir = process.cwd();
-    for (let i = 0; i < 20; i++) {
-      const envPath = path.join(dir, ".env.sticky");
-      if (fs.existsSync(envPath)) {
-        const content = fs.readFileSync(envPath, "utf-8");
-        const match = content.match(/^STICKY_PUSH_TOKEN=(.+)$/m);
-        if (match) return match[1].trim();
-        break;
-      }
-      const parent = path.dirname(dir);
-      if (parent === dir) break;
-      dir = parent;
-    }
-  } catch (_) {}
-  return null;
-}
-
-/**
- * Given a remote name, return an authenticated push URL if STICKY_PUSH_TOKEN
- * is configured. Embeds the token into the HTTPS URL so the push works from
- * any process context without needing a credential helper.
- * Returns null if no token or remote URL is not HTTPS.
- */
-function _getAuthenticatedUrl(remote) {
-  const token = _getPushToken();
-  if (!token) return null;
-  try {
-    const url = execFileSync("git", ["remote", "get-url", remote], GIT_OPTS).trim();
-    if (!url.startsWith("https://")) return null;
-    // Insert token: https://TOKEN@github.com/...
-    return url.replace(/^https:\/\/([^@]*)@?/, `https://${token}@`);
-  } catch (_) {
-    return null;
-  }
-}
-
 // ── Git helpers ───────────────────────────────────────────
 
 function getDefaultRemote() {
@@ -87,23 +41,11 @@ function readFileFromBranch(ref, filePath) {
   }
 }
 
-/** Returns all file paths in a git ref as an array. */
-function listFilesInBranch(ref) {
-  try {
-    const out = execFileSync("git", ["ls-tree", "-r", "--name-only", ref], GIT_OPTS);
-    return out.trim().split(/\r?\n/).filter(Boolean);
-  } catch (_) {
-    return [];
-  }
-}
-
 /**
  * Commit { relativePath: content } to a branch using git plumbing.
  * Does not touch the working tree or the main index. Returns the new commit SHA.
- * explicitParentSha: if provided, use this SHA as the parent instead of the
- * current local branch tip (used during retry to parent off the remote SHA).
  */
-function commitFilesToBranch(branchName, fileMap, explicitParentSha) {
+function commitFilesToBranch(branchName, fileMap) {
   const branchRef = "refs/heads/" + branchName;
   const tmpIndex = path.join(
     os.tmpdir(),
@@ -111,15 +53,13 @@ function commitFilesToBranch(branchName, fileMap, explicitParentSha) {
   );
 
   try {
-    let parentSha = explicitParentSha || null;
-    if (!parentSha) {
-      try {
-        parentSha = execFileSync("git", ["rev-parse", "--verify", branchRef], {
-          encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
-        }).trim();
-      } catch (_) {
-        // Branch doesn't exist yet — first commit creates it as orphan
-      }
+    let parentSha = null;
+    try {
+      parentSha = execFileSync("git", ["rev-parse", "--verify", branchRef], {
+        encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
+    } catch (_) {
+      // Branch doesn't exist yet — first commit creates it as orphan
     }
 
     const indexEnv = { ...process.env, GIT_INDEX_FILE: tmpIndex };
@@ -210,13 +150,10 @@ function pushDataBranch(remote, branchName, maxRetries, localMemPath, loadJsonFn
   if (!remote) return { ok: false, error: "no remote configured" };
 
   const pushSpec = DATA_REF + ":" + DATA_REF;
-  // Use token-authenticated URL if available — bypasses credential helpers so
-  // pushes work from background hook processes (no keychain/credential-manager needed).
-  const pushTarget = _getAuthenticatedUrl(remote) || remote;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      execFileSync("git", ["push", pushTarget, pushSpec], {
+      execFileSync("git", ["push", remote, pushSpec], {
         timeout: 30000, stdio: ["pipe", "pipe", "pipe"],
       });
       return { ok: true, error: null };
@@ -225,56 +162,22 @@ function pushDataBranch(remote, branchName, maxRetries, localMemPath, loadJsonFn
         return { ok: false, error: err.message };
       }
 
-      // Fetch remote, build a merged file map (local files + remote files +
-      // merged sticky-note.json), then re-commit parented off the remote SHA
-      // so the next push attempt is a fast-forward.
+      // Fetch, merge, and re-commit so the next push attempt advances the ref
       try {
         const fetchResult = fetchDataBranch(remote, branchName);
-        if (fetchResult.ok && fetchResult.remoteRef) {
-          // Get the remote SHA to use as parent for the re-commit
-          const remoteSha = execFileSync(
-            "git", ["rev-parse", fetchResult.remoteRef], GIT_OPTS
-          ).trim();
-
-          // Build merged file map: start with remote files as base, then
-          // overlay local files so this user's audit/presence are preserved.
-          // Capture remote sticky-note.json BEFORE the local overlay so we
-          // have the actual remote content to merge (not the local overwrite).
-          const fileMap = {};
-          const localRef = "refs/heads/" + branchName;
-          let remoteStickyContent = null;
-          for (const f of listFilesInBranch(fetchResult.remoteRef)) {
-            const content = readFileFromBranch(fetchResult.remoteRef, f);
-            if (content !== null) {
-              fileMap[f] = content;
-              if (f === "sticky-note.json") remoteStickyContent = content;
-            }
-          }
-          for (const f of listFilesInBranch(localRef)) {
-            const content = readFileFromBranch(localRef, f);
-            if (content !== null) fileMap[f] = content;
-          }
-
-          // Merge sticky-note.json from both sides using captured remote content
-          if (localMemPath && remoteStickyContent) {
-            mergeAndSaveFromRemote(
-              localMemPath, remoteStickyContent, loadJsonFn, saveJsonFn
-            );
-            fileMap["sticky-note.json"] = fs.readFileSync(localMemPath, "utf-8");
-          }
-
-          if (Object.keys(fileMap).length > 0) {
-            commitFilesToBranch(branchName, fileMap, remoteSha);
+        if (fetchResult.ok && fetchResult.remoteRef && localMemPath) {
+          const remoteContent = readFileFromBranch(fetchResult.remoteRef, "sticky-note.json");
+          if (remoteContent) {
+            mergeAndSaveFromRemote(localMemPath, remoteContent, loadJsonFn, saveJsonFn);
+            const mergedContent = fs.readFileSync(localMemPath, "utf-8");
+            commitFilesToBranch(branchName, { "sticky-note.json": mergedContent });
           }
         }
       } catch (_) {}
 
-      // Brief exponential backoff — use Atomics.wait to block without CPU spin
-      try {
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.pow(2, attempt) * 300);
-      } catch (_) {
-        // Atomics.wait unavailable (e.g. SharedArrayBuffer disabled) — skip delay
-      }
+      // Brief exponential backoff (busy-wait — synchronous context)
+      const end = Date.now() + Math.pow(2, attempt) * 300;
+      while (Date.now() < end) {}
     }
   }
   return { ok: false, error: "max retries exceeded" };
@@ -322,16 +225,9 @@ function mergeAndSaveFromRemote(localMemPath, remoteContent, loadJsonFn, saveJso
     return; // corrupt remote — skip
   }
 
-  let localMemory;
-  if (loadJsonFn) {
-    localMemory = loadJsonFn(localMemPath, { ...EMPTY_MEMORY });
-  } else {
-    try {
-      localMemory = JSON.parse(fs.readFileSync(localMemPath, "utf-8"));
-    } catch (_) {
-      localMemory = { ...EMPTY_MEMORY };
-    }
-  }
+  const localMemory = loadJsonFn
+    ? loadJsonFn(localMemPath, { ...EMPTY_MEMORY })
+    : { ...EMPTY_MEMORY };
 
   const localThreads = Array.isArray(localMemory.threads) ? localMemory.threads.filter(Boolean) : [];
   const remoteThreads = Array.isArray(remoteMemory.threads) ? remoteMemory.threads.filter(Boolean) : [];
