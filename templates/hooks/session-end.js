@@ -954,7 +954,7 @@ function _collectDirFiles(dir, ext, prefix, fileMap) {
 }
 
 function commitAndPushDataBranch() {
-  if (!dataBranch) return;
+  if (!dataBranch) return null;
   try {
     const fileMap = {};
     const memPath = getMemoryPath();
@@ -966,7 +966,7 @@ function commitAndPushDataBranch() {
     _collectDirFiles(getPresenceDir(), ".json", "presence/", fileMap);
     _collectDirFiles(getTranscriptsDir(), ".jsonl", "transcripts/", fileMap);
 
-    if (Object.keys(fileMap).length === 0) return;
+    if (Object.keys(fileMap).length === 0) return null;
 
     dataBranch.commitFilesToBranch(dataBranch.DATA_BRANCH, fileMap);
 
@@ -976,16 +976,18 @@ function commitAndPushDataBranch() {
         remote, dataBranch.DATA_BRANCH, 3, getMemoryPath(), loadJson, saveJson
       );
       if (!pushResult.ok) {
-        process.stderr.write(
-          "[STICKY-NOTE] warning: failed to push data branch — " + pushResult.error + "\n" +
-          "[STICKY-NOTE] your data is safe locally in .git/sticky-note/\n"
-        );
+        const hint = pushResult.error && pushResult.error.includes("authentication")
+          ? " Add STICKY_PUSH_TOKEN=<github_pat> to .env.sticky to fix."
+          : "";
+        const msg = `[STICKY-NOTE] ⚠️ data branch push failed — ${pushResult.error}${hint}`;
+        logHookError("data-branch-push", new Error(pushResult.error));
+        return msg;
       }
     }
+    return null;
   } catch (err) {
-    process.stderr.write(
-      "[STICKY-NOTE] warning: data branch sync failed — " + err.message + "\n"
-    );
+    logHookError("data-branch-sync", err);
+    return `[STICKY-NOTE] ⚠️ data branch sync failed — ${err.message}`;
   }
 }
 
@@ -1306,7 +1308,9 @@ async function main() {
   if (cloud) {
     const threadToSync = threads.find(t => t.session_id === sessionId);
     if (threadToSync) {
-      cloudWriteThread(threadToSync).catch(() => {});
+      cloudWriteThread(threadToSync).catch(err => {
+        logHookError("session-end:cloud-write", err);
+      });
     }
   }
 
@@ -1320,14 +1324,15 @@ async function main() {
   }
 
   // Commit current data to sticky-note/data branch and push
-  commitAndPushDataBranch();
+  const dataBranchWarning = commitAndPushDataBranch();
 
   const fileCount = filesTouched.length;
   const commitCount = commitShas.length;
   const statusLabel = isCopilotCli ? "updated" : "closed";
   const statusMsg = `[STICKY-NOTE] Session ${statusLabel} - thread ${isCopilotCli ? "updated" : "created"} (${fileCount} file${fileCount !== 1 ? "s" : ""}${commitCount > 0 ? ", " + commitCount + " commit" + (commitCount !== 1 ? "s" : "") : ""})`;
+  const fullOutput = dataBranchWarning ? `${statusMsg}\n${dataBranchWarning}` : statusMsg;
   try {
-    process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
+    process.stdout.write(JSON.stringify({ output: fullOutput }) + "\n");
   } catch (_) {
     process.stdout.write('{"output":""}\n');
   }

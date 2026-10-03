@@ -1071,10 +1071,11 @@ async function cmdInit() {
     print("  ⏭️  .gitignore already configured");
   }
 
-  // Add .gitattributes merge strategy
+  // Add .gitattributes merge strategy for both thread data and config
   const gitattrsPath = path.join(process.cwd(), ".gitattributes");
   const oldMergeRule = ".sticky-note/sticky-note.json merge=union";
   const mergeRule = ".sticky-note/sticky-note.json merge=sticky-note";
+  const configMergeRule = ".sticky-note/sticky-note-config.json merge=sticky-note";
   let gitattrsContent = "";
   if (fs.existsSync(gitattrsPath)) {
     gitattrsContent = fs.readFileSync(gitattrsPath, "utf-8");
@@ -1089,9 +1090,17 @@ async function cmdInit() {
       ? `\n# Sticky Note - JSON-aware thread merge\n${mergeRule}\n`
       : `\n\n# Sticky Note - JSON-aware thread merge\n${mergeRule}\n`;
     fs.appendFileSync(gitattrsPath, addition);
+    gitattrsContent += addition;
     print("  [OK] .gitattributes updated (merge=sticky-note)");
   } else {
     print("  ⏭️  .gitattributes already configured");
+  }
+  // Also protect sticky-note-config.json — merge conflicts here silently break
+  // cloud transport and hook loading for the entire team.
+  if (!gitattrsContent.includes(configMergeRule)) {
+    const addition = `${configMergeRule}\n`;
+    fs.appendFileSync(gitattrsPath, addition);
+    print("  [OK] .gitattributes: sticky-note-config.json protected from merge conflicts");
   }
 
   // Install merge driver script and git config
@@ -1452,14 +1461,25 @@ async function cmdUpdate() {
     }
   }
 
-  if (fs.existsSync(gitattrsPath)) {
-    let gitattrsContent = fs.readFileSync(gitattrsPath, "utf-8");
+  {
+    let gitattrsContent = fs.existsSync(gitattrsPath)
+      ? fs.readFileSync(gitattrsPath, "utf-8") : "";
     const oldRule = ".sticky-note/sticky-note.json merge=union";
     const newRule = ".sticky-note/sticky-note.json merge=sticky-note";
+    const configRule = ".sticky-note/sticky-note-config.json merge=sticky-note";
     if (gitattrsContent.includes(oldRule)) {
       gitattrsContent = gitattrsContent.replace(oldRule, newRule);
       fs.writeFileSync(gitattrsPath, gitattrsContent, "utf-8");
       print("  [OK] .gitattributes upgraded (merge=union -> merge=sticky-note)");
+    } else if (!gitattrsContent.includes(newRule)) {
+      const addition = `\n# Sticky Note - JSON-aware thread merge\n${newRule}\n`;
+      fs.appendFileSync(gitattrsPath, addition);
+      gitattrsContent += addition;
+      print("  [OK] .gitattributes updated (merge=sticky-note)");
+    }
+    if (!gitattrsContent.includes(configRule)) {
+      fs.appendFileSync(gitattrsPath, `${configRule}\n`);
+      print("  [OK] .gitattributes: sticky-note-config.json protected from merge conflicts");
     }
   }
 

@@ -450,6 +450,20 @@ function clearResumeSignal() {
 function loadJson(filePath, defaultVal) {
   try {
     const raw = fs.readFileSync(filePath, "utf-8");
+    // Detect unresolved git merge conflict markers — JSON.parse would silently
+    // swallow the SyntaxError and return the default, hiding the real problem.
+    // This breaks useCloud(), thread loading, and config reading with no trace.
+    if (raw.includes("<<<<<<<") || raw.includes(">>>>>>>")) {
+      logHookError(
+        "loadJson",
+        new Error(
+          `Unresolved git merge conflict in ${filePath}. ` +
+          `Resolve the conflict and commit, or restore the file with ` +
+          `\`git checkout HEAD -- ${path.relative(process.cwd(), filePath) || filePath}\``
+        )
+      );
+      return defaultVal !== undefined ? defaultVal : {};
+    }
     return JSON.parse(raw);
   } catch (_) {
     return defaultVal !== undefined ? defaultVal : {};

@@ -69,15 +69,38 @@ function _installedCliVersion() {
 }
 function formatVersionWarning(config) {
   try {
-    const min = config && config.min_version;
-    if (!min) return "";
     const installed = _installedCliVersion();
     if (!installed) return "";
-    if (_cmpSemver(installed, min) >= 0) return "";
-    const msg =
-      `[STICKY-NOTE] ⚠️ Installed sticky-note-cli v${installed} is below ` +
-      `this project's min_version v${min}. Run \`npm i -D sticky-note-cli@latest\` ` +
-      `to update — features and schema may differ until you do.`;
+    const warnings = [];
+
+    // Check 1: installed version is below the project's required minimum.
+    const min = config && config.min_version;
+    if (min && _cmpSemver(installed, min) < 0) {
+      warnings.push(
+        `[STICKY-NOTE] ⚠️ sticky-note-cli v${installed} is below this project's ` +
+        `min_version v${min}. Run \`npm i -g sticky-note-cli@latest\` to update — ` +
+        `features and bug fixes are missing until you do.`
+      );
+    }
+
+    // Check 2: hook scripts in .claude/hooks/ are older than the installed CLI.
+    // This means the teammate installed a newer CLI but never ran `npx sticky-note update`
+    // to refresh the hook files — they're running old code with new expectations.
+    const hookVer = config && config.hook_version;
+    if (hookVer && _cmpSemver(installed, hookVer) > 0) {
+      const iv = _parseSemver(installed), hv = _parseSemver(hookVer);
+      // Warn on any minor or major gap — patch-only differences are usually safe.
+      if (iv && hv && (iv[0] !== hv[0] || iv[1] !== hv[1])) {
+        warnings.push(
+          `[STICKY-NOTE] ⚠️ Hook scripts are v${hookVer} but sticky-note-cli v${installed} ` +
+          `is installed. Run \`npx sticky-note update\` to get the latest fixes ` +
+          `(data branch push, identity, credential handling).`
+        );
+      }
+    }
+
+    if (warnings.length === 0) return "";
+    const msg = warnings.join("\n");
     try { process.stderr.write(msg + "\n"); } catch (_) { /* non-fatal */ }
     return msg;
   } catch (_) {
