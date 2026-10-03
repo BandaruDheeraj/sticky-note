@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sticky-note": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        ".claude/sticky-note-mcp.js"
+      ]
+    }
+  }
+}

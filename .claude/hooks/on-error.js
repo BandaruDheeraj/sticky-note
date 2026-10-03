@@ -1,0 +1,177 @@
+#!/usr/bin/env node
+"use strict";
+/**
+ * on-error.js — Stuck Thread (V2)
+ *
+ * Hook: errorOccurred (Copilot CLI) / PostToolUseFailure (Claude Code)
+ * Writes a thread with status="stuck" and captures the error message.
+ * Appends JSONL audit line.
+ */
+
+function _safeExit() {
+  try {
+    process.stdout.write(JSON.stringify({ output: "" }) + "\n");
+  } catch (_) {
+    process.stdout.write('{"output":""}\n');
+  }
+  process.exit(0);
+}
+
+let getMemoryPath, loadJson, saveJson, saveMemoryMerged, appendAuditLine, appendAuditLineBoth, getUser, detectTool, getSessionId, useCloud, cloudReadThreads, cloudWriteThread;
+try {
+  ({
+    getMemoryPath,
+    loadJson,
+    saveJson,
+    saveMemoryMerged,
+    appendAuditLine,
+    appendAuditLineBoth,
+    getUser,
+    detectTool,
+    getSessionId,
+    useCloud,
+    cloudReadThreads,
+    cloudWriteThread,
+  } = require("./sticky-utils.js"));
+} catch (_) {
+  _safeExit();
+}
+
+let eventWriter = null;
+try { eventWriter = require("./event-writer.js"); } catch (_) {}
+
+function _isDenial(hookInput) {
+  if (hookInput.blocked === true) return true;
+  const msg = (hookInput.error || hookInput.message || "").toLowerCase();
+  return (
+    msg.includes("blocked by the user") ||
+    msg.includes("user rejected") ||
+    msg.includes("permission denied by user") ||
+    msg.includes("tool was blocked")
+  );
+}
+
+async function main() {
+  let hookInput = {};
+  try {
+    if (!process.stdin.isTTY) {
+      const raw = require("fs").readFileSync(0, "utf-8").trim();
+      if (raw) {
+        hookInput = JSON.parse(raw);
+      }
+    }
+  } catch (_) {
+    hookInput = {};
+  }
+
+  const sessionId = getSessionId(hookInput);
+  let toolName = hookInput.tool_name || process.env.TOOL_NAME || "unknown";
+  if (toolName === "unknown") {
+    toolName = detectTool(hookInput);
+  }
+  const errorMsg = (hookInput.error || hookInput.message || "Unknown error").substring(0, 200);
+  const user = getUser();
+  const now = new Date().toISOString();
+
+  const cloud = useCloud();
+  const memoryPath = getMemoryPath();
+  const memory = loadJson(memoryPath, { version: "2", project: "", threads: [] });
+
+  if (cloud) {
+    const cloudThreads = await cloudReadThreads();
+    if (cloudThreads) memory.threads = cloudThreads;
+  }
+
+  if (!Array.isArray(memory.threads)) {
+    memory.threads = [];
+  }
+  const threads = memory.threads;
+
+  let existing = null;
+  for (const thread of threads) {
+    if (thread.session_id === sessionId) {
+      existing = thread;
+      break;
+    }
+  }
+
+  if (existing) {
+    existing.status = "stuck";
+    existing.last_note = errorMsg;
+    existing.last_activity_at = now;
+    if (!Array.isArray(existing.failed_approaches)) {
+      existing.failed_approaches = [];
+    }
+    existing.failed_approaches.push({
+      description: errorMsg.substring(0, 150),
+      error: errorMsg.substring(0, 100),
+    });
+    // Cap at 5 entries
+    if (existing.failed_approaches.length > 5) {
+      existing.failed_approaches = existing.failed_approaches.slice(-5);
+    }
+  }
+  // If no thread exists for this session, skip — session-start.js creates the
+  // thread now. Creating standalone "stuck" threads from tool failures produced
+  // garbage entries (tool="Bash"/"Glob", no branch, no context).
+
+  const auditEntry = {
+    type: "error",
+    user: user,
+    ts: now,
+    session_id: sessionId,
+    error: errorMsg,
+    tool: toolName,
+  };
+  appendAuditLineBoth(auditEntry, cloud);
+
+  // Write structured event for AI blame
+  if (eventWriter) {
+    try {
+      const isDenial = _isDenial(hookInput);
+      if (isDenial) {
+        const denialEvent = eventWriter.buildEvent(
+          eventWriter.EVENT_TYPES.TOOL_DENIED,
+          {
+            tool: toolName,
+            args: eventWriter.sanitizeToolArgs(toolName, hookInput.tool_input || {}),
+            reason: errorMsg,
+          },
+          sessionId
+        );
+        appendAuditLineBoth(denialEvent, cloud);
+      } else {
+        const errorEvent = eventWriter.buildEvent(
+          eventWriter.EVENT_TYPES.TOOL_ERROR,
+          {
+            tool: toolName,
+            args: eventWriter.sanitizeToolArgs(toolName, hookInput.tool_input || {}),
+            error: errorMsg,
+          },
+          sessionId
+        );
+        appendAuditLineBoth(errorEvent, cloud);
+      }
+    } catch (_) {
+      // best-effort
+    }
+  }
+
+  saveMemoryMerged(memoryPath, memory);
+  if (cloud) {
+    const threadToSync = existing || threads[threads.length - 1];
+    cloudWriteThread(threadToSync).catch(() => {});
+  }
+  const statusMsg = `[STICKY-NOTE] Marked thread as STUCK - ${errorMsg.substring(0, 80)}`;
+  try {
+    process.stdout.write(JSON.stringify({ output: statusMsg }) + "\n");
+  } catch (_) {
+    process.stdout.write('{"output":""}\n');
+  }
+  process.exit(0);
+}
+
+main().catch((err) => {
+  try { logHookError("on-error", err); } catch (_) {}
+  _safeExit();
+});

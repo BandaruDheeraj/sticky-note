@@ -1,0 +1,24 @@
+{
+  "stale_days": 14,
+  "copilot_cli_auto_close_hours": 24,
+  "inject_token_budget": 1000,
+  "auto_sync": true,
+  "auto_push": true,
+  "capture_transcripts": true,
+  "redact_transcripts": true,
+  "mcp_servers": [
+    {
+      "name": "sticky-note",
+      "type": "stdio",
+      "source": "~/.copilot/mcp-config.json",
+      "command": "node",
+      "args": [
+        ".claude/sticky-note-mcp.js"
+      ]
+    }
+  ],
+  "skills": [],
+  "conventions": [],
+  "hook_version": "3.1.38",
+  "min_version": "3.1.38"
+}

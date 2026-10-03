@@ -1,0 +1,23 @@
+
+# Sticky Note
+.claude/settings.local.json
+.claude/worktrees/
+.env.sticky
+.sticky-note/.sticky-session
+.sticky-note/.sticky-resume
+.sticky-note/.sticky-head
+.sticky-note/.sticky-injected
+.sticky-note/.sticky-active-resume
+.sticky-note/.sticky-checkpoint
+.sticky-note/.sticky-banner-shown
+.sticky-note/hook-debug.log
+.sticky-note/.sticky-debug.jsonl
+.sticky-note/.sticky-errors.log
+.sticky-note/.sticky-syncing
+.sticky-note/.sticky-backups/
+.sticky-note/.env-provision-hash
+.sticky-note/.overlap-warned
+.sticky-note/.overlap-pending
+.sticky-note/.overlap-dismissed
+.sticky-note/sticky-note-audit.jsonl
+.sticky-note/.sticky-presence.json
