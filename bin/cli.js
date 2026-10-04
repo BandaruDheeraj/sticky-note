@@ -5025,14 +5025,19 @@ function _commitFilesToDataBranch(srcDir) {
       });
     }
 
-    // Walk srcDir and commit all files
+    // Walk srcDir and commit only valid data-branch files
+    const VALID_DATA_PREFIXES = ["audit/", "presence/", "transcripts/"];
+    function isValidDataPath(relPath) {
+      if (relPath === "sticky-note.json") return true;
+      return VALID_DATA_PREFIXES.some(p => relPath.startsWith(p));
+    }
     function walkAndAdd(dir, prefix) {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         const relPath = prefix ? prefix + "/" + entry.name : entry.name;
         if (entry.isDirectory()) {
           walkAndAdd(full, relPath);
-        } else if (entry.isFile() && !entry.name.startsWith(".sticky-")) {
+        } else if (entry.isFile() && isValidDataPath(relPath)) {
           const content = fs.readFileSync(full);
           const blobSha = execFileSync("git", ["hash-object", "-w", "--stdin"], {
             input: content, encoding: "utf-8", timeout: 5000, stdio: ["pipe", "pipe", "pipe"],

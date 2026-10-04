@@ -1,0 +1,21 @@
+# Wrangler local dev state — never ship to npm
+sticky-server/.wrangler/
+
+# Dev/planning artifacts
+.superpowers/
+docs/superpowers/
+
+# Test artifacts
+test-hooks.md
+
+# Secrets
+.env
+.env.sticky
+
+# Git and CI config
+.github/
+.gitattributes
+
+# Sticky Note local state
+.sticky-note/
+.claude/settings.local.json

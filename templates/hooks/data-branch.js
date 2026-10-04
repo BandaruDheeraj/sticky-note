@@ -243,7 +243,16 @@ function pushDataBranch(remote, branchName, maxRetries, localMemPath, loadJsonFn
           const fileMap = {};
           const localRef = "refs/heads/" + branchName;
           let remoteStickyContent = null;
+
+          // Only allow valid data-branch paths — prevents perpetuating bad paths
+          // that may have been committed by an earlier buggy migration.
+          function _isValidDataPath(f) {
+            if (f === "sticky-note.json") return true;
+            return f.startsWith("audit/") || f.startsWith("presence/") || f.startsWith("transcripts/");
+          }
+
           for (const f of listFilesInBranch(fetchResult.remoteRef)) {
+            if (!_isValidDataPath(f)) continue;
             const content = readFileFromBranch(fetchResult.remoteRef, f);
             if (content !== null) {
               fileMap[f] = content;
@@ -251,6 +260,7 @@ function pushDataBranch(remote, branchName, maxRetries, localMemPath, loadJsonFn
             }
           }
           for (const f of listFilesInBranch(localRef)) {
+            if (!_isValidDataPath(f)) continue;
             const content = readFileFromBranch(localRef, f);
             if (content !== null) fileMap[f] = content;
           }

@@ -45,3 +45,14 @@ __pycache__/
 
 # sticky-note: data branch migration
 .sticky-note/sticky-note.json
+.sticky-note/audit/
+.sticky-note/presence/
+
+# Wrangler local dev state
+sticky-server/.wrangler/
+
+# Dev/planning artifacts
+.superpowers/
+
+# Test artifacts
+test-hooks.md
