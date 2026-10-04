@@ -5,8 +5,8 @@
   "threads": [
     {
       "id": "6869e313-b4fa-4f20-b894-c72da6265c8e",
-      "status": "expired",
       "user": "dbandaru",
+      "status": "expired",
       "closed_at": "2026-04-13T21:25:13.814Z",
       "files_touched": [],
       "failed_approaches": [],
@@ -103,8 +103,8 @@
     },
     {
       "id": "demo-alice-docs-update",
-      "status": "expired",
       "user": "alice",
+      "status": "expired",
       "closed_at": "2026-04-14T00:36:05.724Z",
       "files_touched": [
         "README.md",
@@ -677,18 +677,18 @@
       "work_type": "feature-development",
       "activities": [],
       "tool_calls": {
-        "Bash": 446764420,
-        "Glob": 24153330,
-        "Read": 189199030,
-        "Grep": 32212690,
-        "Edit": 64444070,
-        "Write": 24161550,
-        "Skill": 4021770,
-        "ToolSearch": 8043790,
-        "TaskCreate": 4029440,
-        "TaskUpdate": 8059530,
-        "Agent": 4850,
-        "AskUserQuestion": 650
+        "Bash": 616103516,
+        "Glob": 33308271,
+        "Read": 260912003,
+        "Grep": 44422413,
+        "Edit": 88870603,
+        "Write": 33319607,
+        "Skill": 5546159,
+        "ToolSearch": 11092663,
+        "TaskCreate": 5556736,
+        "TaskUpdate": 11114369,
+        "Agent": 6693,
+        "AskUserQuestion": 897
       },
       "prompts": [
         "running into errors rn \n● Ran 1 stop hook (ctrl+o to expand)\n  ⎿  Stop hook error: Failed with non-blocking status code: node:internal/modules/cjs/loader:1459\n    throw err;\n    ^\n\n  Error: Cannot find module 'C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\MOBA\\MOBA\\backend\\.claude\\hooks\\on-stop.js'\n     "
@@ -936,7 +936,7 @@
       "branch": "main",
       "created_at": "2026-09-01T17:41:47.734Z",
       "closed_at": null,
-      "last_activity_at": "2026-10-03T23:44:17.591Z",
+      "last_activity_at": "2026-10-04T01:52:36.518Z",
       "files_touched": [
         "sticky-server/wrangler.toml",
         "bin/cli.js",
@@ -973,7 +973,7 @@
       "branch": "main",
       "created_at": "2026-08-27T22:12:37.717Z",
       "closed_at": null,
-      "last_activity_at": "2026-10-03T23:44:17.591Z",
+      "last_activity_at": "2026-10-04T01:52:36.519Z",
       "files_touched": [
         "bin/cli.js",
         "package.json",
@@ -1011,7 +1011,7 @@
       "branch": "main",
       "created_at": "2026-08-27T01:57:17.253Z",
       "closed_at": null,
-      "last_activity_at": "2026-10-03T23:44:17.591Z",
+      "last_activity_at": "2026-10-04T01:52:36.519Z",
       "files_touched": [
         ".mcp.json",
         ".claude/sticky-note-mcp.js",
@@ -1048,7 +1048,7 @@
       "branch": "main",
       "created_at": "2026-08-24T02:07:19.590Z",
       "closed_at": null,
-      "last_activity_at": "2026-10-03T23:44:17.591Z",
+      "last_activity_at": "2026-10-04T01:52:36.519Z",
       "files_touched": [
         "docs/setup.md",
         "README.md",
@@ -1089,7 +1089,7 @@
       "branch": "main",
       "created_at": "2026-08-21T18:52:27.596Z",
       "closed_at": null,
-      "last_activity_at": "2026-10-03T23:44:17.591Z",
+      "last_activity_at": "2026-10-04T01:52:36.519Z",
       "files_touched": [
         "../../../../.claude/plugins/cache/claude-plugins-official/superpowers/6.0.3/skills/subagent-driven-development/scripts",
         ".superpowers/sdd/task-1-brief.md",
@@ -1186,7 +1186,7 @@
       "branch": "main",
       "created_at": "2026-08-20T18:00:16.022Z",
       "closed_at": null,
-      "last_activity_at": "2026-10-03T23:44:17.591Z",
+      "last_activity_at": "2026-10-04T01:52:36.519Z",
       "files_touched": [
         "templates\\gitignore-additions.txt",
         "..\\pogo\\.gitignore",
@@ -1268,7 +1268,7 @@
       "branch": "main",
       "created_at": "2026-08-20T17:39:02.479Z",
       "closed_at": null,
-      "last_activity_at": "2026-10-03T23:44:17.591Z",
+      "last_activity_at": "2026-10-04T01:52:36.519Z",
       "files_touched": [],
       "last_note": "",
       "narrative": "",
@@ -1289,9 +1289,13 @@
     },
     {
       "id": "1efd5848-4ff7-4cfd-a740-a7f541cf4af7",
-      "status": "expired",
       "user": "dheer",
+      "project": "",
+      "status": "closed",
+      "branch": "main",
+      "created_at": "2026-08-07T19:47:33.799Z",
       "closed_at": "2026-08-08T03:10:40.992Z",
+      "last_activity_at": "2026-08-08T03:10:40.992Z",
       "files_touched": [
         ".sticky-note/sticky-note.json",
         "CHANGELOG.md",
@@ -1339,6 +1343,8 @@
         ".github/copilot-instructions.md",
         ".gitignore"
       ],
+      "last_note": "[debugging] Published as 3.1.5. Try again:\n\n```\n! cd /tmp/test-sticky && node \"C:/Users/dheer/OneDrive/Desktop/Projects/sticky-note/bin/cli.js\" init\n```",
+      "narrative": "Published as 3.1.5. Try again:\n\n```\n! cd /tmp/test-sticky && node \"C:/Users/dheer/OneDrive/Desktop/Projects/sticky-note/bin/cli.js\" init\n```",
       "failed_approaches": [
         {
           "description": "Here's where things stand:\n\n---\n\n**Your last thread (stuck, `2c636a72`)** — You were on `main` building the **data-branch** feature (storing threads i",
@@ -1357,8 +1363,12 @@
           "files_tried": []
         }
       ],
+      "handoff_summary": "What done: feature-development on .sticky-note/sticky-note.json, CHANGELOG.md, .sticky-note\\sticky-note.json, .claude/settings.json, .sticky-note/.sticky-checkpoint | What failed: Here's where things stand:\n\n---\n\n**Your last thread (stuck, ; # Simplify: Code Review and Cleanup\n\nReview all changed file | Status: ```\n! mkdir -p /tmp/test-sticky && cd /tmp/test-sticky && git init && git config user.email \"test@test.com\" && git config user.name \"Test\" && node \"C:",
       "related_session_ids": [],
       "resume_chain": [],
+      "tool": "claude-code",
+      "session_id": "ac0067cc-afd2-4520-9e48-5a62e3919012",
+      "work_type": "debugging",
       "activities": [
         "error: ✓ threads runs without error",
         "error: error: Your local changes to the following files would be overwritten by checkout:",
@@ -1405,6 +1415,42 @@
       ],
       "contributors": [
         "dheer"
+      ],
+      "resume_history": [],
+      "transcript_captured": true
+    },
+    {
+      "id": "de2d302b-d849-48f9-90e2-6d8a3c30b965",
+      "user": "BandaruDheeraj",
+      "project": "",
+      "status": "open",
+      "branch": "main",
+      "created_at": "2026-10-04T01:52:36.607Z",
+      "closed_at": null,
+      "last_activity_at": "2026-10-04T02:26:18.370Z",
+      "files_touched": [
+        ".sticky-note/sticky-note.json",
+        "bin/cli.js",
+        "templates/hooks/sticky-utils.js",
+        "templates/hooks/data-branch.js",
+        ".sticky-note/sticky-note-config.json",
+        ".env.sticky",
+        "sticky-server/wrangler.toml"
+      ],
+      "last_note": "",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "claude-code",
+      "session_id": "7ba7aa9f-2a8b-4c56-8855-2807cb65c15c",
+      "work_type": "",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": [],
+      "contributors": [
+        "BandaruDheeraj"
       ],
       "resume_history": []
     },

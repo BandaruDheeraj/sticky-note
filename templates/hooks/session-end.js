@@ -1004,7 +1004,7 @@ function commitAndPushDataBranch() {
 
 // ── Cloudflare KV sync ────────────────────────────────────
 
-function syncThreadsToCloudflareKV() {
+async function syncThreadsToCloudflareKV() {
   try {
     const { url: stickyUrl, headers } = _makeCloudHeaders();
     if (!stickyUrl) return null; // No Cloudflare URL configured
@@ -1017,23 +1017,22 @@ function syncThreadsToCloudflareKV() {
       return null;
     }
 
-    const threads = threadData.threads;
-    const project = headers["X-Sticky-Project"] || "default";
-    let synced = 0;
+    const threads = threadData.threads.filter((t) => t && t.id);
+    if (threads.length === 0) return null;
 
-    // Push each thread to KV asynchronously (non-blocking)
-    threads.forEach((thread) => {
-      if (!thread || !thread.id) return;
-      fetch(`${stickyUrl}/threads/${thread.id}`, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify(thread),
-        signal: AbortSignal.timeout(10000),
-      }).catch(() => {});
-      synced++;
-    });
+    // Await all pushes so the process doesn't exit before they complete
+    await Promise.all(
+      threads.map((thread) =>
+        fetch(`${stickyUrl}/threads/${thread.id}`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(thread),
+          signal: AbortSignal.timeout(10000),
+        }).catch(() => {})
+      )
+    );
 
-    return synced > 0 ? `[STICKY-NOTE] ⓘ synced ${synced} thread(s) to Cloudflare` : null;
+    return `[STICKY-NOTE] ⓘ synced ${threads.length} thread(s) to Cloudflare`;
   } catch (err) {
     // Non-fatal — KV sync failure shouldn't block session-end
     return null;
@@ -1375,8 +1374,8 @@ async function main() {
   // Commit current data to sticky-note/data branch and push
   const dataBranchWarning = commitAndPushDataBranch();
 
-  // Sync threads to Cloudflare KV
-  const kvSyncMsg = syncThreadsToCloudflareKV();
+  // Sync threads to Cloudflare KV (awaited so process doesn't exit before fetch completes)
+  const kvSyncMsg = await syncThreadsToCloudflareKV();
 
   const fileCount = filesTouched.length;
   const commitCount = commitShas.length;
