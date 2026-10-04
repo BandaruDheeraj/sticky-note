@@ -1002,6 +1002,44 @@ function commitAndPushDataBranch() {
   }
 }
 
+// ── Cloudflare KV sync ────────────────────────────────────
+
+function syncThreadsToCloudflareKV() {
+  try {
+    const { url: stickyUrl, headers } = _makeCloudHeaders();
+    if (!stickyUrl) return null; // No Cloudflare URL configured
+
+    const memPath = getMemoryPath();
+    if (!fs.existsSync(memPath)) return null;
+
+    const threadData = loadJson(memPath);
+    if (!threadData || !threadData.threads || !Array.isArray(threadData.threads)) {
+      return null;
+    }
+
+    const threads = threadData.threads;
+    const project = headers["X-Sticky-Project"] || "default";
+    let synced = 0;
+
+    // Push each thread to KV asynchronously (non-blocking)
+    threads.forEach((thread) => {
+      if (!thread || !thread.id) return;
+      fetch(`${stickyUrl}/threads/${thread.id}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify(thread),
+        signal: AbortSignal.timeout(10000),
+      }).catch(() => {});
+      synced++;
+    });
+
+    return synced > 0 ? `[STICKY-NOTE] ⓘ synced ${synced} thread(s) to Cloudflare` : null;
+  } catch (err) {
+    // Non-fatal — KV sync failure shouldn't block session-end
+    return null;
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────
 
 async function main() {
@@ -1337,11 +1375,14 @@ async function main() {
   // Commit current data to sticky-note/data branch and push
   const dataBranchWarning = commitAndPushDataBranch();
 
+  // Sync threads to Cloudflare KV
+  const kvSyncMsg = syncThreadsToCloudflareKV();
+
   const fileCount = filesTouched.length;
   const commitCount = commitShas.length;
   const statusLabel = isCopilotCli ? "updated" : "closed";
   const statusMsg = `[STICKY-NOTE] Session ${statusLabel} - thread ${isCopilotCli ? "updated" : "created"} (${fileCount} file${fileCount !== 1 ? "s" : ""}${commitCount > 0 ? ", " + commitCount + " commit" + (commitCount !== 1 ? "s" : "") : ""})`;
-  const fullOutput = dataBranchWarning ? `${statusMsg}\n${dataBranchWarning}` : statusMsg;
+  const fullOutput = [statusMsg, dataBranchWarning, kvSyncMsg].filter(Boolean).join("\n");
   try {
     process.stdout.write(JSON.stringify({ output: fullOutput }) + "\n");
   } catch (_) {
