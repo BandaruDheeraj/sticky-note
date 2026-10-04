@@ -697,18 +697,18 @@
       "work_type": "feature-development",
       "activities": [],
       "tool_calls": {
-        "Bash": 178819290,
-        "Glob": 9667470,
-        "Read": 75727680,
-        "Grep": 12893260,
-        "Edit": 25794000,
-        "Write": 9670760,
-        "Skill": 1609730,
-        "ToolSearch": 3219560,
-        "TaskCreate": 1612800,
-        "TaskUpdate": 3225860,
-        "Agent": 1940,
-        "AskUserQuestion": 260
+        "Bash": 428939252,
+        "Glob": 23189652,
+        "Read": 181650296,
+        "Grep": 30927456,
+        "Edit": 61872856,
+        "Write": 23197544,
+        "Skill": 3861308,
+        "ToolSearch": 7722856,
+        "TaskCreate": 3868672,
+        "TaskUpdate": 7737968,
+        "Agent": 4656,
+        "AskUserQuestion": 624
       },
       "prompts": [
         "running into errors rn \n● Ran 1 stop hook (ctrl+o to expand)\n  ⎿  Stop hook error: Failed with non-blocking status code: node:internal/modules/cjs/loader:1459\n    throw err;\n    ^\n\n  Error: Cannot find module 'C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\MOBA\\MOBA\\backend\\.claude\\hooks\\on-stop.js'\n     "

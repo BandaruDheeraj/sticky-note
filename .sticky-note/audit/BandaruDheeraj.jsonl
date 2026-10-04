@@ -153,8 +153,111 @@
 {"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:02:43.432Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"templates\\hooks\\data-branch.js"}
 {"type":"stop","user":"BandaruDheeraj","ts":"2026-10-04T01:02:52.620Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","reason":"stop_checkpoint"}
 {"type":"inject_result","user":"BandaruDheeraj","ts":"2026-10-04T01:05:00.366Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","prompt":"he just updated and closed a session","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
-{"type":"error","user":"BandaruDheeraj","ts":"2026-10-04T01:43:18.484Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","error":"Exit code 1\nSaved working directory and index state WIP on main: c49f5a3 fix: clean data branch, add path validation, fix npm bloat\nFrom https://github.com/BandaruDheeraj/sticky-note\n   29e8880..08cc2","tool":"Bash"}
-{"type":"lazy_inject","user":"BandaruDheeraj","ts":"2026-10-04T01:43:28.674Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\sticky-note\\.gitignore","threads_injected":5,"thread_ids":["1efd5848","c171b8a2","323d0bbf","546e2ec5","9c5418b6"]}
-{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:43:33.933Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":".gitignore"}
-{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:43:45.934Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
-{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:44:00.732Z","tool":"Edit","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":".gitignore"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:05:17.891Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"stop","user":"BandaruDheeraj","ts":"2026-10-04T01:05:55.506Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","reason":"stop_checkpoint"}
+{"type":"inject_result","user":"BandaruDheeraj","ts":"2026-10-04T01:10:12.659Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","prompt":"ok he had an error he is handling it, can you explain to me why the data branch has a .sticky-note folder isn't that unn","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:10:29.606Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:10:43.423Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"templates\\hooks\\session-end.js"}
+{"type":"stop","user":"BandaruDheeraj","ts":"2026-10-04T01:10:56.941Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","reason":"stop_checkpoint"}
+{"type":"inject_result","user":"BandaruDheeraj","ts":"2026-10-04T01:12:09.443Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","prompt":"look through the entire repo and all the branches figure out anyhthing that should be removed and then also see if there","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:12:40.911Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:12:52.443Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:13:04.707Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:13:24.422Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:13:25.025Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:13:25.289Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":".gitignore"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:13:36.766Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:13:55.725Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:13:56.310Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:13:56.570Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"package.json"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:14:09.230Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:14:21.213Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"lazy_inject","user":"BandaruDheeraj","ts":"2026-10-04T01:14:29.323Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\sticky-note\\test-hooks.md","threads_injected":1,"thread_ids":["8ea86820"]}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:14:36.682Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"test-hooks.md"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:14:37.107Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"error","user":"BandaruDheeraj","ts":"2026-10-04T01:14:49.701Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","error":"File does not exist. Note: your current working directory is C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\sticky-note.","tool":"Read"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:14:53.456Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"templates\\hooks\\session-end.js"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:15:07.126Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:15:19.408Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"templates\\hooks\\data-branch.js"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:15:31.605Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"templates\\hooks\\data-branch.js"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:15:42.364Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:15:54.449Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:16:07.444Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:16:20.527Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:16:32.528Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:16:44.875Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:16:57.299Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"error","user":"BandaruDheeraj","ts":"2026-10-04T01:17:09.497Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","error":"EISDIR: illegal operation on a directory, read 'C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\sticky-note\\sticky-server'","tool":"Read"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:17:22.817Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:17:34.805Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:17:46.996Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:17:59.138Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:18:10.247Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:18:20.695Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:18:30.699Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":".env.sticky"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:18:42.300Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:18:55.888Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:19:06.501Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:19:18.494Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:19:30.566Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:19:42.600Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:19:53.041Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:20:13.153Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:20:27.422Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:20:38.546Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:20:48.807Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:21:03.762Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"templates\\hooks\\session-end.js"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:21:17.973Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:21:30.002Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:21:41.395Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:21:54.241Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:22:06.064Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:22:44.692Z","tool":"Agent","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"stop","user":"BandaruDheeraj","ts":"2026-10-04T01:22:56.333Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","reason":"stop_checkpoint"}
+{"type":"inject_result","user":"BandaruDheeraj","ts":"2026-10-04T01:26:16.058Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","prompt":"wait but why are the .sticky-note folder still around and why are threads getting pushed here?","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:26:40.527Z","tool":"Grep","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"bin\\cli.js"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:26:51.322Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"bin\\cli.js"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:27:02.454Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"bin\\cli.js"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:27:16.094Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"bin\\cli.js"}
+{"type":"stop","user":"BandaruDheeraj","ts":"2026-10-04T01:27:29.895Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","reason":"stop_checkpoint"}
+{"type":"inject_result","user":"BandaruDheeraj","ts":"2026-10-04T01:31:30.623Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","prompt":"but I don't get it when do threads get pushed to the branch and when do they go to the folder","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"stop","user":"BandaruDheeraj","ts":"2026-10-04T01:31:49.170Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","reason":"stop_checkpoint"}
+{"type":"inject_result","user":"BandaruDheeraj","ts":"2026-10-04T01:34:29.127Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","prompt":"ok great clean it up then and also handle the other finidings you had","result":"no_scored_threads","threads_scored":0,"threads_injected":0}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:34:47.863Z","tool":"ToolSearch","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:35:00.338Z","tool":"TaskCreate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:35:12.583Z","tool":"TaskCreate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:35:24.105Z","tool":"TaskCreate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:35:36.234Z","tool":"TaskCreate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:35:48.939Z","tool":"TaskCreate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:36:00.026Z","tool":"TaskCreate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:36:11.528Z","tool":"TaskCreate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:36:23.195Z","tool":"TaskUpdate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:36:33.124Z","tool":"TaskUpdate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:36:43.456Z","tool":"TaskUpdate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:36:54.162Z","tool":"TaskUpdate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:37:04.178Z","tool":"TaskUpdate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:37:14.512Z","tool":"TaskUpdate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:37:26.615Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:37:48.007Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:38:00.302Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:38:15.419Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:38:39.828Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:38:53.214Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"templates\\hooks\\data-branch.js"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:39:05.948Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"bin\\cli.js"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:39:21.596Z","tool":"Read","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":".gitignore"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:39:44.681Z","tool":"Edit","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"templates\\hooks\\data-branch.js","lines_changed":["246-253","255-255","263-263"],"checkpoint_topic":"ok great clean it up then and also handle the other finidings you had"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:40:00.395Z","tool":"Edit","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":"bin\\cli.js","lines_changed":["5028-5033","5040-5040"],"checkpoint_topic":"ok great clean it up then and also handle the other finidings you had"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:40:15.832Z","tool":"Write","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":".npmignore","checkpoint_topic":"ok great clean it up then and also handle the other finidings you had"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:40:32.714Z","tool":"Edit","session_id":"33259cab-34ea-4355-a273-58f218349a22","file":".gitignore","lines_changed":["50-58"],"checkpoint_topic":"ok great clean it up then and also handle the other finidings you had"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:40:46.548Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"error","user":"BandaruDheeraj","ts":"2026-10-04T01:40:59.396Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","error":"Exit code 1\nrm '.sticky-note/.overlap-warned'\nrm '.sticky-note/.sticky-checkpoint'\nrm '.sticky-note/.sticky-injected'\nrm 'test-hooks.md'\nwarning: not deleting branch 'feature/v3' that is not yet merge","tool":"Bash"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:41:12.984Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:41:24.043Z","tool":"TaskUpdate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:41:34.323Z","tool":"TaskUpdate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:41:45.441Z","tool":"TaskUpdate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:41:56.056Z","tool":"TaskUpdate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:42:06.230Z","tool":"TaskUpdate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:42:17.118Z","tool":"TaskUpdate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:42:28.846Z","tool":"TaskUpdate","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"tool_use","user":"BandaruDheeraj","ts":"2026-10-04T01:42:47.869Z","tool":"Bash","session_id":"33259cab-34ea-4355-a273-58f218349a22"}
+{"type":"error","user":"BandaruDheeraj","ts":"2026-10-04T01:43:02.580Z","session_id":"33259cab-34ea-4355-a273-58f218349a22","error":"Exit code 1\ngit: 'credential-osxkeychain' is not a git command. See 'git --help'.\nTo https://github.com/BandaruDheeraj/sticky-note.git\n ! [rejected]        main -> main (fetch first)\nerror: failed to ","tool":"Bash"}
