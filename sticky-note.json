@@ -5,23 +5,13 @@
   "threads": [
     {
       "id": "6869e313-b4fa-4f20-b894-c72da6265c8e",
+      "status": "expired",
       "user": "dbandaru",
-      "project": "",
-      "status": "closed",
-      "branch": "master",
-      "created_at": "2026-04-10T23:14:20.995Z",
       "closed_at": "2026-04-13T21:25:13.814Z",
-      "last_activity_at": "2026-04-10T23:14:20.997Z",
       "files_touched": [],
-      "last_note": "",
-      "narrative": "",
       "failed_approaches": [],
-      "handoff_summary": "",
       "related_session_ids": [],
       "resume_chain": [],
-      "tool": "copilot-cli",
-      "session_id": "25f34572-e3a0-4983-b475-a49e9ea3ba5b",
-      "work_type": "",
       "activities": [],
       "tool_calls": {},
       "prompts": [],
@@ -113,27 +103,17 @@
     },
     {
       "id": "demo-alice-docs-update",
+      "status": "expired",
       "user": "alice",
-      "project": "",
-      "status": "closed",
-      "branch": "feature/docs-refresh",
-      "created_at": "2026-04-10T14:00:00.000Z",
       "closed_at": "2026-04-14T00:36:05.724Z",
-      "last_activity_at": "2026-04-10T22:15:00.000Z",
       "files_touched": [
         "README.md",
         "CONTRIBUTING.md",
         "docs/branch-switching.md"
       ],
-      "last_note": "Updating docs to reflect v2.5 merge driver and bootstrap changes. README done, CONTRIBUTING in progress.",
-      "narrative": "Refreshing all documentation to cover the new merge driver, bootstrap secret handling, and rollback detection features. README has been updated with the new setup flow. CONTRIBUTING.md needs the section on how the merge driver works for contributors. Also updating branch-switching docs.",
       "failed_approaches": [],
-      "handoff_summary": "README.md is updated. CONTRIBUTING.md still needs a 'How the merge driver works' section. docs/branch-switching.md needs review — may be outdated after the v2 branch was deleted.",
       "related_session_ids": [],
       "resume_chain": [],
-      "tool": "copilot-cli",
-      "session_id": "demo-session-alice-docs",
-      "work_type": "documentation",
       "activities": [
         "edited 2 file(s)",
         "touched 3 file(s)",
@@ -697,18 +677,18 @@
       "work_type": "feature-development",
       "activities": [],
       "tool_calls": {
-        "Bash": 107518618,
-        "Glob": 5812758,
-        "Read": 45532744,
-        "Grep": 7752324,
-        "Edit": 15509144,
-        "Write": 5814736,
-        "Skill": 967882,
-        "ToolSearch": 1935824,
-        "TaskCreate": 969728,
-        "TaskUpdate": 1939612,
-        "Agent": 1164,
-        "AskUserQuestion": 156
+        "Bash": 446764420,
+        "Glob": 24153330,
+        "Read": 189199030,
+        "Grep": 32212690,
+        "Edit": 64444070,
+        "Write": 24161550,
+        "Skill": 4021770,
+        "ToolSearch": 8043790,
+        "TaskCreate": 4029440,
+        "TaskUpdate": 8059530,
+        "Agent": 4850,
+        "AskUserQuestion": 650
       },
       "prompts": [
         "running into errors rn \n● Ran 1 stop hook (ctrl+o to expand)\n  ⎿  Stop hook error: Failed with non-blocking status code: node:internal/modules/cjs/loader:1459\n    throw err;\n    ^\n\n  Error: Cannot find module 'C:\\Users\\dheer\\OneDrive\\Desktop\\Projects\\MOBA\\MOBA\\backend\\.claude\\hooks\\on-stop.js'\n     "
@@ -1495,6 +1475,129 @@
         "Keshav Ailaney"
       ],
       "resume_history": []
+    },
+    {
+      "id": "20c1de3b-09ba-45c7-b2ed-8a90ceb50feb",
+      "user": "Keshav Ailaney",
+      "project": "",
+      "status": "open",
+      "branch": "main",
+      "created_at": "2026-10-04T01:08:45.990Z",
+      "closed_at": null,
+      "last_activity_at": "2026-10-04T01:08:45.990Z",
+      "files_touched": [],
+      "last_note": "",
+      "narrative": "",
+      "failed_approaches": [],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "unknown",
+      "session_id": "9bda8f73-2d61-44af-a86b-a24f3b61b1d8",
+      "work_type": "",
+      "activities": [],
+      "tool_calls": {},
+      "prompts": [],
+      "contributors": [
+        "Keshav Ailaney"
+      ],
+      "resume_history": []
+    },
+    {
+      "id": "6687439b-95b9-4a6a-a402-a2b42f575d10",
+      "user": "BandaruDheeraj",
+      "project": "",
+      "status": "closed",
+      "branch": "main",
+      "created_at": "2026-10-04T01:52:15.377Z",
+      "closed_at": "2026-10-04T01:52:15.377Z",
+      "last_activity_at": "2026-10-04T01:52:15.377Z",
+      "files_touched": [
+        "bin\\cli.js",
+        "templates\\hooks\\data-branch.js",
+        ".npmignore",
+        ".gitignore",
+        "package.json",
+        "templates\\hooks\\session-start.js",
+        ".claude\\hooks\\session-start.js",
+        "templates\\hooks\\session-end.js",
+        "test-hooks.md",
+        ".env.sticky",
+        ".claude/hooks/session-end.js",
+        ".claude/hooks/session-start.js",
+        ".gitattributes",
+        ".sticky-note/.overlap-warned",
+        ".sticky-note/.sticky-checkpoint",
+        "bin/cli.js",
+        "package-lock.json",
+        "sticky-server/wrangler.toml",
+        "templates/hooks/data-branch.js",
+        "templates/hooks/session-end.js",
+        "templates/hooks/session-start.js"
+      ],
+      "last_note": "[debugging] Published **3.1.46** — clean 153KB package. Here's a summary of everything done:\n\n**Data branch** — stripped 22 non-data files (`.claude/`, `.github/`, `CLAUDE.md`, `.sticky-note/`, etc.).",
+      "narrative": "Published **3.1.46** — clean 153KB package. Here's a summary of everything done:\n\n**Data branch** — stripped 22 non-data files (`.claude/`, `.github/`, `CLAUDE.md`, `.sticky-note/`, etc.). Now only contains `sticky-note.json`, `audit/`, `presence/`.\n\n**Code fixes** — path validation in both the push",
+      "failed_approaches": [
+        {
+          "description": "The most likely cause is **authentication**. The session-end hook runs as a background process with no TTY, so git's credential helper (keychain, cred",
+          "error": "sue, have him check his `.sticky-note/` error log:\n\n```bash\ncat .sticky-note/.sticky-errors.jsonl | ",
+          "files_tried": [
+            ".env.sticky",
+            ".sticky-note/.sticky-errors.jsonl",
+            ".env.sticky",
+            "github.com"
+          ]
+        },
+        {
+          "description": "From the `sticky-note.json` I already read, Keshav has one thread:\n\n```\n[CLOSED] closed · Keshav Ailaney · ❓ unknown · main\n  ID: 8ea86820-a484-47ff-b",
+          "error": "lasted about a minute. No narrative or failed approaches — looks like a quick test session. The tool",
+          "files_tried": [
+            "sticky-note.json",
+            ".claude/hooks/session-end.js",
+            ".claude/hooks/session-start.js",
+            "test-hooks.md"
+          ]
+        },
+        {
+          "description": "Both have it. So the real question is **why didn't it pull Keshav's thread automatically at session start?** Most likely the fetch failed silently due",
+          "error": "session start?** Most likely the fetch failed silently due to auth — same `STICKY_PUSH_TOKEN` issue.",
+          "files_tried": []
+        }
+      ],
+      "handoff_summary": "",
+      "related_session_ids": [],
+      "resume_chain": [],
+      "tool": "claude-code",
+      "session_id": "33259cab-34ea-4355-a273-58f218349a22",
+      "work_type": "debugging",
+      "activities": [
+        "error: error: failed to push some refs to 'https://github.com/BandaruDheeraj/sticky-note.git'",
+        "error: error: Your local changes to the following files would be overwritten by merge:",
+        "error: error: cannot pull with rebase: You have unstaged changes.",
+        "ran tests",
+        "inspected logs/output",
+        "reviewed git history",
+        "switched branches",
+        "edited 8 file(s)"
+      ],
+      "tool_calls": {
+        "Read": 25,
+        "Bash": 38,
+        "Grep": 7,
+        "Edit": 7,
+        "Glob": 1,
+        "Agent": 1,
+        "ToolSearch": 1,
+        "TaskCreate": 7,
+        "TaskUpdate": 14,
+        "Write": 1
+      },
+      "prompts": [],
+      "contributors": [
+        "BandaruDheeraj"
+      ],
+      "resume_history": [],
+      "transcript_captured": true
     }
   ]
 }
