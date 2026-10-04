@@ -865,12 +865,22 @@ async function cmdInit() {
       print("  [WARN] Cloud setup failed: " + cloudResult.error + "\n");
     }
   } else if (process.env.STICKY_URL) {
-    // Write existing STICKY_URL from environment into .env.sticky
+    // Write existing STICKY_URL from environment into .env.sticky.
+    // Preserve any existing values (e.g. STICKY_PUSH_TOKEN written earlier in this
+    // same init run by the teammate flow) rather than overwriting the whole file.
     const envStickyPath = path.join(process.cwd(), ".env.sticky");
     const stickyUrl = process.env.STICKY_URL;
     const stickyApiKey = process.env.STICKY_API_KEY || "";
-    let content = `STICKY_URL=${stickyUrl}\n`;
-    if (stickyApiKey) content += `STICKY_API_KEY=${stickyApiKey}\n`;
+    let existing = "";
+    try { existing = fs.readFileSync(envStickyPath, "utf-8"); } catch (_) {}
+    const setKey = (src, key, val) => {
+      if (!val) return src;
+      const re = new RegExp(`^${key}=.*$`, "m");
+      return re.test(src) ? src.replace(re, `${key}=${val}`) : src + (src.endsWith("\n") || !src ? "" : "\n") + `${key}=${val}\n`;
+    };
+    let content = setKey(existing, "STICKY_URL", stickyUrl);
+    if (stickyApiKey) content = setKey(content, "STICKY_API_KEY", stickyApiKey);
+    if (!content.endsWith("\n") && content.length > 0) content += "\n";
     fs.writeFileSync(envStickyPath, content, "utf-8");
     print("  [OK] .env.sticky (cloud backend configured)");
   }
