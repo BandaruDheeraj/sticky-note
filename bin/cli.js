@@ -744,6 +744,29 @@ async function cmdInit() {
         v3Mode ? "y" : "N"
       );
       wantsCloud = cloudAnswer.toLowerCase() === "y" || cloudAnswer.toLowerCase() === "yes";
+
+      // Always ask for STICKY_PUSH_TOKEN — needed for data branch push from hook
+      // processes regardless of whether cloud backend is configured.
+      print("\n  A GitHub Personal Access Token (PAT) is needed so sticky-note can push");
+      print("  thread data in the background without requiring interactive credential access.");
+      print("  Create one at https://github.com/settings/tokens with 'repo' scope (or");
+      print("  'contents: write' for fine-grained tokens).");
+      const pushTokenAnswer = await ask(rl, "Enter your STICKY_PUSH_TOKEN (GitHub PAT, leave blank to skip)", "");
+      if (pushTokenAnswer.trim()) {
+        const envStickyPath = path.join(process.cwd(), ".env.sticky");
+        let envContent = "";
+        try { envContent = fs.readFileSync(envStickyPath, "utf-8"); } catch (_) {}
+        if (!envContent.endsWith("\n") && envContent.length > 0) envContent += "\n";
+        if (!/^STICKY_PUSH_TOKEN=/m.test(envContent)) {
+          envContent += `STICKY_PUSH_TOKEN=${pushTokenAnswer.trim()}\n`;
+        } else {
+          envContent = envContent.replace(/^STICKY_PUSH_TOKEN=.+$/m, `STICKY_PUSH_TOKEN=${pushTokenAnswer.trim()}`);
+        }
+        fs.writeFileSync(envStickyPath, envContent, "utf-8");
+        print("  [OK] STICKY_PUSH_TOKEN written to .env.sticky");
+      } else {
+        print("  ⏭️  No PAT entered — data branch push will rely on system credential helper");
+      }
     }
 
     rl.close();
@@ -877,6 +900,19 @@ async function cmdInit() {
           print(`    wrangler secret put GITHUB_REPO  # value: ${repo.trim()}`);
         }
       }
+      // Also write STICKY_PUSH_TOKEN to .env.sticky so session-end hook can
+      // push the data branch from background processes without a credential helper.
+      try {
+        const envStickyPath = path.join(process.cwd(), ".env.sticky");
+        let envContent = "";
+        try { envContent = fs.readFileSync(envStickyPath, "utf-8"); } catch (_) {}
+        if (!envContent.endsWith("\n") && envContent.length > 0) envContent += "\n";
+        if (!/^STICKY_PUSH_TOKEN=/m.test(envContent)) {
+          envContent += `STICKY_PUSH_TOKEN=${pat.trim()}\n`;
+          fs.writeFileSync(envStickyPath, envContent, "utf-8");
+          print("  ✓ STICKY_PUSH_TOKEN written to .env.sticky (data branch push)");
+        }
+      } catch (_) {}
     }
     rl2.close();
 
