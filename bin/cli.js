@@ -4021,7 +4021,7 @@ function cmdSync() {
 
   try {
     const status = execSync(
-      'git status --porcelain -- ".sticky-note/sticky-note.json" ".sticky-note/audit/" ".sticky-note/presence/"',
+      'git status --porcelain -- ".sticky-note/sticky-note.json" ".sticky-note/audit/" ".sticky-note/presence/" ".sticky-note/environment/"',
       { encoding: "utf-8", cwd: process.cwd() }
     ).trim();
     if (!status) {
@@ -4037,7 +4037,7 @@ function cmdSync() {
     try {
       execFileSync("git", [
         "add", "--", ".sticky-note/sticky-note.json",
-        ".sticky-note/audit/", ".sticky-note/presence/"
+        ".sticky-note/audit/", ".sticky-note/presence/", ".sticky-note/environment/"
       ], { cwd: process.cwd(), timeout: 10000, stdio: ["pipe", "pipe", "pipe"] });
 
       execFileSync("git", [
@@ -4072,7 +4072,7 @@ function cmdPull() {
   if (fs.existsSync(stickyDir)) {
     try {
       const status = execSync(
-        'git status --porcelain -- ".sticky-note/sticky-note.json" ".sticky-note/audit/" ".sticky-note/presence/"',
+        'git status --porcelain -- ".sticky-note/sticky-note.json" ".sticky-note/audit/" ".sticky-note/presence/" ".sticky-note/environment/"',
         { encoding: "utf-8", cwd: process.cwd() }
       ).trim();
       if (status) {
@@ -4081,7 +4081,7 @@ function cmdPull() {
         try {
           execFileSync("git", [
             "add", "--", ".sticky-note/sticky-note.json",
-            ".sticky-note/audit/", ".sticky-note/presence/"
+            ".sticky-note/audit/", ".sticky-note/presence/", ".sticky-note/environment/"
           ], { cwd: process.cwd(), timeout: 10000, stdio: ["pipe", "pipe", "pipe"] });
           execFileSync("git", [
             "commit", "--no-verify", "-m", "chore(sticky-note): sync thread data"
@@ -4905,40 +4905,27 @@ async function _cmdMigrateDataBranch() {
     print("  [WARN] Could not commit to data branch: " + err.message);
   }
 
-  // Step 3: Add data files to .gitignore — but NOT sticky-note-config.json.
-  // sticky-note-config.json must stay committed so teammates get sticky_url
-  // on git pull (which triggers the API key prompt in `npx sticky-note init`).
+  // Step 3: Add blanket .sticky-note/ to .gitignore (covers data files and config).
+  // This ensures all transient files are ignored, but relies on git to track
+  // .sticky-note-config.json via explicit git add in sync/post-commit hooks.
   print("");
   const gitignorePath = path.join(cwd, ".gitignore");
   const MARKER = "# sticky-note: data branch migration";
-  // Ignore only the data files, not the whole directory.
-  const IGNORE_LINES = [
-    ".sticky-note/sticky-note.json",
-    ".sticky-note/audit/",
-    ".sticky-note/presence/",
-  ];
+  const BLANKET_IGNORE = ".sticky-note/";
   let gitignoreUpdated = false;
   if (fs.existsSync(gitignorePath)) {
     const existing = fs.readFileSync(gitignorePath, "utf-8");
     const gitignoreLines = existing.split(/\r?\n/).map(l => l.trim());
-    // Also clean up the old broad ignore if present from a previous migration run
-    const hasBroad = gitignoreLines.includes(".sticky-note/");
-    const missingLines = IGNORE_LINES.filter(l => !gitignoreLines.includes(l));
-    if (hasBroad) {
-      // Replace the broad ignore with specific lines
-      const replaced = existing.replace(/\.sticky-note\/\n?/, IGNORE_LINES.join("\n") + "\n");
-      fs.writeFileSync(gitignorePath, replaced, "utf-8");
-      gitignoreUpdated = true;
-    } else if (missingLines.length > 0) {
-      fs.appendFileSync(gitignorePath, "\n" + MARKER + "\n" + missingLines.join("\n") + "\n");
+    if (!gitignoreLines.includes(BLANKET_IGNORE)) {
+      fs.appendFileSync(gitignorePath, "\n" + MARKER + "\n" + BLANKET_IGNORE + "\n");
       gitignoreUpdated = true;
     }
   } else {
-    fs.writeFileSync(gitignorePath, MARKER + "\n" + IGNORE_LINES.join("\n") + "\n");
+    fs.writeFileSync(gitignorePath, MARKER + "\n" + BLANKET_IGNORE + "\n");
     gitignoreUpdated = true;
   }
   if (gitignoreUpdated) {
-    print("  [OK] .gitignore: ignoring data files only (sticky-note-config.json stays committed)");
+    print("  [OK] .gitignore: added .sticky-note/");
   } else {
     print("  [OK] .gitignore already up to date");
   }

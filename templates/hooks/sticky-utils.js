@@ -82,6 +82,18 @@ let _cachedStickyDir = null;
 function _stickyDir() {
   if (_cachedStickyDir) return _cachedStickyDir;
   try {
+    const gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    const dataBranchDir = path.join(gitDir, "sticky-note");
+    if (fs.existsSync(path.join(dataBranchDir, "sticky-note.json"))) {
+      _cachedStickyDir = dataBranchDir;
+      return _cachedStickyDir;
+    }
+  } catch (_) {
+    // Fall through to check .sticky-note/
+  }
+  try {
     const root = execFileSync("git", ["rev-parse", "--show-toplevel"], {
       encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
     }).trim();

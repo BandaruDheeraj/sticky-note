@@ -33,18 +33,28 @@ function setup() {
 // Manually set up the same files that `init` would create, bypassing interactive prompts
 function setupStickyNote() {
   const stickyDir = path.join(tmpDir, ".sticky-note");
+  const gitStickyDir = path.join(tmpDir, ".git", "sticky-note");
   const claudeHooksDir = path.join(tmpDir, ".claude", "hooks");
   const githubHooksDir = path.join(tmpDir, ".github", "hooks");
 
+  // Create both .sticky-note/ (working tree) and .git/sticky-note/ (post-migration)
   fs.mkdirSync(stickyDir, { recursive: true });
   fs.mkdirSync(path.join(stickyDir, "audit"), { recursive: true });
   fs.mkdirSync(path.join(stickyDir, "presence"), { recursive: true });
+  fs.mkdirSync(gitStickyDir, { recursive: true });
+  fs.mkdirSync(path.join(gitStickyDir, "audit"), { recursive: true });
+  fs.mkdirSync(path.join(gitStickyDir, "presence"), { recursive: true });
   fs.mkdirSync(claudeHooksDir, { recursive: true });
   fs.mkdirSync(githubHooksDir, { recursive: true });
 
+  const memoryData = JSON.stringify({ version: "2", project: "", threads: [] }, null, 2) + "\n";
   fs.writeFileSync(
     path.join(stickyDir, "sticky-note.json"),
-    JSON.stringify({ version: "2", project: "", threads: [] }, null, 2) + "\n"
+    memoryData
+  );
+  fs.writeFileSync(
+    path.join(gitStickyDir, "sticky-note.json"),
+    memoryData
   );
   fs.writeFileSync(
     path.join(stickyDir, "sticky-note-config.json"),
@@ -439,8 +449,8 @@ try {
     const memPath = utils.getMemoryPath();
     const expected = path.join(tmpDir, ".git", "sticky-note", "sticky-note.json");
     assert.strictEqual(
-      path.normalize(memPath),
-      path.normalize(expected),
+      fs.realpathSync(memPath),
+      fs.realpathSync(expected),
       `Expected ${expected}, got ${memPath}`
     );
   });
