@@ -1,3 +1,12 @@
 
+# Normalize line endings
+* text=auto
+*.json text eol=lf
+*.jsonl text eol=lf
+*.js text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=crlf
+
 # Sticky Note - JSON-aware thread merge
 .sticky-note/sticky-note.json merge=sticky-note
+.sticky-note/sticky-note-config.json merge=sticky-note

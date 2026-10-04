@@ -1,24 +1,49 @@
 {
   "stale_days": 14,
-  "copilot_cli_auto_close_hours": 24,
   "inject_token_budget": 1000,
-  "auto_sync": true,
-  "auto_push": true,
-  "capture_transcripts": true,
-  "redact_transcripts": true,
   "mcp_servers": [
     {
       "name": "sticky-note",
       "type": "stdio",
-      "source": "~/.copilot/mcp-config.json",
+      "source": ".mcp.json",
       "command": "node",
       "args": [
         ".claude/sticky-note-mcp.js"
       ]
+    },
+    {
+      "name": "context7",
+      "type": "stdio",
+      "source": ".mcp.json",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ]
+    },
+    {
+      "name": "github",
+      "type": "stdio",
+      "source": ".mcp.json",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    {
+      "name": "claude_ai_Exa",
+      "type": "unknown",
+      "source": ".mcp.json"
     }
   ],
   "skills": [],
   "conventions": [],
-  "hook_version": "3.1.38",
-  "min_version": "3.1.38"
+  "hook_version": "3.1.43",
+  "min_version": "3.1.38",
+  "sticky_url": "https://sticky-note-server.sticky-server.workers.dev",
+  "environment_version": "1"
 }

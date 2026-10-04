@@ -193,7 +193,11 @@ async function main() {
     const toolInput = hookInput.tool_input || hookInput.input || hookInput.toolArgs || {};
     const cmd = typeof toolInput === "string" ? toolInput : (toolInput.command || "");
     if (/\bgit\s+(pull|merge|rebase|fetch)\b/.test(cmd)) {
-      try { syncStickyNote({}); } catch (_) {}
+      try {
+        syncStickyNote({});
+      } catch (err) {
+        _emit(`[STICKY-NOTE] ⚠️ Auto-sync before git operation failed: ${err && err.message ? err.message : err}\nSticky-note files may be dirty — run \`npx sticky-note pull\` manually to avoid conflicts.`);
+      }
     }
   }
 

@@ -450,6 +450,20 @@ function clearResumeSignal() {
 function loadJson(filePath, defaultVal) {
   try {
     const raw = fs.readFileSync(filePath, "utf-8");
+    // Detect unresolved git merge conflict markers — JSON.parse would silently
+    // swallow the SyntaxError and return the default, hiding the real problem.
+    // This breaks useCloud(), thread loading, and config reading with no trace.
+    if (raw.includes("<<<<<<<") || raw.includes(">>>>>>>")) {
+      logHookError(
+        "loadJson",
+        new Error(
+          `Unresolved git merge conflict in ${filePath}. ` +
+          `Resolve the conflict and commit, or restore the file with ` +
+          `\`git checkout HEAD -- ${path.relative(process.cwd(), filePath) || filePath}\``
+        )
+      );
+      return defaultVal !== undefined ? defaultVal : {};
+    }
     return JSON.parse(raw);
   } catch (_) {
     return defaultVal !== undefined ? defaultVal : {};
@@ -641,6 +655,14 @@ function appendAuditLineBoth(entry, cloud) {
 // ── Environment helpers ───────────────────────────────────
 
 function getUser() {
+  // Prefer git config user.name — consistent across machines regardless of OS login name.
+  // Fall back to OS env vars, then "unknown".
+  try {
+    const name = execFileSync("git", ["config", "user.name"], {
+      encoding: "utf-8", timeout: 3000, stdio: ["pipe", "pipe", "pipe"],
+    }).trim();
+    if (name) return name;
+  } catch (_) {}
   return process.env.USER || process.env.USERNAME || "unknown";
 }
 
@@ -1272,6 +1294,7 @@ function getCloudConfig() {
   return {
     url: process.env.STICKY_URL || envFile.STICKY_URL || "",
     apiKey: process.env.STICKY_API_KEY || envFile.STICKY_API_KEY || "",
+    pushToken: process.env.STICKY_PUSH_TOKEN || envFile.STICKY_PUSH_TOKEN || "",
   };
 }
 
