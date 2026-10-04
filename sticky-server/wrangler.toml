@@ -12,7 +12,7 @@ ENVIRONMENT = "production"
 
 [[kv_namespaces]]
 binding = "STICKY_KV"
-id = "PLACEHOLDER_KV_NAMESPACE_ID"
+id = "b406d9cfd5d943d2bac59487a510c1b7"
 
 [durable_objects]
 bindings = [
