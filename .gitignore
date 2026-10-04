@@ -45,5 +45,3 @@ __pycache__/
 
 # sticky-note: data branch migration
 .sticky-note/sticky-note.json
-.sticky-note/audit/
-.sticky-note/presence/
