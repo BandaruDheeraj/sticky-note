@@ -85,6 +85,7 @@ const {
   cloudWriteThread,
   cloudDeletePresence,
   syncStickyNote,
+  logHookError,
 } = utils;
 
 // ── AI event writer ───────────────────────────────────────
@@ -1021,6 +1022,7 @@ async function syncThreadsToCloudflareKV() {
     if (threads.length === 0) return null;
 
     // Await all pushes so the process doesn't exit before they complete
+    let authFailed = false;
     await Promise.all(
       threads.map((thread) =>
         fetch(`${stickyUrl}/threads/${thread.id}`, {
@@ -1028,10 +1030,15 @@ async function syncThreadsToCloudflareKV() {
           headers,
           body: JSON.stringify(thread),
           signal: AbortSignal.timeout(10000),
+        }).then((resp) => {
+          if (resp.status === 401 || resp.status === 403) authFailed = true;
         }).catch(() => {})
       )
     );
 
+    if (authFailed) {
+      return `[STICKY-NOTE] ⚠️ Cloudflare thread sync failed — auth error (check STICKY_API_KEY in .env.sticky)`;
+    }
     return `[STICKY-NOTE] ⓘ synced ${threads.length} thread(s) to Cloudflare`;
   } catch (err) {
     // Non-fatal — KV sync failure shouldn't block session-end

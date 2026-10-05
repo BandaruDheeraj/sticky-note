@@ -38,11 +38,15 @@
       "name": "claude_ai_Exa",
       "type": "unknown",
       "source": ".mcp.json"
+    },
+    {
+      "name": "plugin_cloudflare_cloudflare-api",
+      "source": "auto-detected"
     }
   ],
   "skills": [],
   "conventions": [],
-  "hook_version": "3.1.43",
+  "hook_version": "3.1.48",
   "min_version": "3.1.38",
   "sticky_url": "https://sticky-note-server.sticky-server.workers.dev",
   "environment_version": "1"
