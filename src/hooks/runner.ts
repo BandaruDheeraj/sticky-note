@@ -23,6 +23,8 @@ export async function runHook(adapter: AgentAdapter, rawInput: string): Promise<
     if (!(await services.config()).exists) return ''; // repo hasn't opted in via `init`
 
     const log = await services.log();
+    // A "start" with no matching "ok"/"FAILED" means the agent killed the hook (e.g. timeout).
+    await log.write(`${adapter.name} ${event.kind} session=${event.sessionId} start`);
     const [store, sessions, identity, repoRoot] = await Promise.all([
       services.store(),
       services.sessions(),

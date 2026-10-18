@@ -13,8 +13,16 @@ export const SessionState = z.object({
   agent: z.string(),
   startedAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
-  /** Created lazily on the first prompt, so empty sessions leave no thread. */
+  /** Set once the session's thread has been committed to the store. */
   threadId: z.string().nullable().default(null),
+  /**
+   * Thread planned on the first prompt but not yet committed. Committing is
+   * deferred to the end of the turn to keep git off the prompt's critical path.
+   */
+  pendingThread: z
+    .object({ title: z.string(), branch: z.string().nullable(), createdAt: z.string().datetime() })
+    .nullable()
+    .default(null),
   /** Files edited since the last flush to the thread. */
   pendingFiles: z.array(z.string()).default([]),
 });

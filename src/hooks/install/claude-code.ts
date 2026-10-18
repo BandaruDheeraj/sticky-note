@@ -30,8 +30,9 @@ const MATCHERS: Partial<Record<(typeof CLAUDE_CODE_EVENTS)[number], string>> = {
   PostToolUse: EDIT_TOOL_NAMES.join('|'),
 };
 
-// SessionEnd syncs with the remote, so it gets longer.
-const TIMEOUTS: Partial<Record<(typeof CLAUDE_CODE_EVENTS)[number], number>> = { SessionEnd: 30 };
+// Generous because a killed hook is worse than a slow one; SessionEnd also syncs with the remote.
+const DEFAULT_TIMEOUT = 30;
+const TIMEOUTS: Partial<Record<(typeof CLAUDE_CODE_EVENTS)[number], number>> = { SessionEnd: 60 };
 
 /**
  * Merge sticky-note hooks into .claude/settings.json, preserving everything
@@ -58,7 +59,7 @@ export async function installClaudeCodeHooks(repoRoot: string, hookCommand = DEF
       .filter((group) => group.hooks.length > 0);
     const ours: HookGroup = {
       ...(MATCHERS[event] && { matcher: MATCHERS[event] }),
-      hooks: [{ type: 'command', command: `${hookCommand} run-hook claude-code`, timeout: TIMEOUTS[event] ?? 10 }],
+      hooks: [{ type: 'command', command: `${hookCommand} run-hook claude-code`, timeout: TIMEOUTS[event] ?? DEFAULT_TIMEOUT }],
     };
     hooks[event] = [...kept, ours];
   }

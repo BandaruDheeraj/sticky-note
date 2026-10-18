@@ -15,11 +15,12 @@ export interface HookDeps {
 }
 
 /**
- * What each event does:
- *  - session-start: remember the session (no thread yet)
- *  - prompt:        first prompt creates the session's thread, titled from the prompt
- *  - tool-used:     note edited files locally (cheap, no git)
- *  - turn-end:      flush noted files to the thread (one commit per turn)
+ * What each event does. Only turn-end and session-end touch git; the others
+ * just update the local session file, so they stay fast even on a slow disk.
+ *  - session-start: remember the session
+ *  - prompt:        first prompt plans the session's thread, titled from the prompt
+ *  - tool-used:     note edited files
+ *  - turn-end:      commit the planned thread and noted files (one commit per turn)
  *  - session-end:   flush, mark the session ended, forget it, and sync
  */
 export async function handleHookEvent(event: HookEvent, deps: HookDeps): Promise<HookResult> {
@@ -31,16 +32,13 @@ export async function handleHookEvent(event: HookEvent, deps: HookDeps): Promise
     case 'prompt':
       await deps.sessions.update(event.sessionId, async (cur) => {
         const state = cur ?? freshSession(event, deps);
-        if (state.threadId) return { next: state, result: undefined };
-        const thread = createThread({
+        if (state.threadId || state.pendingThread) return { next: state, result: undefined };
+        const pendingThread = {
           title: titleFromText(event.prompt),
-          author: deps.identity,
           branch: await deps.currentBranch(),
-          session: { id: event.sessionId, agent: event.agent, startedAt: state.startedAt },
-          now: deps.now(),
-        });
-        await deps.store.save(thread, `thread ${thread.id}: started in ${event.agent}`);
-        return { next: { ...state, threadId: thread.id, updatedAt: deps.now().toISOString() }, result: undefined };
+          createdAt: deps.now().toISOString(),
+        };
+        return { next: { ...state, pendingThread, updatedAt: deps.now().toISOString() }, result: undefined };
       });
       return {};
 
@@ -77,18 +75,41 @@ export async function handleHookEvent(event: HookEvent, deps: HookDeps): Promise
   }
 }
 
-/** Write pending files to the session's thread; returns the updated session state. */
+/** Commit the session's planned thread and pending files; returns the updated session state. */
 async function flush(state: SessionState, deps: HookDeps): Promise<SessionState> {
+  const now = deps.now();
+
+  if (!state.threadId && state.pendingThread) {
+    const thread = createThread({
+      title: state.pendingThread.title,
+      author: deps.identity,
+      branch: state.pendingThread.branch,
+      files: state.pendingFiles,
+      session: { id: state.sessionId, agent: state.agent, startedAt: state.startedAt },
+      now: new Date(state.pendingThread.createdAt),
+    });
+    await deps.store.save(thread, `thread ${thread.id}: started in ${state.agent}`);
+    return { ...state, threadId: thread.id, pendingThread: null, pendingFiles: [], updatedAt: now.toISOString() };
+  }
+
   if (!state.threadId || state.pendingFiles.length === 0) return state;
   const thread = await deps.store.get(state.threadId);
   if (thread) {
-    const updated = recordActivity(thread, { files: state.pendingFiles, person: deps.identity, now: deps.now() });
+    const updated = recordActivity(thread, { files: state.pendingFiles, person: deps.identity, now });
     if (updated !== thread) await deps.store.save(updated, `thread ${thread.id}: ${state.pendingFiles.length} file(s) touched`);
   }
-  return { ...state, pendingFiles: [], updatedAt: deps.now().toISOString() };
+  return { ...state, pendingFiles: [], updatedAt: now.toISOString() };
 }
 
 function freshSession(event: HookEvent, deps: HookDeps): SessionState {
   const iso = deps.now().toISOString();
-  return { sessionId: event.sessionId, agent: event.agent, startedAt: iso, updatedAt: iso, threadId: null, pendingFiles: [] };
+  return {
+    sessionId: event.sessionId,
+    agent: event.agent,
+    startedAt: iso,
+    updatedAt: iso,
+    threadId: null,
+    pendingThread: null,
+    pendingFiles: [],
+  };
 }

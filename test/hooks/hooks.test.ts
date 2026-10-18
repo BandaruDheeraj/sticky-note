@@ -67,15 +67,15 @@ describe('installClaudeCodeHooks', () => {
     expect(settings.permissions).toEqual({ allow: ['Bash(ls)'] });
     expect(settings.hooks.Stop).toEqual([
       { hooks: [{ type: 'command', command: 'say done' }] },
-      { hooks: [{ type: 'command', command: 'sn run-hook claude-code', timeout: 10 }] },
+      { hooks: [{ type: 'command', command: 'sn run-hook claude-code', timeout: 30 }] },
     ]);
-    expect(settings.hooks.SessionStart).toEqual([{ hooks: [{ type: 'command', command: 'sn run-hook claude-code', timeout: 10 }] }]);
+    expect(settings.hooks.SessionStart).toEqual([{ hooks: [{ type: 'command', command: 'sn run-hook claude-code', timeout: 30 }] }]);
     expect(settings.hooks.PostToolUse[0].matcher).toBe('Edit|MultiEdit|Write|NotebookEdit');
 
     expect((await installClaudeCodeHooks(dir, 'sn')).changed).toBe(false);
     await installClaudeCodeHooks(dir, 'node dist/cli.js'); // switching command replaces, doesn't duplicate
     const switched = JSON.parse(await readFile(path.join(dir, '.claude', 'settings.json'), 'utf8'));
-    expect(switched.hooks.SessionStart).toEqual([{ hooks: [{ type: 'command', command: 'node dist/cli.js run-hook claude-code', timeout: 10 }] }]);
+    expect(switched.hooks.SessionStart).toEqual([{ hooks: [{ type: 'command', command: 'node dist/cli.js run-hook claude-code', timeout: 30 }] }]);
   });
 });
 
@@ -100,7 +100,20 @@ describe('run-hook claude-code', () => {
     await hook({ hook_event_name: 'SessionStart', source: 'startup' });
     expect((await store.list()).threads).toHaveLength(0); // no thread until there's a prompt
 
+    const initial = await commits();
+
+    // Prompts and tool calls only touch the local session file: no git work on the hot path.
     await hook({ hook_event_name: 'UserPromptSubmit', prompt: 'Fix the flaky login test\nmore detail here' });
+    await Promise.all([
+      hook({ hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: path.join(dir, 'src/login.ts') } }),
+      hook({ hook_event_name: 'PostToolUse', tool_name: 'Write', tool_input: { file_path: 'test/login.test.ts' } }),
+      hook({ hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/login.ts' } }),
+    ]);
+    expect(await commits()).toBe(initial);
+    expect((await store.list()).threads).toHaveLength(0);
+
+    // End of turn: thread and files land in one commit.
+    await hook({ hook_event_name: 'Stop' });
     let [thread] = (await store.list()).threads;
     expect(thread).toMatchObject({
       title: 'Fix the flaky login test',
@@ -109,25 +122,20 @@ describe('run-hook claude-code', () => {
       author: { name: 'Test User' },
       sessions: [{ id: 'sess-1', agent: 'claude-code', endedAt: null }],
     });
+    expect(thread!.files.sort()).toEqual(['src/login.ts', 'test/login.test.ts']);
+    expect(await commits()).toBe(initial + 1);
 
-    await hook({ hook_event_name: 'UserPromptSubmit', prompt: 'second prompt' }); // same thread
-    const afterPrompts = await commits();
-
-    // Parallel tool calls: recorded locally, no commits yet.
-    await Promise.all([
-      hook({ hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: path.join(dir, 'src/login.ts') } }),
-      hook({ hook_event_name: 'PostToolUse', tool_name: 'Write', tool_input: { file_path: 'test/login.test.ts' } }),
-      hook({ hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/login.ts' } }),
-    ]);
-    expect(await commits()).toBe(afterPrompts);
-
+    // Later turns update the same thread.
+    await hook({ hook_event_name: 'UserPromptSubmit', prompt: 'second prompt' });
+    await hook({ hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/session.ts' } });
     await hook({ hook_event_name: 'Stop' });
     [thread] = (await store.list()).threads;
-    expect(thread!.files.sort()).toEqual(['src/login.ts', 'test/login.test.ts']);
-    expect(await commits()).toBe(afterPrompts + 1);
+    expect(thread!.title).toBe('Fix the flaky login test');
+    expect(thread!.files).toContain('src/session.ts');
+    expect(await commits()).toBe(initial + 2);
 
     await hook({ hook_event_name: 'Stop' }); // nothing pending: no commit
-    expect(await commits()).toBe(afterPrompts + 1);
+    expect(await commits()).toBe(initial + 2);
 
     await hook({ hook_event_name: 'SessionEnd', reason: 'prompt_input_exit' });
     [thread] = (await store.list()).threads;
@@ -135,6 +143,15 @@ describe('run-hook claude-code', () => {
     expect(existsSync(path.join(await localStateDir(git), 'sessions', 'sess-1.json'))).toBe(false);
 
     expect(await git.run(['status', '--porcelain'])).toBe(statusBefore); // user's tree untouched by hooks
+  });
+
+  it('commits a first-turn thread at session end if the turn never finished', async () => {
+    const { hook, store } = await setup();
+    await hook({ hook_event_name: 'UserPromptSubmit', prompt: 'interrupted' });
+    await hook({ hook_event_name: 'SessionEnd', reason: 'other' });
+    const [thread] = (await store.list()).threads;
+    expect(thread).toMatchObject({ title: 'interrupted' });
+    expect(thread!.sessions[0]!.endedAt).not.toBeNull();
   });
 
   it('leaves no thread for a session without prompts', async () => {

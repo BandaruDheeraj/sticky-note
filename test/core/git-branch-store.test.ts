@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { Git } from '../../src/core/git.js';
 import { GitBranchStore } from '../../src/core/store/git-branch-store.js';
 import { AmbiguousIdError } from '../../src/core/store/thread-store.js';
 import { closeThread, createThread, type Thread } from '../../src/core/thread.js';
@@ -112,6 +113,52 @@ describe('GitBranchStore', () => {
     await rm(await s.worktreePath(), { recursive: true, force: true });
 
     expect((await store(dir).list()).threads.map((t) => t.title)).toEqual(['kept']);
+  });
+
+  describe('recovery from a killed process', () => {
+    // Simulates a hook killed between `git add` and `git commit`, leaving a lock behind.
+    async function interruptedWrite(dir: string) {
+      const s = store(dir);
+      await s.init();
+      const worktree = await s.worktreePath();
+      const orphan = thread('orphan');
+      await mkdir(path.join(worktree, 'threads'), { recursive: true });
+      await writeFile(path.join(worktree, 'threads', `${orphan.id}.json`), JSON.stringify(orphan));
+      const wt = new Git(worktree);
+      await wt.run(['add', '--all']);
+      await writeFile(path.resolve(worktree, await wt.run(['rev-parse', '--git-path', 'index.lock'])), '');
+      return { s, wt, orphan };
+    }
+
+    it('commits leftovers and clears a stale index.lock on the next save', async () => {
+      const { dir } = await makeRepo();
+      const { s, wt } = await interruptedWrite(dir);
+      await s.save(thread('next'));
+      expect(await wt.run(['status', '--porcelain'])).toBe('');
+      expect((await s.list()).threads.map((t) => t.title).sort()).toEqual(['next', 'orphan']);
+    });
+
+    it('syncs successfully after an interrupted write', async () => {
+      const remote = await makeBareRemote();
+      const alice = await makeRepo({ remote, user: 'Alice' });
+      const { s, orphan } = await interruptedWrite(alice.dir);
+      expect((await s.sync()).pushed).toBeGreaterThan(0);
+
+      const bob = await makeRepo({ remote, user: 'Bob' });
+      await store(bob.dir).sync();
+      expect(await store(bob.dir).get(orphan.id)).not.toBeNull();
+    });
+
+    it('takes over a lock held by a dead process immediately', async () => {
+      const { dir, git } = await makeRepo();
+      const lock = path.join(await git.commonDir(), 'sticky-note', 'lock');
+      await mkdir(lock, { recursive: true });
+      await writeFile(path.join(lock, 'pid'), '999999'); // no such process
+
+      const started = Date.now();
+      await store(dir).save(thread('after crash'));
+      expect(Date.now() - started).toBeLessThan(5_000);
+    });
   });
 
   describe('sync', () => {

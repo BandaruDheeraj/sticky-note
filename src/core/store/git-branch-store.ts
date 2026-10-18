@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Git, GitError } from '../git.js';
 import { withLock } from '../lock.js';
@@ -32,7 +32,7 @@ export interface GitBranchStoreOptions {
  */
 export class GitBranchStore implements ThreadStore {
   private readonly repo: Git;
-  private paths?: { worktree: string; lock: string; noHooks: string };
+  private paths?: { worktree: string; lock: string; tmp: string; noHooks: string };
 
   constructor(private readonly opts: GitBranchStoreOptions) {
     this.repo = new Git(opts.repoDir);
@@ -83,18 +83,21 @@ export class GitBranchStore implements ThreadStore {
     const valid = Thread.parse(thread);
     await this.withWriteLock(async () => {
       const worktree = await this.ensureWorktree();
-      const rel = path.posix.join(THREADS_DIR, `${valid.id}.json`);
-      const abs = path.join(worktree, rel);
-      await mkdir(path.dirname(abs), { recursive: true });
-      // Write-then-rename so readers never see a half-written file.
-      const tmp = `${abs}.${process.pid}.tmp`;
-      await writeFile(tmp, `${JSON.stringify(valid, null, 2)}\n`);
-      await rename(tmp, abs);
-
       const wt = this.repo.at(worktree);
-      await wt.run(['add', '--', rel]);
-      if ((await wt.tryRun(['diff', '--cached', '--quiet'])) !== null) return; // no change
-      await this.commit(wt, message ?? `thread ${valid.id}: ${valid.status}`);
+      await this.recover(wt);
+
+      const abs = path.join(worktree, THREADS_DIR, `${valid.id}.json`);
+      await mkdir(path.dirname(abs), { recursive: true });
+      // Write-then-rename so readers never see a half-written file. The temp
+      // file lives outside the worktree so it can never be committed.
+      const { tmp } = await this.resolvePaths();
+      await mkdir(tmp, { recursive: true });
+      const tmpFile = path.join(tmp, `${valid.id}.${process.pid}.json`);
+      await writeFile(tmpFile, `${JSON.stringify(valid, null, 2)}\n`);
+      await rename(tmpFile, abs);
+
+      // Also picks up anything an interrupted earlier write left uncommitted.
+      await this.commitPending(wt, message ?? `thread ${valid.id}: ${valid.status}`);
     });
   }
 
@@ -104,6 +107,8 @@ export class GitBranchStore implements ThreadStore {
 
     return this.withWriteLock(async () => {
       const wt = this.repo.at(await this.ensureWorktree());
+      await this.recover(wt);
+      await this.commitPending(wt, 'recover uncommitted thread changes');
       const remoteRef = `refs/remotes/${remote}/${dataBranch}`;
       let pulled = 0;
 
@@ -153,6 +158,7 @@ export class GitBranchStore implements ThreadStore {
       this.paths = {
         worktree: path.join(base, 'worktree'),
         lock: path.join(base, 'lock'),
+        tmp: path.join(base, 'tmp'),
         noHooks: path.join(base, 'no-hooks'),
       };
     }
@@ -223,8 +229,26 @@ export class GitBranchStore implements ThreadStore {
     }
   }
 
-  private async commit(wt: Git, message: string): Promise<void> {
+  /** Stage and commit every change under threads/. Returns false if there was nothing to commit. */
+  private async commitPending(wt: Git, message: string): Promise<boolean> {
+    if (!existsSync(path.join(wt.cwd, THREADS_DIR))) return false;
+    await wt.run(['add', '--all', '--', THREADS_DIR]);
+    if ((await wt.tryRun(['diff', '--cached', '--quiet'])) !== null) return false;
     await wt.run(['commit', '--quiet', '--no-verify', '-m', message], { config: await this.commitConfig() });
+    return true;
+  }
+
+  /**
+   * Undo debris from a process killed mid-operation (hooks get killed on
+   * timeout). Must be called with the write lock held, which guarantees no
+   * other sticky-note process is using the worktree.
+   */
+  private async recover(wt: Git): Promise<void> {
+    const gitPath = async (name: string) => path.resolve(wt.cwd, await wt.run(['rev-parse', '--git-path', name]));
+    await rm(await gitPath('index.lock'), { force: true });
+    if (existsSync(await gitPath('rebase-merge')) || existsSync(await gitPath('rebase-apply'))) {
+      await wt.tryRun(['rebase', '--abort']);
+    }
   }
 
   /** Disable the user's repo hooks for data commits and supply an identity if none is configured. */
