@@ -22,6 +22,6 @@ export const syncCommand = defineCommand({
       out.warn(`No remote "${config.remote}" configured; threads are only stored locally.`);
       return;
     }
-    out.success(`Synced ${config.dataBranch} with ${config.remote}: pulled ${result.pulled}, pushed ${result.pushed}`);
+    out.success(`Synced ${config.dataBranch} with ${config.remote}: pulled ${result.pulled}, pushed ${result.pushed}${result.merged ? `, merged ${result.merged} thread(s)` : ''}`);
   },
 });

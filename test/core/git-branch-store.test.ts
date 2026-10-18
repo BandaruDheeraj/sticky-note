@@ -164,7 +164,7 @@ describe('GitBranchStore', () => {
   describe('sync', () => {
     it('skips when there is no remote', async () => {
       const { dir } = await makeRepo();
-      expect(await store(dir).sync()).toEqual({ skipped: 'no-remote', pulled: 0, pushed: 0 });
+      expect(await store(dir).sync()).toEqual({ skipped: 'no-remote', pulled: 0, pushed: 0, merged: 0 });
     });
 
     it("shares threads between teammates through the remote", async () => {
@@ -196,22 +196,64 @@ describe('GitBranchStore', () => {
       expect((await store(carol.dir).list()).threads.map((t) => t.title)).toEqual(['from alice']);
     });
 
-    it('aborts cleanly when both sides edited the same thread', async () => {
+    it('merges concurrent edits to the same thread instead of failing', async () => {
       const remote = await makeBareRemote();
       const alice = await makeRepo({ remote, user: 'Alice' });
       const bob = await makeRepo({ remote, user: 'Bob' });
 
-      const shared = thread('shared');
+      const shared = thread('shared', { files: ['a.ts'] });
       await store(alice.dir).save(shared);
       await store(alice.dir).sync();
       await store(bob.dir).sync();
 
-      await store(alice.dir).save({ ...shared, narrative: 'alice' });
+      const later = (m: number) => new Date(Date.now() + m * 60_000).toISOString();
+      await store(alice.dir).save({ ...shared, files: ['a.ts', 'alice.ts'], narrative: 'alice', updatedAt: later(1) });
       await store(alice.dir).sync();
-      await store(bob.dir).save({ ...shared, narrative: 'bob' });
+      await store(bob.dir).save({ ...shared, files: ['a.ts', 'bob.ts'], narrative: 'bob', updatedAt: later(2) });
 
-      await expect(store(bob.dir).sync()).rejects.toThrow(/Could not merge/);
-      expect((await store(bob.dir).get(shared.id))?.narrative).toBe('bob');
+      expect(await store(bob.dir).sync()).toMatchObject({ merged: 1, pushed: 2 }); // bob's edit + merge commit
+      const merged = await store(bob.dir).get(shared.id);
+      expect(merged).toMatchObject({ narrative: 'bob', files: ['a.ts', 'alice.ts', 'bob.ts'] });
+      expect(await new Git(await store(bob.dir).worktreePath()).run(['status', '--porcelain'])).toBe('');
+
+      await store(alice.dir).sync();
+      expect(await store(alice.dir).get(shared.id)).toEqual(merged);
+    });
+
+    it('keeps history linear when edits touch different threads', async () => {
+      const remote = await makeBareRemote();
+      const alice = await makeRepo({ remote, user: 'Alice' });
+      const bob = await makeRepo({ remote, user: 'Bob' });
+      await store(alice.dir).save(thread('a'));
+      await store(alice.dir).sync();
+      await store(bob.dir).save(thread('b'));
+
+      expect(await store(bob.dir).sync()).toMatchObject({ merged: 0 });
+      const merges = await bob.git.run(['rev-list', '--merges', '--count', BRANCH]);
+      expect(merges).toBe('0');
+    });
+
+    it('leaves local data intact on a conflict it cannot resolve', async () => {
+      const remote = await makeBareRemote();
+      const alice = await makeRepo({ remote, user: 'Alice' });
+      const bob = await makeRepo({ remote, user: 'Bob' });
+      await store(alice.dir).save(thread('seed'));
+      await store(alice.dir).sync();
+      await store(bob.dir).sync();
+
+      // Same non-thread file edited on both sides (not something sticky-note writes).
+      for (const [who, text] of [[alice, 'alice'], [bob, 'bob']] as const) {
+        const wt = new Git(await store(who.dir).worktreePath());
+        await writeFile(path.join(wt.cwd, 'NOTES.md'), text);
+        await wt.run(['add', 'NOTES.md']);
+        await wt.run(['commit', '-q', '-m', text]);
+      }
+      await store(alice.dir).sync();
+
+      await expect(store(bob.dir).sync()).rejects.toThrow(/unexpected conflict in NOTES.md/);
+      const wt = new Git(await store(bob.dir).worktreePath());
+      expect(await wt.run(['status', '--porcelain'])).toBe('');
+      expect((await store(bob.dir).list()).threads).toHaveLength(1);
     });
   });
 });

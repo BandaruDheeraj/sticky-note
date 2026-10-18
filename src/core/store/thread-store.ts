@@ -12,6 +12,8 @@ export interface SyncResult {
   pulled: number;
   /** Commits pushed to the remote. */
   pushed: number;
+  /** Threads edited on both sides and merged automatically. */
+  merged: number;
 }
 
 export interface StoreStatus {

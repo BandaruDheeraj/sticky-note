@@ -69,7 +69,7 @@ export async function handleHookEvent(event: HookEvent, deps: HookDeps): Promise
         return { next: null, result: undefined };
       });
       const result = await deps.store.sync();
-      await deps.log(result.skipped ? `sync skipped: ${result.skipped}` : `synced: pulled ${result.pulled}, pushed ${result.pushed}`);
+      await deps.log(result.skipped ? `sync skipped: ${result.skipped}` : `synced: pulled ${result.pulled}, pushed ${result.pushed}${result.merged ? `, merged ${result.merged} thread(s)` : ''}`);
       return {};
     }
   }

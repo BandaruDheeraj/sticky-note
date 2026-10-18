@@ -4,6 +4,7 @@ import path from 'node:path';
 import { Git, GitError } from '../git.js';
 import { withLock } from '../lock.js';
 import { localStateDir } from '../paths.js';
+import { mergeThreads } from '../thread-merge.js';
 import { Thread } from '../thread.js';
 import {
   AmbiguousIdError,
@@ -17,6 +18,7 @@ import {
 } from './thread-store.js';
 
 const THREADS_DIR = 'threads';
+const MAX_PUSH_ATTEMPTS = 3;
 
 export interface GitBranchStoreOptions {
   /** Any directory inside the user's repo. */
@@ -103,7 +105,7 @@ export class GitBranchStore implements ThreadStore {
 
   async sync(): Promise<SyncResult> {
     const { dataBranch, remote } = this.opts;
-    if (!(await this.repo.hasRemote(remote))) return { skipped: 'no-remote', pulled: 0, pushed: 0 };
+    if (!(await this.repo.hasRemote(remote))) return { skipped: 'no-remote', pulled: 0, pushed: 0, merged: 0 };
 
     return this.withWriteLock(async () => {
       const wt = this.repo.at(await this.ensureWorktree());
@@ -111,24 +113,26 @@ export class GitBranchStore implements ThreadStore {
       await this.commitPending(wt, 'recover uncommitted thread changes');
       const remoteRef = `refs/remotes/${remote}/${dataBranch}`;
       let pulled = 0;
+      let merged = 0;
 
-      const remoteExists = await this.fetch(wt);
-      if (remoteExists) {
-        pulled = await this.countCommits(wt, `HEAD..${remoteRef}`);
+      // Retry when a teammate pushes between our fetch and our push.
+      for (let attempt = 1; ; attempt++) {
+        const remoteExists = await this.fetch(wt);
+        if (remoteExists) {
+          pulled += await this.countCommits(wt, `HEAD..${remoteRef}`);
+          merged += await this.integrate(wt, remoteRef);
+        }
+        const pushed = await this.countCommits(wt, remoteExists ? `${remoteRef}..HEAD` : 'HEAD');
+        if (remoteExists && pushed === 0) return { pulled, pushed, merged };
         try {
-          await wt.run(['rebase', remoteRef], { config: await this.commitConfig() });
+          await wt.run(['push', '--quiet', remote, `HEAD:refs/heads/${dataBranch}`]);
+          await wt.run(['update-ref', remoteRef, 'HEAD']);
+          return { pulled, pushed, merged };
         } catch (err) {
-          await wt.tryRun(['rebase', '--abort']);
-          throw new SyncConflictError(err instanceof GitError ? err.stderr.trim() : String(err));
+          const rejected = err instanceof GitError && /rejected|non-fast-forward|fetch first/i.test(err.stderr);
+          if (!rejected || attempt >= MAX_PUSH_ATTEMPTS) throw err;
         }
       }
-
-      const pushed = remoteExists ? await this.countCommits(wt, `${remoteRef}..HEAD`) : await this.countCommits(wt, 'HEAD');
-      if (pushed > 0 || !remoteExists) {
-        await wt.run(['push', '--quiet', remote, `HEAD:refs/heads/${dataBranch}`]);
-        await wt.run(['update-ref', remoteRef, 'HEAD']);
-      }
-      return { pulled, pushed };
     });
   }
 
@@ -229,6 +233,43 @@ export class GitBranchStore implements ThreadStore {
     }
   }
 
+  /**
+   * Bring the remote's commits into HEAD. Rebases when possible for a linear
+   * history. If both sides edited the same thread, merges instead and resolves
+   * each conflicted thread field by field, so people never see a git conflict.
+   * Returns how many threads needed merging.
+   */
+  private async integrate(wt: Git, remoteRef: string): Promise<number> {
+    const config = await this.commitConfig();
+    if ((await wt.tryRun(['rebase', remoteRef], { config })) !== null) return 0;
+    await wt.tryRun(['rebase', '--abort']);
+
+    if ((await wt.tryRun(['merge', '--no-ff', '--no-commit', '--allow-unrelated-histories', remoteRef], { config })) !== null) {
+      await wt.run(['commit', '--quiet', '--no-verify', '-m', `merge ${remoteRef}`], { config });
+      return 0;
+    }
+
+    const conflicted = (await wt.run(['diff', '--name-only', '--diff-filter=U'])).split('\n').filter(Boolean);
+    try {
+      if (conflicted.length === 0) throw new SyncConflictError('merge failed without conflicting files');
+      for (const file of conflicted) {
+        if (!new RegExp(`^${THREADS_DIR}/[^/]+\\.json$`).test(file)) throw new SyncConflictError(`unexpected conflict in ${file}`);
+        // Stage 2 is our version, stage 3 theirs; one is missing if a side deleted the file.
+        const versions = (await Promise.all([2, 3].map((stage) => wt.tryRun(['show', `:${stage}:${file}`]))))
+          .filter((v): v is string => v !== null)
+          .map((v) => Thread.parse(JSON.parse(v)));
+        const merged = versions.reduce(mergeThreads);
+        await writeFile(path.join(wt.cwd, file), `${JSON.stringify(merged, null, 2)}\n`);
+        await wt.run(['add', '--', file]);
+      }
+      await wt.run(['commit', '--quiet', '--no-verify', '-m', `merge ${conflicted.length} concurrently edited thread(s)`], { config });
+      return conflicted.length;
+    } catch (err) {
+      await wt.tryRun(['merge', '--abort']);
+      throw err instanceof SyncConflictError ? err : new SyncConflictError((err as Error).message);
+    }
+  }
+
   /** Stage and commit every change under threads/. Returns false if there was nothing to commit. */
   private async commitPending(wt: Git, message: string): Promise<boolean> {
     if (!existsSync(path.join(wt.cwd, THREADS_DIR))) return false;
@@ -249,6 +290,7 @@ export class GitBranchStore implements ThreadStore {
     if (existsSync(await gitPath('rebase-merge')) || existsSync(await gitPath('rebase-apply'))) {
       await wt.tryRun(['rebase', '--abort']);
     }
+    if (existsSync(await gitPath('MERGE_HEAD'))) await wt.tryRun(['merge', '--abort']);
   }
 
   /** Disable the user's repo hooks for data commits and supply an identity if none is configured. */
