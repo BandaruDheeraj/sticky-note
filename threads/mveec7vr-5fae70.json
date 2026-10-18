@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "mveec7vr-5fae70",
   "title": "test",
-  "status": "active",
+  "status": "closed",
   "workType": "other",
   "author": {
     "name": "Keshav Ailaney",
@@ -16,9 +16,10 @@
   ],
   "branch": "ailaney-rewrite",
   "files": [],
-  "narrative": "",
+  "narrative": "Manual test thread from initial CLI testing",
   "failedApproaches": [],
+  "sessions": [],
   "createdAt": "2026-10-18T22:27:53.703Z",
-  "updatedAt": "2026-10-18T22:27:53.703Z",
-  "closedAt": null
+  "updatedAt": "2026-10-18T22:56:57.206Z",
+  "closedAt": "2026-10-18T22:56:57.206Z"
 }
