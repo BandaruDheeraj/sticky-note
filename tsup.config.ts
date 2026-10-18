@@ -7,6 +7,8 @@ export default defineConfig({
   target: 'node20',
   platform: 'node',
   bundle: true,
+  // Inline dependencies too: dist/cli.js must run standalone with no module resolution.
+  noExternal: [/.*/],
   clean: true,
   sourcemap: true,
   banner: { js: '#!/usr/bin/env node' },
