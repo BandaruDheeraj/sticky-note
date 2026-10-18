@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "mveec7vr-5fae70",
+  "title": "test",
+  "status": "active",
+  "workType": "other",
+  "author": {
+    "name": "Keshav Ailaney",
+    "email": "keshavailaney@gmail.com"
+  },
+  "contributors": [
+    {
+      "name": "Keshav Ailaney",
+      "email": "keshavailaney@gmail.com"
+    }
+  ],
+  "branch": "ailaney-rewrite",
+  "files": [],
+  "narrative": "",
+  "failedApproaches": [],
+  "createdAt": "2026-10-18T22:27:53.703Z",
+  "updatedAt": "2026-10-18T22:27:53.703Z",
+  "closedAt": null
+}
