@@ -1,44 +1,38 @@
 {
   "name": "sticky-note-cli",
-  "version": "3.1.49",
-  "description": "Human-to-human handoff for AI coding assistants. Git-backed shared memory for Claude Code and Copilot CLI.",
+  "version": "4.0.0-alpha.0",
+  "description": "Shared memory for AI coding agents. Git-backed record of what every teammate's agent is doing and has done.",
   "license": "MIT",
+  "type": "module",
   "bin": {
-    "sticky-note": "bin/cli.js",
-    "sticky-note-cli": "bin/cli.js",
-    "sticky-note-mcp": "bin/mcp-server.js"
+    "sticky-note": "dist/cli.js",
+    "sticky-note-cli": "dist/cli.js"
   },
-  "keywords": [
-    "ai",
-    "claude-code",
-    "copilot-cli",
-    "handoff",
-    "sticky-note-json",
-    "hooks",
-    "developer-tools"
+  "files": [
+    "dist/"
   ],
-  "author": "Dheeraj Bandaru",
-  "homepage": "https://github.com/BandaruDheeraj/sticky-note#readme",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/cli/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsup": "^8.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/BandaruDheeraj/sticky-note.git"
-  },
-  "files": [
-    "bin/",
-    "src/",
-    "templates/",
-    "sticky-server/*.js",
-    "sticky-server/*.toml",
-    "sticky-server/adapters/",
-    "sticky-server/LICENSE"
-  ],
-  "engines": {
-    "node": ">=16.0.0"
-  },
-  "scripts": {
-    "test": "node test/smoke.test.js"
-  },
-  "devDependencies": {
-    "sticky-note-cli": "^3.1.38"
   }
 }
