@@ -20,6 +20,16 @@ export const FailedApproach = z.object({
 });
 export type FailedApproach = z.infer<typeof FailedApproach>;
 
+/** One agent session that contributed to a thread. */
+export const SessionRef = z.object({
+  id: z.string(),
+  /** Which coding agent ran it, e.g. "claude-code". */
+  agent: z.string(),
+  startedAt: z.string().datetime(),
+  endedAt: z.string().datetime().nullable().default(null),
+});
+export type SessionRef = z.infer<typeof SessionRef>;
+
 /**
  * A thread is the unit of shared context: one goal pursued by one or more
  * people's agents. Stored as threads/<id>.json on the data branch.
@@ -36,6 +46,7 @@ export const Thread = z.object({
   files: z.array(z.string()).default([]),
   narrative: z.string().default(''),
   failedApproaches: z.array(FailedApproach).default([]),
+  sessions: z.array(SessionRef).default([]),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   closedAt: z.string().datetime().nullable().default(null),
@@ -54,6 +65,7 @@ export interface NewThreadInput {
   workType?: WorkType;
   files?: string[];
   narrative?: string;
+  session?: { id: string; agent: string; startedAt: string };
   now?: Date;
 }
 
@@ -71,9 +83,44 @@ export function createThread(input: NewThreadInput): Thread {
     branch: input.branch,
     files: dedupe(input.files ?? []),
     narrative: input.narrative ?? '',
+    sessions: input.session ? [input.session] : [],
     createdAt: iso,
     updatedAt: iso,
   });
+}
+
+/** Record work done in a session: touched files and who did it. Returns the same object if nothing changed. */
+export function recordActivity(thread: Thread, activity: { files: string[]; person: Person; now?: Date }): Thread {
+  const files = dedupe([...thread.files, ...activity.files]);
+  const isNewContributor = !thread.contributors.some((p) => samePerson(p, activity.person));
+  if (files.length === thread.files.length && !isNewContributor) return thread;
+  return {
+    ...thread,
+    files,
+    contributors: isNewContributor ? [...thread.contributors, activity.person] : thread.contributors,
+    updatedAt: (activity.now ?? new Date()).toISOString(),
+  };
+}
+
+export function endSession(thread: Thread, sessionId: string, now = new Date()): Thread {
+  const iso = now.toISOString();
+  if (!thread.sessions.some((s) => s.id === sessionId && s.endedAt === null)) return thread;
+  return {
+    ...thread,
+    sessions: thread.sessions.map((s) => (s.id === sessionId ? { ...s, endedAt: iso } : s)),
+    updatedAt: iso,
+  };
+}
+
+/** A short single-line title derived from free text such as a user's first prompt. */
+export function titleFromText(text: string, maxLength = 80): string {
+  const line = text.trim().split('\n')[0]!.replace(/\s+/g, ' ').trim();
+  if (!line) return 'Untitled';
+  return line.length <= maxLength ? line : `${line.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
+function samePerson(a: Person, b: Person): boolean {
+  return a.email && b.email ? a.email.toLowerCase() === b.email.toLowerCase() : a.name === b.name;
 }
 
 export function closeThread(thread: Thread, opts: { summary?: string; now?: Date } = {}): Thread {

@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Git, GitError } from '../git.js';
 import { withLock } from '../lock.js';
+import { localStateDir } from '../paths.js';
 import { Thread } from '../thread.js';
 import {
   AmbiguousIdError,
@@ -148,7 +149,7 @@ export class GitBranchStore implements ThreadStore {
 
   private async resolvePaths() {
     if (!this.paths) {
-      const base = path.join(await this.repo.commonDir(), 'sticky-note');
+      const base = await localStateDir(this.repo);
       this.paths = {
         worktree: path.join(base, 'worktree'),
         lock: path.join(base, 'lock'),

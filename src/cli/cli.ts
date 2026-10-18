@@ -11,6 +11,7 @@ export interface CliOptions {
   version: string;
   registry: CommandRegistry;
   streams?: OutputStreams;
+  stdin?: NodeJS.ReadableStream;
   cwd?: string;
 }
 
@@ -49,7 +50,12 @@ export class Cli {
         return ExitCode.Ok;
       }
       const cwd = path.resolve(this.opts.cwd ?? process.cwd(), input.options.cwd ?? '.');
-      const ctx: CommandContext = { cwd, out: new Output(this.streams, jsonMode), services: new Services(cwd) };
+      const ctx: CommandContext = {
+        cwd,
+        out: new Output(this.streams, jsonMode),
+        stdin: this.opts.stdin ?? process.stdin,
+        services: new Services(cwd),
+      };
       return (await command.run(ctx, input)) ?? ExitCode.Ok;
     } catch (err) {
       return this.fail(err, jsonMode, command);

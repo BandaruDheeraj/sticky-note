@@ -1,32 +1,14 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { PassThrough } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Cli } from '../../src/cli/cli.js';
 import { defineCommand } from '../../src/cli/command.js';
-import { createRegistry } from '../../src/cli/commands/index.js';
 import { CommandRegistry } from '../../src/cli/registry.js';
+import { runCli } from '../helpers/cli.js';
 import { cleanupTmpDirs, makeRepo, tmpDir } from '../helpers/repo.js';
 
 afterEach(cleanupTmpDirs);
 
-async function run(argv: string[], opts: { cwd?: string; registry?: CommandRegistry } = {}) {
-  const stdout = new PassThrough();
-  const stderr = new PassThrough();
-  let out = '';
-  let err = '';
-  stdout.on('data', (c) => (out += c));
-  stderr.on('data', (c) => (err += c));
-  const cli = new Cli({
-    bin: 'sticky-note',
-    version: '0.0.0-test',
-    registry: opts.registry ?? createRegistry(),
-    streams: { stdout, stderr, color: false },
-    cwd: opts.cwd,
-  });
-  const code = await cli.run(argv);
-  return { code, out, err, json: () => JSON.parse(out) };
-}
+const run = runCli;
 
 describe('Cli framework', () => {
   const registry = () =>

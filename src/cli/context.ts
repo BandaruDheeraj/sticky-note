@@ -1,6 +1,10 @@
+import path from 'node:path';
 import { loadConfig, type Config } from '../core/config.js';
 import { Git } from '../core/git.js';
 import { resolveIdentity } from '../core/identity.js';
+import { FileLog } from '../core/log.js';
+import { localStateDir } from '../core/paths.js';
+import { SessionStore } from '../core/session.js';
 import { GitBranchStore } from '../core/store/git-branch-store.js';
 import type { ThreadStore } from '../core/store/thread-store.js';
 import type { Person } from '../core/thread.js';
@@ -45,6 +49,14 @@ export class Services {
     });
   }
 
+  sessions(): Promise<SessionStore> {
+    return this.memo('sessions', async () => new SessionStore(path.join(await localStateDir(this.git()), 'sessions')));
+  }
+
+  log(): Promise<FileLog> {
+    return this.memo('log', async () => new FileLog(path.join(await localStateDir(this.git()), 'logs', 'hooks.log')));
+  }
+
   private memo<T>(key: string, factory: () => Promise<T>): Promise<T> {
     if (!this.cache.has(key)) this.cache.set(key, factory());
     return this.cache.get(key) as Promise<T>;
@@ -54,5 +66,6 @@ export class Services {
 export interface CommandContext {
   cwd: string;
   out: Output;
+  stdin: NodeJS.ReadableStream;
   services: Services;
 }
