@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "mveg5yzi-56c2db",
+  "title": "are you working",
+  "status": "active",
+  "workType": "other",
+  "author": {
+    "name": "Keshav Ailaney",
+    "email": "keshavailaney@gmail.com"
+  },
+  "contributors": [
+    {
+      "name": "Keshav Ailaney",
+      "email": "keshavailaney@gmail.com"
+    }
+  ],
+  "branch": "ailaney-rewrite",
+  "files": [],
+  "narrative": "",
+  "failedApproaches": [],
+  "sessions": [
+    {
+      "id": "97d7c659-10e0-4ce0-8032-2a8687533836",
+      "agent": "claude-code",
+      "startedAt": "2026-10-18T23:18:57.081Z",
+      "endedAt": null
+    }
+  ],
+  "createdAt": "2026-10-18T23:19:01.470Z",
+  "updatedAt": "2026-10-18T23:19:01.470Z",
+  "closedAt": null
+}
