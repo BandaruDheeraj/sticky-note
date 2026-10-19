@@ -23,9 +23,11 @@
       "id": "2c3a0846-e472-420a-828a-391a892ac9f2",
       "agent": "claude-code",
       "startedAt": "2026-10-19T00:32:16.139Z",
-      "endedAt": null
+      "endedAt": null,
+      "lastActiveAt": "2026-10-19T20:14:08.824Z"
     }
   ],
+  "commits": [],
   "createdAt": "2026-10-19T00:32:16.526Z",
   "updatedAt": "2026-10-19T00:32:16.526Z",
   "closedAt": null
