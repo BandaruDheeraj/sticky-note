@@ -20,7 +20,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "npm run build && vitest run --config vitest.e2e.config.ts"
+    "test:e2e": "npm run build && vitest run --config vitest.e2e.config.ts",
+    "demo": "npm run build && scripts/demo.sh",
+    "demo:setup": "npm run build && scripts/demo-setup.sh"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

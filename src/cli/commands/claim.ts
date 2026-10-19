@@ -79,7 +79,7 @@ export const claimsCommand = defineCommand({
     out.json({ ok: true, claims });
     if (claims.length === 0) return out.print('No active claims.');
     out.table(
-      claims.map((c) => [c.file, c.owner.name, ago(c.claimedAt, now), `expires ${new Date(c.expiresAt).toLocaleTimeString()}`, c.reason ?? '']),
+      claims.map((c) => [c.file, c.owner.name, ago(c.claimedAt, now), new Date(c.expiresAt).toLocaleString(), c.reason ?? '']),
       ['FILE', 'BY', 'CLAIMED', 'EXPIRES', 'REASON'],
     );
   },

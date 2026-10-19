@@ -87,6 +87,22 @@ git commit -m "Set up sticky-note"
    ```
    Your session appears as a thread, titled from your first prompt.
 
+## Try it: two-person demo
+
+**Scripted (about 30 seconds, no Claude needed).** It plays two teammates' sessions through the real CLI and git, and prints what each person and each agent is shown:
+
+```sh
+npm run demo
+```
+
+**Live, with two real Claude Code sessions.** This creates `~/sticky-demo`: a shared remote plus clones for "Alice" and "Bob", each with its own git identity and hooks already installed. It then prints step-by-step instructions for two terminals:
+
+```sh
+npm run demo:setup        # or: scripts/demo-setup.sh /some/other/dir
+```
+
+Remove it afterwards with `rm -rf ~/sticky-demo`.
+
 ## Using it day to day
 
 Nothing to do: work in Claude Code as usual. Behind the scenes:
