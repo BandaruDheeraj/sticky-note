@@ -1,5 +1,6 @@
 import { CommandRegistry } from '../registry.js';
 import { closeCommand } from './close.js';
+import { contextCommand } from './context.js';
 import { initCommand } from './init.js';
 import { newCommand } from './new.js';
 import { runHookCommand } from './run-hook.js';
@@ -17,6 +18,7 @@ export function createRegistry(): CommandRegistry {
     threadsCommand,
     showCommand,
     closeCommand,
+    contextCommand,
     syncCommand,
     runHookCommand,
   );

@@ -55,6 +55,18 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/dist/cli.js\" run-hook claude-code",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }

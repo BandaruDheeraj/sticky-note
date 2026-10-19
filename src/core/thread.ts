@@ -119,7 +119,7 @@ export function titleFromText(text: string, maxLength = 80): string {
   return line.length <= maxLength ? line : `${line.slice(0, maxLength - 1).trimEnd()}…`;
 }
 
-function samePerson(a: Person, b: Person): boolean {
+export function samePerson(a: Person, b: Person): boolean {
   return a.email && b.email ? a.email.toLowerCase() === b.email.toLowerCase() : a.name === b.name;
 }
 

@@ -110,3 +110,16 @@ describe('commands', () => {
     expect(r.json()).toMatchObject({ ok: false, error: { message: 'No thread matches "missing"' } });
   });
 });
+
+describe('context command', () => {
+  it('previews ranking and the injected text', async () => {
+    const { dir } = await makeRepo();
+    await run(['new', 'Billing export', '-f', 'src/billing/export.ts'], { cwd: dir });
+    const r = await run(['context', '-f', 'src/billing/export.ts', '--json'], { cwd: dir });
+    const json = r.json();
+    expect(json.mode).toBe('prompt');
+    expect(json.ranked[0]).toMatchObject({ title: 'Billing export' });
+    expect(json.ranked[0].reasons[0]).toMatch(/touches src\/billing\/export.ts/);
+    expect(json.injected).toContain('[sticky-note] Related work by your team:');
+  });
+});

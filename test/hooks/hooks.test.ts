@@ -7,6 +7,7 @@ import { GitBranchStore } from '../../src/core/store/git-branch-store.js';
 import { claudeCodeAdapter } from '../../src/hooks/adapters/claude-code.js';
 import { editedFiles } from '../../src/hooks/edited-files.js';
 import { installClaudeCodeHooks } from '../../src/hooks/install/claude-code.js';
+import { createThread } from '../../src/core/thread.js';
 import { runCli } from '../helpers/cli.js';
 import { cleanupTmpDirs, makeBareRemote, makeRepo } from '../helpers/repo.js';
 
@@ -31,6 +32,7 @@ describe('claudeCodeAdapter', () => {
     expect(JSON.parse(claudeCodeAdapter.render(start, { context: 'hello' }))).toEqual({
       hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: 'hello' },
     });
+    expect(JSON.parse(claudeCodeAdapter.render(start, { notice: 'seen by the person' }))).toEqual({ systemMessage: 'seen by the person' });
     const stop = claudeCodeAdapter.parse({ ...base, hook_event_name: 'Stop' })!;
     expect(claudeCodeAdapter.render(stop, { context: 'ignored' })).toBe('');
   });
@@ -71,6 +73,7 @@ describe('installClaudeCodeHooks', () => {
     ]);
     expect(settings.hooks.SessionStart).toEqual([{ hooks: [{ type: 'command', command: 'sn run-hook claude-code', timeout: 30 }] }]);
     expect(settings.hooks.PostToolUse[0].matcher).toBe('Edit|MultiEdit|Write|NotebookEdit');
+    expect(settings.hooks.PreToolUse[0].matcher).toBe('Edit|MultiEdit|Write|NotebookEdit');
 
     expect((await installClaudeCodeHooks(dir, 'sn')).changed).toBe(false);
     await installClaudeCodeHooks(dir, 'node dist/cli.js'); // switching command replaces, doesn't duplicate
@@ -197,5 +200,77 @@ describe('run-hook claude-code', () => {
     });
     const log = await readFile(path.join(await localStateDir(git), 'logs', 'hooks.log'), 'utf8');
     expect(log).toMatch(/claude-code prompt session=x ok/);
+  });
+});
+
+describe('surfacing through hooks', () => {
+  const alice = { name: 'Alice', email: 'alice@example.com' };
+
+  async function setup() {
+    const repo = await makeRepo();
+    await runCli(['init', '--skip-hooks'], { cwd: repo.dir });
+    const store = new GitBranchStore({ repoDir: repo.dir, dataBranch: BRANCH, remote: 'origin' });
+    const hook = async (payload: Record<string, unknown>) => {
+      const r = await runCli(['run-hook', 'claude-code'], {
+        cwd: repo.dir,
+        stdin: JSON.stringify({ session_id: 'me-1', cwd: repo.dir, ...payload }),
+      });
+      return r.out.trim() ? JSON.parse(r.out) : null;
+    };
+    return { ...repo, store, hook };
+  }
+
+  it("shows teammates' stuck and live work at session start, to the agent and the person", async () => {
+    const { store, hook } = await setup();
+    const stuck = { ...createThread({ title: 'Payments webhook retries', author: alice, branch: 'main' }), status: 'stuck' as const };
+    await store.save(stuck);
+
+    const out = await hook({ hook_event_name: 'SessionStart', source: 'startup' });
+    expect(out.hookSpecificOutput.hookEventName).toBe('SessionStart');
+    expect(out.hookSpecificOutput.additionalContext).toContain('STUCK · "Payments webhook retries" · Alice');
+    expect(out.systemMessage).toMatch(/sticky-note: 1 related thread \(1 stuck\)/);
+  });
+
+  it('injects threads related to the prompt, once per thread version', async () => {
+    const { store, hook } = await setup();
+    const related = createThread({ title: 'Rate limiter rewrite', author: alice, branch: 'main', files: ['src/api/rate-limit.ts'] });
+    await store.save(related);
+    await store.save(createThread({ title: 'Unrelated docs', author: alice, branch: 'other', files: ['README.md'] }));
+
+    const first = await hook({ hook_event_name: 'UserPromptSubmit', prompt: 'make src/api/rate-limit.ts configurable' });
+    expect(first.hookSpecificOutput.additionalContext).toContain('Rate limiter rewrite');
+    expect(first.hookSpecificOutput.additionalContext).not.toContain('Unrelated docs');
+
+    expect(await hook({ hook_event_name: 'UserPromptSubmit', prompt: 'and rate-limit.ts tests too' })).toBeNull();
+
+    await store.save({ ...related, narrative: 'new findings', updatedAt: new Date(Date.now() + 1000).toISOString() });
+    const again = await hook({ hook_event_name: 'UserPromptSubmit', prompt: 'rate-limit.ts again' });
+    expect(again.hookSpecificOutput.additionalContext).toContain('new findings');
+  });
+
+  it("warns once before editing a file in a teammate's live thread", async () => {
+    const { dir, store, hook } = await setup();
+    const t = createThread({ title: 'Refactor auth', author: alice, branch: 'main', files: ['src/auth.ts'], session: { id: 'a-1', agent: 'claude-code', startedAt: new Date().toISOString() } });
+    await store.save(t);
+
+    const edit = { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: path.join(dir, 'src/auth.ts') } };
+    const out = await hook(edit);
+    expect(out.hookSpecificOutput).toMatchObject({ hookEventName: 'PreToolUse' });
+    expect(out.hookSpecificOutput.additionalContext).toContain('Alice (working on it right now): "Refactor auth"');
+    expect(out.hookSpecificOutput.permissionDecision).toBeUndefined(); // advisory, never blocks
+    expect(out.systemMessage).toBe('sticky-note: Alice is working on src/auth.ts ("Refactor auth")');
+
+    expect(await hook(edit)).toBeNull();
+    expect(await hook({ ...edit, tool_input: { file_path: path.join(dir, 'src/other.ts') } })).toBeNull();
+  });
+
+  it('never surfaces the session\'s own thread', async () => {
+    const { store, hook } = await setup();
+    await hook({ hook_event_name: 'UserPromptSubmit', prompt: 'work on src/feature-flags.ts' });
+    await hook({ hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/feature-flags.ts' } });
+    await hook({ hook_event_name: 'Stop' });
+    expect((await store.list()).threads).toHaveLength(1);
+    expect(await hook({ hook_event_name: 'UserPromptSubmit', prompt: 'more on src/feature-flags.ts' })).toBeNull();
+    expect(await hook({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/feature-flags.ts' } })).toBeNull();
   });
 });

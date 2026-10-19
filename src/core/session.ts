@@ -25,6 +25,12 @@ export const SessionState = z.object({
     .default(null),
   /** Files edited since the last flush to the thread. */
   pendingFiles: z.array(z.string()).default([]),
+  /** Threads already shown to the agent (id → updatedAt at the time), so we don't repeat them. */
+  surfaced: z.record(z.string()).default({}),
+  /** Files we've already warned about overlapping work on, once per session. */
+  warnedFiles: z.array(z.string()).default([]),
+  /** Last background sync started by this session. */
+  lastSyncAt: z.string().datetime().nullable().default(null),
 });
 export type SessionState = z.infer<typeof SessionState>;
 

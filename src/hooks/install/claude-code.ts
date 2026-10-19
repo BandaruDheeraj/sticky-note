@@ -27,6 +27,7 @@ const isOurs = (command = '') => /\brun-hook claude-code$/.test(command) || /sti
 
 const MATCHERS: Partial<Record<(typeof CLAUDE_CODE_EVENTS)[number], string>> = {
   // Only file edits matter for now; avoids spawning a process for every Read/Bash.
+  PreToolUse: EDIT_TOOL_NAMES.join('|'),
   PostToolUse: EDIT_TOOL_NAMES.join('|'),
 };
 

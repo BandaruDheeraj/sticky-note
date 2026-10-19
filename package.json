@@ -19,7 +19,8 @@
     "dev": "tsx src/cli/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "npm run build && vitest run --config vitest.e2e.config.ts"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

@@ -18,12 +18,13 @@ const Payload = z
   .passthrough();
 
 /** Claude Code event names that `init` registers, in settings.json order. */
-export const CLAUDE_CODE_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PostToolUse', 'Stop', 'SessionEnd'] as const;
+export const CLAUDE_CODE_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionEnd'] as const;
 
 /** Events whose stdout Claude Code can add to the model's context. */
 const CONTEXT_EVENTS: Partial<Record<HookEvent['kind'], string>> = {
   'session-start': 'SessionStart',
   prompt: 'UserPromptSubmit',
+  'tool-before': 'PreToolUse',
 };
 
 export const claudeCodeAdapter: AgentAdapter = {
@@ -37,6 +38,8 @@ export const claudeCodeAdapter: AgentAdapter = {
         return { ...base, kind: 'session-start', source: p.source ?? 'startup' };
       case 'UserPromptSubmit':
         return { ...base, kind: 'prompt', prompt: p.prompt ?? '' };
+      case 'PreToolUse':
+        return { ...base, kind: 'tool-before', toolName: p.tool_name ?? '', toolInput: p.tool_input ?? {} };
       case 'PostToolUse':
         return { ...base, kind: 'tool-used', toolName: p.tool_name ?? '', toolInput: p.tool_input ?? {} };
       case 'Stop':
@@ -50,7 +53,10 @@ export const claudeCodeAdapter: AgentAdapter = {
 
   render(event, result) {
     const hookEventName = CONTEXT_EVENTS[event.kind];
-    if (!hookEventName || !result.context) return '';
-    return JSON.stringify({ hookSpecificOutput: { hookEventName, additionalContext: result.context } });
+    const output: Record<string, unknown> = {};
+    // systemMessage is shown to the person in the transcript; additionalContext only reaches the model.
+    if (result.notice) output.systemMessage = result.notice;
+    if (hookEventName && result.context) output.hookSpecificOutput = { hookEventName, additionalContext: result.context };
+    return Object.keys(output).length ? JSON.stringify(output) : '';
   },
 };
