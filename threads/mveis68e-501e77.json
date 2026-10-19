@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "mveis68e-501e77",
+  "title": "yeah how can we do that and does this overwrite the existing sticky note instal…",
+  "status": "active",
+  "workType": "other",
+  "author": {
+    "name": "BandaruDheeraj",
+    "email": "dheeraj.bandaru@hotmail.com"
+  },
+  "contributors": [
+    {
+      "name": "BandaruDheeraj",
+      "email": "dheeraj.bandaru@hotmail.com"
+    }
+  ],
+  "branch": "ailaney-rewrite",
+  "files": [],
+  "narrative": "",
+  "failedApproaches": [],
+  "sessions": [
+    {
+      "id": "2c3a0846-e472-420a-828a-391a892ac9f2",
+      "agent": "claude-code",
+      "startedAt": "2026-10-19T00:32:16.139Z",
+      "endedAt": null
+    }
+  ],
+  "createdAt": "2026-10-19T00:32:16.526Z",
+  "updatedAt": "2026-10-19T00:32:16.526Z",
+  "closedAt": null
+}
