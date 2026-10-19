@@ -8,3 +8,5 @@ export const PROMPT_MIN_SCORE = 2;
 export const PROMPT_LIMIT = 3;
 /** Minimum gap between background syncs started by one session. */
 export const BACKGROUND_SYNC_INTERVAL_MS = 2 * 60_000;
+/** Earlier threads shown when a file is first touched in a session. */
+export const HISTORY_LIMIT = 3;

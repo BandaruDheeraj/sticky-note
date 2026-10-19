@@ -28,6 +28,7 @@ export function mergeThreads(a: Thread, b: Thread): Thread {
     contributors: union(older.contributors, newer.contributors, personKey),
     failedApproaches: union(older.failedApproaches, newer.failedApproaches, (f: FailedApproach) => `${f.at}\0${f.description}`),
     sessions: mergeSessions(older.sessions, newer.sessions),
+    commits: union(older.commits, newer.commits, (c) => c),
   };
 }
 
@@ -48,10 +49,24 @@ function mergeSessions(a: SessionRef[], b: SessionRef[]): SessionRef[] {
   const byId = new Map<string, SessionRef>();
   for (const s of [...a, ...b]) {
     const prev = byId.get(s.id);
-    // An ended session stays ended; keep the later end time.
-    if (!prev || (s.endedAt ?? '') > (prev.endedAt ?? '')) byId.set(s.id, s);
+    if (!prev) {
+      byId.set(s.id, s);
+      continue;
+    }
+    // An ended session stays ended; keep the later end time and the latest heartbeat.
+    byId.set(s.id, {
+      ...prev,
+      endedAt: maxIso(prev.endedAt, s.endedAt),
+      lastActiveAt: maxIso(prev.lastActiveAt, s.lastActiveAt),
+    });
   }
   return [...byId.values()].sort((x, y) => x.startedAt.localeCompare(y.startedAt));
+}
+
+function maxIso(a: string | null, b: string | null): string | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a > b ? a : b;
 }
 
 function union<T>(a: T[], b: T[], key: (item: T) => string): T[] {

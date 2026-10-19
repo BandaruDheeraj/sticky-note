@@ -1,3 +1,4 @@
+import type { ClaimSet } from '../claim.js';
 import type { Thread, ThreadStatus } from '../thread.js';
 
 export interface ThreadFilter {
@@ -42,6 +43,10 @@ export interface ThreadStore {
   /** Look up by full id or unique id prefix. */
   get(idOrPrefix: string): Promise<Thread | null>;
   save(thread: Thread, message?: string): Promise<void>;
+  /** Every person's claims (one set per person). */
+  listClaims(): Promise<ClaimSet[]>;
+  /** Replace one person's claims. */
+  saveClaims(set: ClaimSet, message?: string): Promise<void>;
   sync(): Promise<SyncResult>;
   status(): Promise<StoreStatus>;
 }

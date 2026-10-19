@@ -123,3 +123,44 @@ describe('context command', () => {
     expect(json.injected).toContain('[sticky-note] Related work by your team:');
   });
 });
+
+describe('claim, unclaim, claims, who', () => {
+  it('manages claims and shows them in who', async () => {
+    const { dir } = await makeRepo();
+    expect((await run(['claim', 'src/a.ts', 'src/b.ts', '-m', 'refactor', '--hours', '2'], { cwd: dir })).code).toBe(0);
+    let claims = (await run(['claims', '--json'], { cwd: dir })).json().claims;
+    expect(claims.map((c: any) => [c.file, c.reason, c.owner.name])).toEqual([['src/a.ts', 'refactor', 'Test User'], ['src/b.ts', 'refactor', 'Test User']]);
+
+    // Paths are resolved relative to the current directory.
+    const { mkdir } = await import('node:fs/promises');
+    await mkdir(path.join(dir, 'src'), { recursive: true });
+    await run(['unclaim', 'a.ts'], { cwd: path.join(dir, 'src') });
+    claims = (await run(['claims', '--json'], { cwd: dir })).json().claims;
+    expect(claims.map((c: any) => c.file)).toEqual(['src/b.ts']);
+
+    const who = (await run(['who', '--json'], { cwd: dir })).json();
+    expect(who.claims.map((c: any) => c.file)).toEqual(['src/b.ts']);
+    expect(who.working).toEqual([]);
+
+    await run(['unclaim', '--all'], { cwd: dir });
+    expect((await run(['claims', '--json'], { cwd: dir })).json().claims).toEqual([]);
+    expect((await run(['claim', '../outside.ts'], { cwd: dir })).code).toBe(2);
+    expect((await run(['unclaim'], { cwd: dir })).code).toBe(2);
+  });
+
+  it('who lists live sessions', async () => {
+    const { dir } = await makeRepo();
+    await run(['init', '--skip-hooks'], { cwd: dir });
+    const hook = (payload: object) => run(['run-hook', 'claude-code'], { cwd: dir, stdin: JSON.stringify({ session_id: 'w1', cwd: dir, ...payload }) });
+    await hook({ hook_event_name: 'UserPromptSubmit', prompt: 'Live work' });
+    await hook({ hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/live.ts' } });
+    await hook({ hook_event_name: 'Stop' });
+
+    const who = (await run(['who', '--json'], { cwd: dir })).json();
+    expect(who.working).toMatchObject([{ person: { name: 'Test User' }, live: true, thread: { title: 'Live work', files: ['src/live.ts'] } }]);
+    expect((await run(['who'], { cwd: dir })).out).toMatch(/Test User\s+active/);
+
+    await hook({ hook_event_name: 'SessionEnd', reason: 'other' });
+    expect((await run(['who', '--json'], { cwd: dir })).json().working).toEqual([]);
+  });
+});

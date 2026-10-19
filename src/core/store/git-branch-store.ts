@@ -4,6 +4,7 @@ import path from 'node:path';
 import { Git, GitError } from '../git.js';
 import { withLock } from '../lock.js';
 import { localStateDir } from '../paths.js';
+import { ClaimSet, mergeClaimSets, ownerKey } from '../claim.js';
 import { mergeThreads } from '../thread-merge.js';
 import { Thread } from '../thread.js';
 import {
@@ -18,6 +19,9 @@ import {
 } from './thread-store.js';
 
 const THREADS_DIR = 'threads';
+const CLAIMS_DIR = 'claims';
+/** Directories of records sticky-note owns on the data branch, and how to merge each kind. */
+const RECORD_DIRS = [THREADS_DIR, CLAIMS_DIR];
 const MAX_PUSH_ATTEMPTS = 3;
 
 export interface GitBranchStoreOptions {
@@ -83,23 +87,45 @@ export class GitBranchStore implements ThreadStore {
 
   async save(thread: Thread, message?: string): Promise<void> {
     const valid = Thread.parse(thread);
+    await this.writeRecord(path.posix.join(THREADS_DIR, `${valid.id}.json`), valid, message ?? `thread ${valid.id}: ${valid.status}`);
+  }
+
+  async listClaims(): Promise<ClaimSet[]> {
+    const dir = path.join(await this.readyWorktree(), CLAIMS_DIR);
+    const entries = await readdir(dir).catch(() => [] as string[]);
+    const sets = await Promise.all(
+      entries
+        .filter((f) => f.endsWith('.json'))
+        .map((f) => readFile(path.join(dir, f), 'utf8').then((raw) => ClaimSet.safeParse(JSON.parse(raw)), () => null)),
+    );
+    return sets.flatMap((r) => (r?.success ? [r.data] : []));
+  }
+
+  async saveClaims(set: ClaimSet, message?: string): Promise<void> {
+    const valid = ClaimSet.parse(set);
+    const rel = path.posix.join(CLAIMS_DIR, `${ownerKey(valid.owner)}.json`);
+    await this.writeRecord(rel, valid, message ?? `claims: ${valid.owner.name} (${valid.claims.length})`);
+  }
+
+  /** Atomically write one JSON record into the data worktree and commit it. */
+  private async writeRecord(rel: string, data: unknown, message: string): Promise<void> {
     await this.withWriteLock(async () => {
       const worktree = await this.ensureWorktree();
       const wt = this.repo.at(worktree);
       await this.recover(wt);
 
-      const abs = path.join(worktree, THREADS_DIR, `${valid.id}.json`);
+      const abs = path.join(worktree, rel);
       await mkdir(path.dirname(abs), { recursive: true });
       // Write-then-rename so readers never see a half-written file. The temp
       // file lives outside the worktree so it can never be committed.
       const { tmp } = await this.resolvePaths();
       await mkdir(tmp, { recursive: true });
-      const tmpFile = path.join(tmp, `${valid.id}.${process.pid}.json`);
-      await writeFile(tmpFile, `${JSON.stringify(valid, null, 2)}\n`);
+      const tmpFile = path.join(tmp, `${path.basename(rel)}.${process.pid}.tmp`);
+      await writeFile(tmpFile, `${JSON.stringify(data, null, 2)}\n`);
       await rename(tmpFile, abs);
 
       // Also picks up anything an interrupted earlier write left uncommitted.
-      await this.commitPending(wt, message ?? `thread ${valid.id}: ${valid.status}`);
+      await this.commitPending(wt, message);
     });
   }
 
@@ -253,16 +279,14 @@ export class GitBranchStore implements ThreadStore {
     try {
       if (conflicted.length === 0) throw new SyncConflictError('merge failed without conflicting files');
       for (const file of conflicted) {
-        if (!new RegExp(`^${THREADS_DIR}/[^/]+\\.json$`).test(file)) throw new SyncConflictError(`unexpected conflict in ${file}`);
         // Stage 2 is our version, stage 3 theirs; one is missing if a side deleted the file.
         const versions = (await Promise.all([2, 3].map((stage) => wt.tryRun(['show', `:${stage}:${file}`]))))
-          .filter((v): v is string => v !== null)
-          .map((v) => Thread.parse(JSON.parse(v)));
-        const merged = versions.reduce(mergeThreads);
+          .filter((v): v is string => v !== null);
+        const merged = mergeRecord(file, versions);
         await writeFile(path.join(wt.cwd, file), `${JSON.stringify(merged, null, 2)}\n`);
         await wt.run(['add', '--', file]);
       }
-      await wt.run(['commit', '--quiet', '--no-verify', '-m', `merge ${conflicted.length} concurrently edited thread(s)`], { config });
+      await wt.run(['commit', '--quiet', '--no-verify', '-m', `merge ${conflicted.length} concurrently edited record(s)`], { config });
       return conflicted.length;
     } catch (err) {
       await wt.tryRun(['merge', '--abort']);
@@ -270,10 +294,11 @@ export class GitBranchStore implements ThreadStore {
     }
   }
 
-  /** Stage and commit every change under threads/. Returns false if there was nothing to commit. */
+  /** Stage and commit every change to sticky-note's records. Returns false if there was nothing to commit. */
   private async commitPending(wt: Git, message: string): Promise<boolean> {
-    if (!existsSync(path.join(wt.cwd, THREADS_DIR))) return false;
-    await wt.run(['add', '--all', '--', THREADS_DIR]);
+    const dirs = RECORD_DIRS.filter((d) => existsSync(path.join(wt.cwd, d)));
+    if (dirs.length === 0) return false;
+    await wt.run(['add', '--all', '--', ...dirs]);
     if ((await wt.tryRun(['diff', '--cached', '--quiet'])) !== null) return false;
     await wt.run(['commit', '--quiet', '--no-verify', '-m', message], { config: await this.commitConfig() });
     return true;
@@ -304,5 +329,20 @@ export class GitBranchStore implements ThreadStore {
 
   private async countCommits(wt: Git, range: string): Promise<number> {
     return Number(await wt.run(['rev-list', '--count', range]));
+  }
+}
+
+/** Field-level merge for a conflicted record, chosen by its directory. Anything else is not ours to merge. */
+function mergeRecord(file: string, versions: string[]): unknown {
+  const [dir, name, ...rest] = file.split('/');
+  if (rest.length || !name?.endsWith('.json')) throw new SyncConflictError(`unexpected conflict in ${file}`);
+  const parsed = versions.map((v) => JSON.parse(v) as unknown);
+  switch (dir) {
+    case THREADS_DIR:
+      return parsed.map((v) => Thread.parse(v)).reduce(mergeThreads);
+    case CLAIMS_DIR:
+      return parsed.map((v) => ClaimSet.parse(v)).reduce(mergeClaimSets);
+    default:
+      throw new SyncConflictError(`unexpected conflict in ${file}`);
   }
 }

@@ -2,8 +2,8 @@ import path from 'node:path';
 import { samePerson, type Person, type Thread } from '../core/thread.js';
 
 const HOUR = 3_600_000;
-/** A thread with an open session updated this recently counts as being worked on right now. */
-export const LIVE_WINDOW_MS = 2 * HOUR;
+/** An open session with a heartbeat this recent counts as being worked on right now. */
+export const LIVE_WINDOW_MS = 30 * 60_000;
 /** Open threads untouched for longer than this no longer trigger overlap warnings. */
 export const OVERLAP_WINDOW_MS = 7 * 24 * HOUR;
 const RECENCY_HALF_LIFE_HOURS = 48;
@@ -29,12 +29,17 @@ export interface RankedThread {
   matchedFiles: string[];
 }
 
+/** When an open session of this thread was last active (its heartbeat, else the thread's last update). */
+export function lastActiveAt(thread: Thread): number | null {
+  const open = thread.sessions.filter((s) => s.endedAt === null);
+  if (open.length === 0) return null;
+  return Math.max(...open.map((s) => Date.parse(s.lastActiveAt ?? thread.updatedAt)));
+}
+
+/** Someone's agent is working on this thread right now: an open session with a recent heartbeat. */
 export function isLive(thread: Thread, now: Date): boolean {
-  return (
-    thread.status !== 'closed' &&
-    thread.sessions.some((s) => s.endedAt === null) &&
-    now.getTime() - Date.parse(thread.updatedAt) < LIVE_WINDOW_MS
-  );
+  const active = lastActiveAt(thread);
+  return thread.status !== 'closed' && active !== null && now.getTime() - active < LIVE_WINDOW_MS;
 }
 
 export function isMine(thread: Thread, me: Person): boolean {

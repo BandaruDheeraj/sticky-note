@@ -79,15 +79,21 @@ export class Cli {
     const argSpecs = command.args ?? [];
     const positionals = [...parsed.positionals];
     const args: Record<string, string | undefined> = {};
+    let rest: string[] = [];
     for (const spec of argSpecs) {
-      args[spec.name] = spec.variadic ? positionals.splice(0).join(' ') || undefined : positionals.shift();
+      if (spec.variadic) {
+        rest = positionals.splice(0);
+        args[spec.name] = rest.join(' ') || undefined;
+      } else {
+        args[spec.name] = positionals.shift();
+      }
     }
     if (!parsed.values.help) {
       const missing = argSpecs.find((s) => s.required && args[s.name] === undefined);
       if (missing) throw new UsageError(`Missing required argument <${missing.name}>`, `Usage: ${this.usageLine(command)}`);
       if (positionals.length > 0) throw new UsageError(`Unexpected argument "${positionals[0]}"`, `Usage: ${this.usageLine(command)}`);
     }
-    return { args, options: parsed.values as Record<string, never> };
+    return { args, rest, options: parsed.values as Record<string, never> };
   }
 
   private fail(err: unknown, jsonMode: boolean, command?: AnyCommand): number {

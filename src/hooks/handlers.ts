@@ -1,16 +1,18 @@
 import { SessionState, type SessionStore } from '../core/session.js';
 import type { ThreadStore } from '../core/store/thread-store.js';
-import { createThread, endSession, recordActivity, titleFromText, type Person, type Thread } from '../core/thread.js';
+import { claimsByOthers, type ActiveClaim } from '../core/claim.js';
+import { createThread, endSession, heartbeat, recordActivity, titleFromText, type Person, type Thread } from '../core/thread.js';
 import {
   BACKGROUND_SYNC_INTERVAL_MS,
+  HISTORY_LIMIT,
   PROMPT_LIMIT,
   PROMPT_MIN_SCORE,
   SESSION_START_LIMIT,
   SESSION_START_MIN_SCORE,
 } from '../surfacing/policy.js';
 import { findOverlaps, isLive, rankThreads, type RankedThread } from '../surfacing/relevance.js';
-import { renderContext, renderOverlapWarning } from '../surfacing/render.js';
-import { editedFiles } from './edited-files.js';
+import { renderClaimWarning, renderContext, renderOverlapWarning } from '../surfacing/render.js';
+import { editedFiles, touchedFiles } from './edited-files.js';
 import type { HookEvent, HookResult } from './events.js';
 
 export interface HookDeps {
@@ -21,6 +23,12 @@ export interface HookDeps {
   currentBranch(): Promise<string | null>;
   /** Start a detached sync so hooks never wait on the network. */
   syncInBackground(): void;
+  /** Current HEAD commit, or null in a repo with no commits. */
+  head(): Promise<string | null>;
+  /** My commits in base..HEAD (for attributing commits to the session's thread). */
+  myCommitsSince(base: string): Promise<string[]>;
+  /** Recent commits that changed `file`. */
+  fileCommits(file: string): Promise<string[]>;
   now(): Date;
   log(message: string): Promise<void>;
 }
@@ -30,9 +38,11 @@ export interface HookDeps {
  * update the local session file and read threads, so they stay fast.
  *  - session-start: remember the session, start a sync, show stuck/live/branch work
  *  - prompt:        plan the thread on the first prompt; show threads related to the prompt
- *  - tool-before:   warn once per file if a teammate's open thread touches it
- *  - tool-used:     note edited files
- *  - turn-end:      commit the planned thread and noted files; background sync (at once for a new thread, else throttled)
+ *  - tool-before:   before an edit, warn once per file about teammates' claims or open threads on it,
+ *                   and show the file's history the first time it's touched
+ *  - tool-used:     note edited files; after a read, show the file's history on first touch
+ *  - turn-end:      commit the planned thread and noted files, heartbeat + new commits;
+ *                   background sync (at once for a new thread, else throttled)
  *  - session-end:   flush, mark the session ended, forget it, and sync
  */
 export async function handleHookEvent(event: HookEvent, deps: HookDeps): Promise<HookResult> {
@@ -40,7 +50,8 @@ export async function handleHookEvent(event: HookEvent, deps: HookDeps): Promise
     case 'session-start': {
       deps.syncInBackground();
       return deps.sessions.update<HookResult>(event.sessionId, async (cur) => {
-        const state = { ...(cur ?? freshSession(event, deps)), lastSyncAt: deps.now().toISOString() };
+        const base = cur ?? freshSession(event, deps);
+        const state = { ...base, baseHead: base.baseHead ?? (await deps.head()), lastSyncAt: deps.now().toISOString() };
         const { threads } = await deps.store.list();
         const selected = rankThreads(threads, {
           me: deps.identity,
@@ -90,41 +101,59 @@ export async function handleHookEvent(event: HookEvent, deps: HookDeps): Promise
       const files = editedFiles(event.toolName, event.toolInput, event.cwd, deps.repoRoot);
       if (files.length === 0) return {};
       return deps.sessions.update<HookResult>(event.sessionId, async (cur) => {
-        const state = cur ?? freshSession(event, deps);
+        let state = cur ?? freshSession(event, deps);
         const unwarned = files.filter((f) => !state.warnedFiles.includes(f));
-        if (unwarned.length === 0) return { next: state, result: {} };
+        const firstTouch = files.filter((f) => !state.touchedFiles.includes(f));
+        if (unwarned.length === 0 && firstTouch.length === 0) return { next: state, result: {} };
 
-        const { threads } = await deps.store.list();
+        const [{ threads }, claimSets] = await Promise.all([deps.store.list(), deps.store.listClaims()]);
         const now = deps.now();
-        const warnings: { file: string; threads: Thread[] }[] = [];
-        for (const file of unwarned) {
-          const overlaps = findOverlaps(threads, file, { me: deps.identity, excludeThreadIds: ownThreadIds(state), now });
-          if (overlaps.length) warnings.push({ file, threads: overlaps });
-        }
-        if (warnings.length === 0) return { next: state, result: {} };
+        const parts: string[] = [];
+        let notice: string | undefined;
 
-        const first = warnings[0]!;
-        const lead = first.threads[0]!;
-        const who = lead.contributors.at(-1)?.name ?? lead.author.name;
-        return {
-          next: { ...state, warnedFiles: [...state.warnedFiles, ...warnings.map((w) => w.file)] },
-          result: {
-            context: warnings.map((w) => renderOverlapWarning(w.file, w.threads, now)).join('\n\n'),
-            notice: `sticky-note: ${who} ${isLive(lead, now) ? 'is working on' : 'has open work on'} ${first.file} ("${lead.title}")${warnings.length > 1 ? ` and ${warnings.length - 1} more file(s)` : ''}`,
-          },
-        };
+        // 1. Overlap: someone else's claim or open thread on the file.
+        const warned: string[] = [];
+        const warnedThreadIds = new Set<string>();
+        for (const file of unwarned) {
+          const claims = claimsByOthers(claimSets, file, deps.identity, now);
+          const overlaps = findOverlaps(threads, file, { me: deps.identity, excludeThreadIds: ownThreadIds(state), now });
+          if (claims.length === 0 && overlaps.length === 0) continue;
+          warned.push(file);
+          overlaps.forEach((t) => warnedThreadIds.add(t.id));
+          if (claims.length) parts.push(renderClaimWarning(file, claims, now));
+          if (overlaps.length) parts.push(renderOverlapWarning(file, overlaps, now));
+          notice ??= overlapNotice(file, claims, overlaps, now);
+        }
+        if (warned.length > 1) notice += ` and ${warned.length - 1} more file(s)`;
+
+        // 2. History: earlier threads on files touched for the first time this session.
+        const history = await historyFor(firstTouch, threads, state, deps, warnedThreadIds);
+        if (history.text) parts.push(history.text);
+
+        state = markSurfaced(
+          { ...state, warnedFiles: [...state.warnedFiles, ...warned], touchedFiles: [...state.touchedFiles, ...firstTouch] },
+          history.shown,
+        );
+        return { next: state, result: { context: parts.join('\n\n') || undefined, notice: notice ?? summarize(history.shown, now) } };
       });
     }
 
     case 'tool-used': {
-      const files = editedFiles(event.toolName, event.toolInput, event.cwd, deps.repoRoot);
-      if (files.length === 0) return {};
-      await deps.sessions.update(event.sessionId, async (cur) => {
-        const state = cur ?? freshSession(event, deps);
-        const pendingFiles = [...new Set([...state.pendingFiles, ...files])];
-        return { next: { ...state, pendingFiles, updatedAt: deps.now().toISOString() }, result: undefined };
+      const edited = editedFiles(event.toolName, event.toolInput, event.cwd, deps.repoRoot);
+      const touched = touchedFiles(event.toolName, event.toolInput, event.cwd, deps.repoRoot);
+      if (touched.length === 0) return {};
+      return deps.sessions.update<HookResult>(event.sessionId, async (cur) => {
+        let state = cur ?? freshSession(event, deps);
+        if (edited.length) state = { ...state, pendingFiles: [...new Set([...state.pendingFiles, ...edited])], updatedAt: deps.now().toISOString() };
+
+        // Reads: show the file's history on first touch (edits already got it before the edit).
+        const firstTouch = touched.filter((f) => !state.touchedFiles.includes(f));
+        if (firstTouch.length === 0) return { next: state, result: {} };
+        const { threads } = await deps.store.list();
+        const history = await historyFor(firstTouch, threads, state, deps);
+        state = markSurfaced({ ...state, touchedFiles: [...state.touchedFiles, ...firstTouch] }, history.shown);
+        return { next: state, result: { context: history.text || undefined, notice: summarize(history.shown, deps.now()) } };
       });
-      return {};
     }
 
     case 'turn-end':
@@ -134,7 +163,22 @@ export async function handleHookEvent(event: HookEvent, deps: HookDeps): Promise
         const sinceSync = state.lastSyncAt ? deps.now().getTime() - Date.parse(state.lastSyncAt) : Infinity;
         // Publish a brand-new thread right away so teammates see the session; otherwise throttle.
         const justCreated = !cur.threadId && state.threadId !== null;
-        if (justCreated || sinceSync >= BACKGROUND_SYNC_INTERVAL_MS) {
+        const syncDue = justCreated || sinceSync >= BACKGROUND_SYNC_INTERVAL_MS;
+
+        // Heartbeat (presence) and commit attribution, written when we're about to sync or there are new commits.
+        if (state.threadId) {
+          const thread = await deps.store.get(state.threadId);
+          if (thread) {
+            const commits = state.baseHead ? (await deps.myCommitsSince(state.baseHead)).filter((c) => !thread.commits.includes(c)) : [];
+            // A thread created this turn already carries a fresh heartbeat.
+            if ((syncDue && !justCreated) || commits.length) {
+              const beat = heartbeat(thread, state.sessionId, { commits, now: deps.now() });
+              if (beat !== thread) await deps.store.save(beat, `thread ${thread.id}: ${commits.length ? `${commits.length} commit(s)` : 'heartbeat'}`);
+            }
+          }
+        }
+        if (!state.baseHead) state = { ...state, baseHead: await deps.head() };
+        if (syncDue) {
           deps.syncInBackground();
           state = { ...state, lastSyncAt: deps.now().toISOString() };
         }
@@ -170,7 +214,7 @@ async function flush(state: SessionState, deps: HookDeps): Promise<SessionState>
       author: deps.identity,
       branch: state.pendingThread.branch,
       files: state.pendingFiles,
-      session: { id: state.sessionId, agent: state.agent, startedAt: state.startedAt },
+      session: { id: state.sessionId, agent: state.agent, startedAt: state.startedAt, lastActiveAt: now.toISOString() },
       now: new Date(state.pendingThread.createdAt),
     });
     await deps.store.save(thread, `thread ${thread.id}: started in ${state.agent}`);
@@ -184,6 +228,46 @@ async function flush(state: SessionState, deps: HookDeps): Promise<SessionState>
     if (updated !== thread) await deps.store.save(updated, `thread ${thread.id}: ${state.pendingFiles.length} file(s) touched`);
   }
   return { ...state, pendingFiles: [], updatedAt: now.toISOString() };
+}
+
+/**
+ * Earlier threads on files touched for the first time: threads that listed the
+ * file, or whose recorded commits changed it (git history → thread).
+ */
+async function historyFor(
+  files: string[],
+  threads: Thread[],
+  state: SessionState,
+  deps: HookDeps,
+  skip: Set<string> = new Set(),
+): Promise<{ text: string; shown: RankedThread[] }> {
+  if (files.length === 0) return { text: '', shown: [] };
+  const own = new Set(ownThreadIds(state));
+  const shown: RankedThread[] = [];
+  for (const file of files) {
+    const commits = new Set(await deps.fileCommits(file));
+    for (const thread of threads) {
+      if (own.has(thread.id) || skip.has(thread.id) || shown.some((r) => r.thread.id === thread.id)) continue;
+      if (state.surfaced[thread.id] === thread.updatedAt) continue;
+      const commit = thread.commits.find((c) => commits.has(c));
+      if (!thread.files.includes(file) && !commit) continue;
+      const reasons = [commit ? `changed ${file} (commit ${commit.slice(0, 7)})` : `touched ${file}`];
+      if (thread.status === 'closed') reasons.push('closed');
+      shown.push({ thread, score: 0, reasons, matchedFiles: [file] });
+    }
+  }
+  shown.sort((a, b) => b.thread.updatedAt.localeCompare(a.thread.updatedAt));
+  const top = shown.slice(0, HISTORY_LIMIT);
+  const heading = files.length === 1 ? `Earlier work on ${files[0]}:` : `Earlier work on ${files.join(', ')}:`;
+  return { text: renderContext(heading, top, deps.now()), shown: top };
+}
+
+function overlapNotice(file: string, claims: ActiveClaim[], overlaps: Thread[], now: Date): string {
+  const claim = claims[0];
+  if (claim) return `sticky-note: ${claim.owner.name} has claimed ${file}${claim.reason ? ` (${claim.reason})` : ''}`;
+  const lead = overlaps[0]!;
+  const who = lead.contributors.at(-1)?.name ?? lead.author.name;
+  return `sticky-note: ${who} ${isLive(lead, now) ? 'is working on' : 'has open work on'} ${file} ("${lead.title}")`;
 }
 
 function ownThreadIds(state: SessionState): string[] {

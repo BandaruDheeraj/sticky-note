@@ -43,17 +43,17 @@ describe('mergeThreads', () => {
   });
 
   it('merges sessions by id, keeping the ended state', () => {
-    const open = edit({ sessions: [{ id: 's1', agent: 'claude-code', startedAt: at(0), endedAt: null }], updatedAt: at(1) });
+    const open = edit({ sessions: [{ id: 's1', agent: 'claude-code', startedAt: at(0), endedAt: null, lastActiveAt: null }], updatedAt: at(1) });
     const ended = edit({
       sessions: [
-        { id: 's1', agent: 'claude-code', startedAt: at(0), endedAt: at(3) },
-        { id: 's2', agent: 'claude-code', startedAt: at(2), endedAt: null },
+        { id: 's1', agent: 'claude-code', startedAt: at(0), endedAt: at(3), lastActiveAt: null },
+        { id: 's2', agent: 'claude-code', startedAt: at(2), endedAt: null, lastActiveAt: null },
       ],
       updatedAt: at(0),
     });
     expect(mergeThreads(open, ended).sessions).toEqual([
-      { id: 's1', agent: 'claude-code', startedAt: at(0), endedAt: at(3) },
-      { id: 's2', agent: 'claude-code', startedAt: at(2), endedAt: null },
+      { id: 's1', agent: 'claude-code', startedAt: at(0), endedAt: at(3), lastActiveAt: null },
+      { id: 's2', agent: 'claude-code', startedAt: at(2), endedAt: null, lastActiveAt: null },
     ]);
   });
 

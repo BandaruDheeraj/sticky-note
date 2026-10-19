@@ -16,10 +16,12 @@ When one person's agent works on something, the next person's agent already know
 | **Capture** | Each Claude Code session becomes a *thread*: title from your first prompt, branch, author, files edited, session start and end. |
 | **Share** | Threads live on a git branch (`sticky-note/context`) and sync through your normal remote. No server and no new infrastructure; it works offline. |
 | **Surface** | At session start, on each prompt, and before each file edit, your agent is told about relevant teammate work: stuck threads, work in progress right now, threads on the same branch, threads that touched the same files. You see a one-line summary in the transcript too. |
-| **Overlap warnings** | Before your agent edits a file that's part of a teammate's open thread, the agent is warned and so are you. Warnings never block the edit. |
-| **CLI** | List, show, create, close and sync threads; preview exactly what agents are shown. |
+| **Overlap warnings** | Before your agent edits a file that's part of a teammate's open thread, or that a teammate has *claimed*, the agent is warned and so are you. Warnings never block the edit. |
+| **Presence** | `sticky-note who` shows whose agents are active right now, on what thread, branch and files, plus active file claims. |
+| **History on first touch** | The first time your agent reads or edits a file in a session, it's shown earlier threads that worked on that file, including closed ones and what didn't work. Commits made during a session are linked to its thread, so a file's git history leads back to the thread that changed it. |
+| **CLI** | List, show, create, close and sync threads; claim files; see who's active; preview exactly what agents are shown. |
 
-**Not built yet** (planned for Release 1): continuing (resuming) a teammate's thread, automatic stuck detection, presence and `who`, file claiming, the MCP server, transcripts and AI blame, Copilot CLI and Codex support, the cloud backend, and environment sync.
+**Not built yet** (planned for Release 1): continuing (resuming) a teammate's thread, automatic stuck detection, the MCP server, transcripts and line-level AI blame, Copilot CLI and Codex support, the cloud backend (real-time presence without git), and environment sync.
 
 ## Requirements
 
@@ -93,9 +95,10 @@ Nothing to do: work in Claude Code as usual. Behind the scenes:
 |---|---|
 | Session starts | Starts a background sync. Tells the agent (and you, in one line) about teammates' stuck threads, work in progress, and threads on your branch. |
 | You send a prompt | The first prompt names your session's thread. Each prompt pulls in teammate threads related to what you asked or to the files you're working on. A thread is shown once, and again only if it changed. |
-| Agent is about to edit a file | If a teammate's open thread touched that file, the agent is warned before editing, and you see a line like `sticky-note: Alice is working on src/billing/invoice.ts ("Fix rounding")`. Once per file per session. |
+| Agent is about to edit a file | If a teammate claimed the file or has an open thread on it, the agent is warned before editing, and you see a line like `sticky-note: Alice is working on src/billing/invoice.ts ("Fix rounding")`. Once per file per session. On the first touch of a file, the agent also gets its history (below). |
+| Agent reads a file | On the first read in a session, the agent is shown earlier threads that touched the file or whose commits changed it. |
 | Agent edits a file | The file is noted locally. This is cheap: no git work. |
-| Agent finishes a turn | The thread and edited files are committed to the data branch. A new thread is pushed immediately, and after that a sync runs at most every 2 minutes. |
+| Agent finishes a turn | The thread and edited files are committed to the data branch, along with a heartbeat (for `who`) and any commits you made this session. A new thread is pushed immediately, and after that a sync runs at most every 2 minutes. |
 | Session ends | The session is marked ended and everything is pushed. |
 
 What the agent receives looks like this:
@@ -119,13 +122,17 @@ Details: `sticky-note show <id>`. Tell the user about anything here that affects
 | `sticky-note new "<title>"` | Start a thread by hand. `-f <file>` (repeatable), `-t bugfix`, `-m "<notes>"` |
 | `sticky-note close <id>` | Mark a thread done. `-s "<summary>"` is appended to its notes |
 | `sticky-note sync` | Pull teammates' threads and push yours now |
+| `sticky-note who` | Whose agents are active right now (a heartbeat in the last 30 min), on what, plus active claims. `-r` includes the last 24h |
+| `sticky-note claim <files...>` | Tell teammates you're working on files; their agents are warned before editing them. `-m "<reason>"`, `--hours 2` (default 8) |
+| `sticky-note unclaim <files...>` | Release claims; `--all` releases all of yours |
+| `sticky-note claims` | List everyone's active claims |
 | `sticky-note context` | Preview what an agent would be shown. `-p "<prompt>"`, `-f <file>`, `-a` to see every thread's score and reasons |
 
 Every command accepts `--json` (machine-readable output), `--cwd <dir>` and `-h`/`--help`.
 
 ## How it works
 
-**Storage.** Each thread is one JSON file, `threads/<id>.json`, on the `sticky-note/context` branch. That branch is checked out in a private git worktree at `.git/sticky-note/worktree`, so your working tree, your current branch and your `git status` are never touched. Commits on the data branch skip your repo's git hooks.
+**Storage.** Each thread is one JSON file, `threads/<id>.json`, on the `sticky-note/context` branch. Each person's file claims are one file, `claims/<person>.json`, so teammates never write the same claims file. That branch is checked out in a private git worktree at `.git/sticky-note/worktree`, so your working tree, your current branch and your `git status` are never touched. Commits on the data branch skip your repo's git hooks.
 
 **Sync.** `sync` fetches the data branch, rebases your thread commits onto it, and pushes. If you and a teammate changed the *same* thread before syncing, it merges the two versions field by field instead of raising a git conflict:
 
@@ -155,7 +162,8 @@ If a teammate pushes first, sync retries.
 | Log shows `start` with no `ok` | The hook was killed (timeout). The next hook recovers automatically; report it if it keeps happening. |
 | Hooks error with a syntax error | `node` on Claude Code's `PATH` is older than 20. Run `node -v` in a plain terminal. |
 | A teammate's work isn't showing up | Run `sticky-note sync` on both sides, then `sticky-note context -a` to see how threads score and why. |
-| A thread shows **IN PROGRESS** though nobody is working on it | Its session didn't end cleanly. It stops counting as live 2 hours after its last update. Automatic crash recovery is planned. |
+| A thread shows **IN PROGRESS** though nobody is working on it | Its session didn't end cleanly. It stops counting as live 30 minutes after its last heartbeat. Automatic crash recovery is planned. |
+| `who` shows someone who just stopped, or misses someone who just started | Presence is as fresh as the last sync: hooks sync in the background during sessions (at most every 2 minutes). Run `sticky-note sync` to refresh now. |
 
 For full error stacks from the CLI, set `STICKY_DEBUG=1`.
 
@@ -181,7 +189,7 @@ node dist/cli.js init --hook-command 'node "$CLAUDE_PROJECT_DIR/dist/cli.js"'
 
 ```
 src/
-  core/        threads, config, git, locking, session state
+  core/        threads, claims, config, git, locking, session state
     store/     ThreadStore interface + git data-branch backend (sync, merge, recovery)
   cli/         Cli class, command registry, output; commands/ has one file per command
   hooks/       agent-neutral events and handlers; adapters/ per agent; install/ per agent

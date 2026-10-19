@@ -1,3 +1,4 @@
+import type { ActiveClaim } from '../core/claim.js';
 import type { Thread } from '../core/thread.js';
 import { isLive, type RankedThread } from './relevance.js';
 
@@ -31,6 +32,15 @@ export function renderOverlapWarning(file: string, threads: Thread[], now: Date)
     lines.push(`- ${who} (${when}): "${t.title}" [${t.status}] id ${t.id}`);
   }
   lines.push('Consider checking with them before editing, to avoid conflicting changes.');
+  return lines.join('\n');
+}
+
+export function renderClaimWarning(file: string, claims: ActiveClaim[], now: Date): string {
+  const lines = [`[sticky-note] ${file} is claimed by a teammate:`];
+  for (const c of claims) {
+    lines.push(`- ${c.owner.name}${c.reason ? `: ${c.reason}` : ''} (claimed ${ago(c.claimedAt, now)}, until ${c.expiresAt})`);
+  }
+  lines.push('Ask the user before editing this file; they may want to coordinate with the claimant first.');
   return lines.join('\n');
 }
 

@@ -187,3 +187,55 @@ describe('e2e 3: surfacing to a teammate', () => {
     expect(later?.hookSpecificOutput?.additionalContext ?? '').not.toContain('IN PROGRESS');
   });
 });
+
+describe('e2e 4: presence, claims, and history across teammates', () => {
+  it('who, claim warnings, and git history leading back to a teammate\'s thread', async () => {
+    const { team } = await makeTeam('Alice', 'Bob');
+    const [alice, bob] = team as [(typeof team)[0], (typeof team)[0]];
+    for (const p of team) await sn(p.dir, ['init', '--skip-hooks']);
+
+    step('Bob claims the schema and shares it');
+    expect((await sn(bob.dir, ['claim', 'db/schema.sql', '-m', 'adding the orders table'])).code).toBe(0);
+    await sn(bob.dir, ['sync']);
+
+    step("Bob's session is active; Alice's `who` shows him and his claim");
+    await bob.hook('b1', { hook_event_name: 'UserPromptSubmit', prompt: 'Add an orders table' });
+    await bob.hook('b1', { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'db/migrations/002_orders.sql' } });
+    await bob.hook('b1', { hook_event_name: 'Stop' });
+    await sn(bob.dir, ['sync']);
+    await sn(alice.dir, ['sync']);
+    const who = await snJson(alice.dir, ['who']);
+    expect(who.working).toMatchObject([{ person: { name: 'Bob' }, live: true, thread: { title: 'Add an orders table' } }]);
+    expect(who.claims).toMatchObject([{ file: 'db/schema.sql', owner: { name: 'Bob' }, reason: 'adding the orders table' }]);
+    expect((await sn(alice.dir, ['who'])).out).toMatch(/Bob\s+active/);
+
+    step("Alice's agent is warned before editing Bob's claimed file");
+    const warn = await alice.hook('a1', { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: 'db/schema.sql' } });
+    expect(warn?.systemMessage).toBe('sticky-note: Bob has claimed db/schema.sql (adding the orders table)');
+
+    step('Alice commits code during a session and pushes it normally');
+    const { writeFile } = await import('node:fs/promises');
+    await alice.hook('a2', { hook_event_name: 'SessionStart', source: 'startup' });
+    await alice.hook('a2', { hook_event_name: 'UserPromptSubmit', prompt: 'Cache exchange rates' });
+    await writeFile(path.join(alice.dir, 'rates.ts'), 'export const ttl = 60;\n');
+    await alice.git.run(['add', 'rates.ts']);
+    await alice.git.run(['commit', '-q', '-m', 'cache exchange rates']);
+    await alice.git.run(['push', '-q', 'origin', 'main']);
+    await alice.hook('a2', { hook_event_name: 'Stop' });
+    await alice.hook('a2', { hook_event_name: 'SessionEnd', reason: 'other' });
+
+    step("Bob pulls the code; his agent reading rates.ts is shown Alice's thread via git history");
+    await bob.git.run(['pull', '-q', 'origin', 'main']);
+    await sn(bob.dir, ['sync']);
+    const history = await bob.hook('b1', { hook_event_name: 'PostToolUse', tool_name: 'Read', tool_input: { file_path: path.join(bob.dir, 'rates.ts') } });
+    expect(history?.hookSpecificOutput?.additionalContext).toContain('Earlier work on rates.ts:');
+    expect(history?.hookSpecificOutput?.additionalContext).toContain('"Cache exchange rates" · Alice');
+    expect(history?.hookSpecificOutput?.additionalContext).toMatch(/changed rates\.ts \(commit [0-9a-f]{7}\)/);
+
+    step('Bob releases the claim; Alice no longer sees it');
+    await sn(bob.dir, ['unclaim', '--all']);
+    await sn(bob.dir, ['sync']);
+    await sn(alice.dir, ['sync']);
+    expect((await snJson(alice.dir, ['claims'])).claims).toEqual([]);
+  });
+});

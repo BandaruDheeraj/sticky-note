@@ -40,6 +40,16 @@ export async function runHook(adapter: AgentAdapter, rawInput: string): Promise<
       repoRoot,
       currentBranch: () => services!.git().currentBranch(),
       syncInBackground: () => syncInBackground(repoRoot, log.file),
+      head: async () => (await services!.git().tryRun(['rev-parse', '--verify', '--quiet', 'HEAD'])) || null,
+      myCommitsSince: async (base) => {
+        const author = identity.email ?? identity.name;
+        const out = await services!.git().tryRun(['log', '--format=%H', `--author=${author}`, '-n', '50', `${base}..HEAD`]);
+        return out ? out.split('\n') : [];
+      },
+      fileCommits: async (file) => {
+        const out = await services!.git().tryRun(['log', '--format=%H', '-n', '50', '--', file]);
+        return out ? out.split('\n') : [];
+      },
       now: () => new Date(),
       log: (m) => log.write(`${adapter.name} ${event!.kind}: ${m}`),
     });

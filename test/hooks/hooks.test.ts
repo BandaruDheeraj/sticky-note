@@ -72,7 +72,7 @@ describe('installClaudeCodeHooks', () => {
       { hooks: [{ type: 'command', command: 'sn run-hook claude-code', timeout: 30 }] },
     ]);
     expect(settings.hooks.SessionStart).toEqual([{ hooks: [{ type: 'command', command: 'sn run-hook claude-code', timeout: 30 }] }]);
-    expect(settings.hooks.PostToolUse[0].matcher).toBe('Edit|MultiEdit|Write|NotebookEdit');
+    expect(settings.hooks.PostToolUse[0].matcher).toBe('Edit|MultiEdit|Write|NotebookEdit|Read');
     expect(settings.hooks.PreToolUse[0].matcher).toBe('Edit|MultiEdit|Write|NotebookEdit');
 
     expect((await installClaudeCodeHooks(dir, 'sn')).changed).toBe(false);
@@ -272,5 +272,84 @@ describe('surfacing through hooks', () => {
     expect((await store.list()).threads).toHaveLength(1);
     expect(await hook({ hook_event_name: 'UserPromptSubmit', prompt: 'more on src/feature-flags.ts' })).toBeNull();
     expect(await hook({ hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/feature-flags.ts' } })).toBeNull();
+  });
+});
+
+describe('4b: claims, history on first touch, commit attribution', () => {
+  const alice = { name: 'Alice', email: 'alice@example.com' };
+
+  async function setup() {
+    const repo = await makeRepo();
+    await runCli(['init', '--skip-hooks'], { cwd: repo.dir });
+    const store = new GitBranchStore({ repoDir: repo.dir, dataBranch: BRANCH, remote: 'origin' });
+    const hook = async (session: string, payload: Record<string, unknown>) => {
+      const r = await runCli(['run-hook', 'claude-code'], { cwd: repo.dir, stdin: JSON.stringify({ session_id: session, cwd: repo.dir, ...payload }) });
+      return r.out.trim() ? JSON.parse(r.out) : null;
+    };
+    return { ...repo, store, hook };
+  }
+
+  it("warns before editing a teammate's claimed file", async () => {
+    const { dir, store, hook } = await setup();
+    const { addClaims, ClaimSet } = await import('../../src/core/claim.js');
+    await store.saveClaims(addClaims(ClaimSet.parse({ schemaVersion: 1, owner: alice }), ['db/schema.sql'], { reason: 'running the migration' }));
+
+    const out = await hook('me', { hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: { file_path: path.join(dir, 'db/schema.sql') } });
+    expect(out.hookSpecificOutput.additionalContext).toContain('db/schema.sql is claimed by a teammate');
+    expect(out.hookSpecificOutput.additionalContext).toContain('Alice: running the migration');
+    expect(out.systemMessage).toBe('sticky-note: Alice has claimed db/schema.sql (running the migration)');
+  });
+
+  it("my own claims don't warn me", async () => {
+    const { dir, hook } = await setup();
+    expect((await runCli(['claim', 'src/mine.ts', '-m', 'mine'], { cwd: dir })).code).toBe(0);
+    expect(await hook('me', { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/mine.ts' } })).toBeNull();
+  });
+
+  it('shows earlier work, including failed approaches, the first time a file is read', async () => {
+    const { store, hook } = await setup();
+    const { closeThread } = await import('../../src/core/thread.js');
+    const old = closeThread({
+      ...createThread({ title: 'Speed up search index', author: alice, branch: 'main', files: ['src/search/index-builder.ts'] }),
+      failedApproaches: [{ description: 'parallel workers', reason: 'lock contention', at: new Date().toISOString() }],
+    });
+    await store.save(old);
+
+    const read = { hook_event_name: 'PostToolUse', tool_name: 'Read', tool_input: { file_path: 'src/search/index-builder.ts' } };
+    const out = await hook('me', read);
+    expect(out.hookSpecificOutput.hookEventName).toBe('PostToolUse');
+    expect(out.hookSpecificOutput.additionalContext).toContain('Earlier work on src/search/index-builder.ts:');
+    expect(out.hookSpecificOutput.additionalContext).toContain("Tried, didn't work: parallel workers (lock contention)");
+    expect(await hook('me', read)).toBeNull(); // only on first touch
+  });
+
+  it('links commits made in a session to its thread, then surfaces that thread from git history', async () => {
+    const { dir, git, store, hook } = await setup();
+    await hook('s1', { hook_event_name: 'SessionStart', source: 'startup' });
+    await hook('s1', { hook_event_name: 'UserPromptSubmit', prompt: 'Tune retry backoff' });
+    // The person (or agent via Bash) commits a file that sticky-note never saw edited.
+    await writeFile(path.join(dir, 'retry.ts'), 'export const backoff = 2;\n');
+    await git.run(['add', 'retry.ts']);
+    await git.run(['commit', '-q', '-m', 'tune backoff']);
+    const sha = await git.run(['rev-parse', 'HEAD']);
+    await hook('s1', { hook_event_name: 'Stop' });
+    await hook('s1', { hook_event_name: 'SessionEnd', reason: 'other' });
+
+    const [thread] = (await store.list()).threads;
+    expect(thread!.commits).toEqual([sha]);
+    expect(thread!.files).toEqual([]); // known only through the commit
+
+    const out = await hook('s2', { hook_event_name: 'PostToolUse', tool_name: 'Read', tool_input: { file_path: 'retry.ts' } });
+    expect(out.hookSpecificOutput.additionalContext).toContain('"Tune retry backoff"');
+    expect(out.hookSpecificOutput.additionalContext).toContain(`changed retry.ts (commit ${sha.slice(0, 7)})`);
+  });
+
+  it("doesn't attribute commits made before the session started", async () => {
+    const { git, store, hook } = await setup();
+    await git.run(['commit', '-q', '--allow-empty', '-m', 'before session']);
+    await hook('s1', { hook_event_name: 'SessionStart', source: 'startup' });
+    await hook('s1', { hook_event_name: 'UserPromptSubmit', prompt: 'x' });
+    await hook('s1', { hook_event_name: 'Stop' });
+    expect((await store.list()).threads[0]!.commits).toEqual([]);
   });
 });

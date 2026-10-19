@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { CLAUDE_CODE_EVENTS } from '../adapters/claude-code.js';
-import { EDIT_TOOL_NAMES } from '../edited-files.js';
+import { EDIT_TOOL_NAMES, READ_TOOL_NAMES } from '../edited-files.js';
 
 export const DEFAULT_HOOK_COMMAND = 'npx --no-install sticky-note-cli';
 export const CLAUDE_SETTINGS_PATH = path.join('.claude', 'settings.json');
@@ -26,9 +26,9 @@ interface HookGroup {
 const isOurs = (command = '') => /\brun-hook claude-code$/.test(command) || /sticky-note.*\brun-hook\b/.test(command);
 
 const MATCHERS: Partial<Record<(typeof CLAUDE_CODE_EVENTS)[number], string>> = {
-  // Only file edits matter for now; avoids spawning a process for every Read/Bash.
+  // Only file tools matter; avoids spawning a process for every Bash/Grep call.
   PreToolUse: EDIT_TOOL_NAMES.join('|'),
-  PostToolUse: EDIT_TOOL_NAMES.join('|'),
+  PostToolUse: [...EDIT_TOOL_NAMES, ...READ_TOOL_NAMES].join('|'),
 };
 
 // Generous because a killed hook is worse than a slow one; SessionEnd also syncs with the remote.

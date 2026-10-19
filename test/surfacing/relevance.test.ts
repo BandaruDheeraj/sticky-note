@@ -12,7 +12,7 @@ function thread(title: string, patch: Partial<Thread> = {}): Thread {
   const t = createThread({ title, author: alice, branch: 'main', now: new Date(hoursAgo(1)) });
   return { ...t, updatedAt: hoursAgo(1), ...patch };
 }
-const live = (t: Thread): Thread => ({ ...t, sessions: [{ id: 's', agent: 'claude-code', startedAt: t.createdAt, endedAt: null }] });
+const live = (t: Thread): Thread => ({ ...t, sessions: [{ id: 's', agent: 'claude-code', startedAt: t.createdAt, endedAt: null, lastActiveAt: hoursAgo(0.1) }] });
 const titles = (threads: Thread[], input: Parameters<typeof rankThreads>[1]) => rankThreads(threads, input).map((r) => r.thread.title);
 
 describe('rankThreads', () => {

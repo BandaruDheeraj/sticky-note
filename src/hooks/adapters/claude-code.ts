@@ -25,6 +25,7 @@ const CONTEXT_EVENTS: Partial<Record<HookEvent['kind'], string>> = {
   'session-start': 'SessionStart',
   prompt: 'UserPromptSubmit',
   'tool-before': 'PreToolUse',
+  'tool-used': 'PostToolUse',
 };
 
 export const claudeCodeAdapter: AgentAdapter = {

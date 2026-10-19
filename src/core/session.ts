@@ -29,6 +29,10 @@ export const SessionState = z.object({
   surfaced: z.record(z.string()).default({}),
   /** Files we've already warned about overlapping work on, once per session. */
   warnedFiles: z.array(z.string()).default([]),
+  /** Files the agent has read or edited; their history is shown on first touch only. */
+  touchedFiles: z.array(z.string()).default([]),
+  /** HEAD when the session began; my commits after it are attributed to the session's thread. */
+  baseHead: z.string().nullable().default(null),
   /** Last background sync started by this session. */
   lastSyncAt: z.string().datetime().nullable().default(null),
 });

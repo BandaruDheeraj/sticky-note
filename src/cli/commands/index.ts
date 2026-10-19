@@ -1,4 +1,5 @@
 import { CommandRegistry } from '../registry.js';
+import { claimCommand, claimsCommand, unclaimCommand } from './claim.js';
 import { closeCommand } from './close.js';
 import { contextCommand } from './context.js';
 import { initCommand } from './init.js';
@@ -8,6 +9,7 @@ import { showCommand } from './show.js';
 import { statusCommand } from './status.js';
 import { syncCommand } from './sync.js';
 import { threadsCommand } from './threads.js';
+import { whoCommand } from './who.js';
 
 /** Every CLI command. To add one: create a file with defineCommand() and list it here. */
 export function createRegistry(): CommandRegistry {
@@ -18,6 +20,10 @@ export function createRegistry(): CommandRegistry {
     threadsCommand,
     showCommand,
     closeCommand,
+    whoCommand,
+    claimCommand,
+    unclaimCommand,
+    claimsCommand,
     contextCommand,
     syncCommand,
     runHookCommand,

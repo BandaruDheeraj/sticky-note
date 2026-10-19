@@ -27,6 +27,8 @@ export const SessionRef = z.object({
   agent: z.string(),
   startedAt: z.string().datetime(),
   endedAt: z.string().datetime().nullable().default(null),
+  /** Heartbeat from the end of the session's latest turn; drives presence. */
+  lastActiveAt: z.string().datetime().nullable().default(null),
 });
 export type SessionRef = z.infer<typeof SessionRef>;
 
@@ -47,6 +49,8 @@ export const Thread = z.object({
   narrative: z.string().default(''),
   failedApproaches: z.array(FailedApproach).default([]),
   sessions: z.array(SessionRef).default([]),
+  /** Commits made during this thread's sessions, linking code history back to the thread. */
+  commits: z.array(z.string()).default([]),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   closedAt: z.string().datetime().nullable().default(null),
@@ -65,7 +69,7 @@ export interface NewThreadInput {
   workType?: WorkType;
   files?: string[];
   narrative?: string;
-  session?: { id: string; agent: string; startedAt: string };
+  session?: { id: string; agent: string; startedAt: string; lastActiveAt?: string };
   now?: Date;
 }
 
@@ -83,7 +87,7 @@ export function createThread(input: NewThreadInput): Thread {
     branch: input.branch,
     files: dedupe(input.files ?? []),
     narrative: input.narrative ?? '',
-    sessions: input.session ? [input.session] : [],
+    sessions: input.session ? [{ endedAt: null, lastActiveAt: null, ...input.session }] : [],
     createdAt: iso,
     updatedAt: iso,
   });
@@ -109,6 +113,20 @@ export function endSession(thread: Thread, sessionId: string, now = new Date()):
     ...thread,
     sessions: thread.sessions.map((s) => (s.id === sessionId ? { ...s, endedAt: iso } : s)),
     updatedAt: iso,
+  };
+}
+
+/** Mark a session active now and attach any new commits. Returns the same object if nothing changed. */
+export function heartbeat(thread: Thread, sessionId: string, opts: { commits?: string[]; now?: Date } = {}): Thread {
+  const iso = (opts.now ?? new Date()).toISOString();
+  const commits = dedupe([...thread.commits, ...(opts.commits ?? [])]);
+  const hasSession = thread.sessions.some((s) => s.id === sessionId && s.endedAt === null);
+  if (!hasSession && commits.length === thread.commits.length) return thread;
+  return {
+    ...thread,
+    commits,
+    sessions: thread.sessions.map((s) => (s.id === sessionId && s.endedAt === null ? { ...s, lastActiveAt: iso } : s)),
+    updatedAt: commits.length > thread.commits.length ? iso : thread.updatedAt,
   };
 }
 

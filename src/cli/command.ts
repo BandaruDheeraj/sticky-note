@@ -30,6 +30,8 @@ export interface ArgSpec {
 
 export interface CommandInput<O extends OptionSpecs> {
   args: Record<string, string | undefined>;
+  /** The variadic argument's values, unjoined (empty if none). */
+  rest: string[];
   options: OptionValues<O> & GlobalOptionValues;
 }
 
