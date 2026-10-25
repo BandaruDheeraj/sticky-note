@@ -257,3 +257,15 @@ describe('GitBranchStore', () => {
     });
   });
 });
+
+describe('sync when local is already ahead of the remote', () => {
+  it('succeeds without trying to commit an empty merge', async () => {
+    const remote = await makeBareRemote();
+    const alice = await makeRepo({ remote, user: 'Alice' });
+    await store(alice.dir).save(thread('local only'));
+    await store(alice.dir).sync();
+    // Remote is now an ancestor of local: a merge would be "Already up to date".
+    await store(alice.dir).save(thread('second local'));
+    await expect(store(alice.dir).sync()).resolves.toMatchObject({ merged: 0 });
+  });
+});

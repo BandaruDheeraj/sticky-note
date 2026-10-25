@@ -301,6 +301,8 @@ export class GitBranchStore implements ThreadStore {
     await wt.tryRun(['rebase', '--abort']);
 
     if ((await wt.tryRun(['merge', '--no-ff', '--no-commit', '--allow-unrelated-histories', remoteRef], { config })) !== null) {
+      // "Already up to date" leaves no MERGE_HEAD and nothing to commit; committing would fail.
+      if (!(await wt.tryRun(['rev-parse', '-q', '--verify', 'MERGE_HEAD']))) return 0;
       await wt.run(['commit', '--quiet', '--no-verify', '-m', `merge ${remoteRef}`], { config });
       return 0;
     }
