@@ -4,9 +4,10 @@ import path from 'node:path';
 import { Git, GitError } from '../git.js';
 import { withLock } from '../lock.js';
 import { localStateDir } from '../paths.js';
+import { AuditEntry, AuditLog, appendAuditEntry, mergeAuditLogs } from '../audit.js';
 import { ClaimSet, mergeClaimSets, ownerKey } from '../claim.js';
 import { mergeThreads } from '../thread-merge.js';
-import { Thread } from '../thread.js';
+import { Person, Thread } from '../thread.js';
 import {
   AmbiguousIdError,
   matchesFilter,
@@ -20,8 +21,9 @@ import {
 
 const THREADS_DIR = 'threads';
 const CLAIMS_DIR = 'claims';
+const AUDIT_DIR = 'audit';
 /** Directories of records sticky-note owns on the data branch, and how to merge each kind. */
-const RECORD_DIRS = [THREADS_DIR, CLAIMS_DIR];
+const RECORD_DIRS = [THREADS_DIR, CLAIMS_DIR, AUDIT_DIR];
 const MAX_PUSH_ATTEMPTS = 3;
 
 export interface GitBranchStoreOptions {
@@ -91,14 +93,7 @@ export class GitBranchStore implements ThreadStore {
   }
 
   async listClaims(): Promise<ClaimSet[]> {
-    const dir = path.join(await this.readyWorktree(), CLAIMS_DIR);
-    const entries = await readdir(dir).catch(() => [] as string[]);
-    const sets = await Promise.all(
-      entries
-        .filter((f) => f.endsWith('.json'))
-        .map((f) => readFile(path.join(dir, f), 'utf8').then((raw) => ClaimSet.safeParse(JSON.parse(raw)), () => null)),
-    );
-    return sets.flatMap((r) => (r?.success ? [r.data] : []));
+    return this.listRecords(CLAIMS_DIR, ClaimSet);
   }
 
   async saveClaims(set: ClaimSet, message?: string): Promise<void> {
@@ -107,26 +102,61 @@ export class GitBranchStore implements ThreadStore {
     await this.writeRecord(rel, valid, message ?? `claims: ${valid.owner.name} (${valid.claims.length})`);
   }
 
-  /** Atomically write one JSON record into the data worktree and commit it. */
-  private async writeRecord(rel: string, data: unknown, message: string): Promise<void> {
+  async listAudit(): Promise<AuditLog[]> {
+    return this.listRecords(AUDIT_DIR, AuditLog);
+  }
+
+  async appendAudit(actor: Person, entry: Omit<AuditEntry, 'at'> & { at?: string }, message?: string): Promise<void> {
+    // Read-modify-write under one lock acquisition, so two hook processes
+    // appending for the same person in quick succession don't lose an entry.
     await this.withWriteLock(async () => {
       const worktree = await this.ensureWorktree();
       const wt = this.repo.at(worktree);
-      await this.recover(wt);
-
-      const abs = path.join(worktree, rel);
-      await mkdir(path.dirname(abs), { recursive: true });
-      // Write-then-rename so readers never see a half-written file. The temp
-      // file lives outside the worktree so it can never be committed.
-      const { tmp } = await this.resolvePaths();
-      await mkdir(tmp, { recursive: true });
-      const tmpFile = path.join(tmp, `${path.basename(rel)}.${process.pid}.tmp`);
-      await writeFile(tmpFile, `${JSON.stringify(data, null, 2)}\n`);
-      await rename(tmpFile, abs);
-
-      // Also picks up anything an interrupted earlier write left uncommitted.
-      await this.commitPending(wt, message);
+      const rel = path.posix.join(AUDIT_DIR, `${ownerKey(actor)}.json`);
+      const existing = await readFile(path.join(worktree, rel), 'utf8').then(
+        (raw) => AuditLog.safeParse(JSON.parse(raw)),
+        () => null,
+      );
+      const log = existing?.success ? existing.data : AuditLog.parse({ schemaVersion: 1, owner: actor });
+      const next = appendAuditEntry(log, entry);
+      await this.writeRecordLocked(wt, rel, next, message ?? `audit: ${actor.name} ${entry.action}`);
     });
+  }
+
+  private async listRecords<T>(dir: string, schema: { safeParse(v: unknown): { success: boolean; data?: T } }): Promise<T[]> {
+    const folder = path.join(await this.readyWorktree(), dir);
+    const entries = await readdir(folder).catch(() => [] as string[]);
+    const results = await Promise.all(
+      entries
+        .filter((f) => f.endsWith('.json'))
+        .map((f) => readFile(path.join(folder, f), 'utf8').then((raw) => schema.safeParse(JSON.parse(raw)), () => null)),
+    );
+    return results.flatMap((r) => (r?.success ? [r.data as T] : []));
+  }
+
+  private async writeRecord(rel: string, data: unknown, message: string): Promise<void> {
+    await this.withWriteLock(async () => {
+      const worktree = await this.ensureWorktree();
+      await this.writeRecordLocked(this.repo.at(worktree), rel, data, message);
+    });
+  }
+
+  /** Atomically write one JSON record into the data worktree and commit it. Caller must hold the write lock. */
+  private async writeRecordLocked(wt: Git, rel: string, data: unknown, message: string): Promise<void> {
+    await this.recover(wt);
+
+    const abs = path.join(wt.cwd, rel);
+    await mkdir(path.dirname(abs), { recursive: true });
+    // Write-then-rename so readers never see a half-written file. The temp
+    // file lives outside the worktree so it can never be committed.
+    const { tmp } = await this.resolvePaths();
+    await mkdir(tmp, { recursive: true });
+    const tmpFile = path.join(tmp, `${path.basename(rel)}.${process.pid}.tmp`);
+    await writeFile(tmpFile, `${JSON.stringify(data, null, 2)}\n`);
+    await rename(tmpFile, abs);
+
+    // Also picks up anything an interrupted earlier write left uncommitted.
+    await this.commitPending(wt, message);
   }
 
   async sync(): Promise<SyncResult> {
@@ -342,6 +372,8 @@ function mergeRecord(file: string, versions: string[]): unknown {
       return parsed.map((v) => Thread.parse(v)).reduce(mergeThreads);
     case CLAIMS_DIR:
       return parsed.map((v) => ClaimSet.parse(v)).reduce(mergeClaimSets);
+    case AUDIT_DIR:
+      return parsed.map((v) => AuditLog.parse(v)).reduce(mergeAuditLogs);
     default:
       throw new SyncConflictError(`unexpected conflict in ${file}`);
   }

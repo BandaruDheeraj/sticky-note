@@ -164,3 +164,33 @@ describe('claim, unclaim, claims, who', () => {
     expect((await run(['who', '--json'], { cwd: dir })).json().working).toEqual([]);
   });
 });
+
+describe('audit', () => {
+  it('records thread and claim actions, filterable by author and thread', async () => {
+    const { dir } = await makeRepo();
+    const created = (await run(['new', 'Investigate flaky test', '--json'], { cwd: dir })).json();
+    await run(['claim', 'src/flaky.ts', '-m', 'debugging'], { cwd: dir });
+    await run(['close', created.thread.id, '-s', 'fixed'], { cwd: dir });
+    await run(['unclaim', '--all'], { cwd: dir });
+
+    const all = (await run(['audit', '--json'], { cwd: dir })).json();
+    expect(all.entries.map((e: any) => e.action)).toEqual(['claim.released', 'thread.closed', 'claim.created', 'thread.created']); // newest first
+    for (const e of all.entries) expect(e.actor.name).toBe('Test User');
+
+    const byThread = (await run(['audit', '--thread', created.thread.id, '--json'], { cwd: dir })).json();
+    expect(byThread.entries.map((e: any) => e.action)).toEqual(['thread.closed', 'thread.created']);
+
+    const byAuthor = (await run(['audit', '--author', 'Test User', '--json'], { cwd: dir })).json();
+    expect(byAuthor.total).toBe(all.total);
+    expect((await run(['audit', '--author', 'nobody', '--json'], { cwd: dir })).json().entries).toEqual([]);
+
+    expect((await run(['audit'], { cwd: dir })).out).toMatch(/thread\.created/);
+    expect((await run(['audit', '--limit', '0'], { cwd: dir })).code).toBe(2);
+  });
+
+  it('has nothing to report in a fresh repo', async () => {
+    const { dir } = await makeRepo();
+    await run(['init', '--skip-hooks'], { cwd: dir });
+    expect((await run(['audit'], { cwd: dir })).out).toMatch(/No audit entries yet/);
+  });
+});

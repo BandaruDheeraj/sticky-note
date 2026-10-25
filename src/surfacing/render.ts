@@ -44,6 +44,17 @@ export function renderClaimWarning(file: string, claims: ActiveClaim[], now: Dat
   return lines.join('\n');
 }
 
+export function renderResume(t: Thread, now: Date): string {
+  const lines = [`[sticky-note] Resumed thread "${t.title}" (id ${t.id})`];
+  lines.push(`Status: ${t.status} · Author: ${t.author.name} · Branch: ${t.branch ?? '-'} · Last updated ${ago(t.updatedAt, now)}`);
+  if (t.files.length) lines.push(`Files: ${listFiles(t.files)}`);
+  const narrative = t.narrative.trim().replace(/\s+/g, ' ');
+  if (narrative) lines.push(`Notes: ${truncate(narrative, MAX_NARRATIVE)}`);
+  for (const f of t.failedApproaches.slice(-3)) lines.push(`Tried, didn't work: ${f.description}${f.reason ? ` (${f.reason})` : ''}`);
+  lines.push("Continue this thread: tell the user you've picked it back up, and use the context above.");
+  return lines.join('\n');
+}
+
 function headline(t: Thread, now: Date): string {
   const status = isLive(t, now) ? 'IN PROGRESS' : t.status.toUpperCase();
   const branch = t.branch ? ` · branch ${t.branch}` : '';

@@ -19,9 +19,12 @@ When one person's agent works on something, the next person's agent already know
 | **Overlap warnings** | Before your agent edits a file that's part of a teammate's open thread, or that a teammate has *claimed*, the agent is warned and so are you. Warnings never block the edit. |
 | **Presence** | `sticky-note who` shows whose agents are active right now, on what thread, branch and files, plus active file claims. |
 | **History on first touch** | The first time your agent reads or edits a file in a session, it's shown earlier threads that worked on that file, including closed ones and what didn't work. Commits made during a session are linked to its thread, so a file's git history leads back to the thread that changed it. |
-| **CLI** | List, show, create, close and sync threads; claim files; see who's active; preview exactly what agents are shown. |
+| **Resume** | `sticky-note resume <id-or-search-words>` continues a thread — yours or a teammate's, open or closed — instead of starting a new one. Your next prompt (in a new session, or the one you're in) attaches to it: title, files, notes and history carry over, and a closed thread reopens. |
+| **Audit trail** | `sticky-note audit` (and the `get_audit_trail` MCP tool) records who created, resumed or closed a thread, and who claimed a file, with timestamps — "who changed what with AI, and when." |
+| **MCP server** | Tools any MCP-capable agent can call on purpose: check overlaps before editing, search past work before starting, see who's active, read a file's history, claim files, close a thread, see the audit trail. `init` registers it in `.mcp.json`. This also covers Cursor, Windsurf and other tools without hooks. |
+| **CLI** | List, show, create, close, resume and sync threads; claim files; see who's active; see the audit trail; preview exactly what agents are shown. |
 
-**Not built yet** (planned for Release 1): continuing (resuming) a teammate's thread, automatic stuck detection, the MCP server, transcripts and line-level AI blame, Copilot CLI and Codex support, the cloud backend (real-time presence without git), and environment sync.
+**Not built yet** (planned for Release 1): automatic stuck detection, transcript capture and line-level AI blame, the remote MCP server and transcript/environment MCP tools, Copilot CLI and Codex support, the cloud backend (real-time presence without git), and environment sync.
 
 ## Requirements
 
@@ -37,7 +40,7 @@ Until v4 is on npm, build it from source once per machine:
 git clone -b ailaney-rewrite https://github.com/BandaruDheeraj/sticky-note.git ~/tools/sticky-note
 cd ~/tools/sticky-note
 npm install
-npm run build          # produces dist/cli.js, a single self-contained file
+npm run build          # produces dist/: cli.js plus chunks loaded on demand, with no runtime dependencies
 ```
 
 Optionally put it on your `PATH` so you can type `sticky-note` instead of `node ~/tools/sticky-note/dist/cli.js`:
@@ -62,13 +65,14 @@ node ~/tools/sticky-note/dist/cli.js init --hook-command "node $HOME/tools/stick
 1. writes `.sticky-note/config.json` (the data branch name and remote)
 2. creates the data branch `sticky-note/context`, or reuses it if a teammate already pushed one
 3. adds Claude Code hooks to `.claude/settings.json`, keeping any settings and hooks you already have
+4. registers the sticky-note MCP server in `.mcp.json`, keeping any other servers
 
-`--hook-command` tells the hooks how to run sticky-note. While v4 isn't on npm, point it at your build with an **absolute path**. The default, `npx --no-install sticky-note-cli`, will be right once v4 is published.
+`--hook-command` tells the hooks and the MCP server how to run sticky-note. While v4 isn't on npm, point it at your build with an **absolute path**. The default, `npx --no-install sticky-note-cli`, will be right once v4 is published.
 
 Then commit the setup so teammates get it:
 
 ```sh
-git add .sticky-note/config.json .claude/settings.json
+git add .sticky-note/config.json .claude/settings.json .mcp.json
 git commit -m "Set up sticky-note"
 ```
 
@@ -81,7 +85,8 @@ git commit -m "Set up sticky-note"
 
 1. Open Claude Code **in the repo root**. If your editor opens a parent folder, Claude Code won't load the repo's hooks.
 2. Run `/hooks`. You should see sticky-note on `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop` and `SessionEnd`. Approve them if prompted.
-3. Ask Claude something and let it finish the turn, then in a terminal:
+3. Run `/mcp`. `sticky-note` should be listed as connected with 9 tools. Approve the project server if prompted.
+4. Ask Claude something and let it finish the turn, then in a terminal:
    ```sh
    sticky-note threads
    ```
@@ -127,6 +132,45 @@ What the agent receives looks like this:
 Details: `sticky-note show <id>`. Tell the user about anything here that affects their request.
 ```
 
+### Resuming a thread
+
+Every new session starts its own thread by default. To continue one instead — yours from yesterday, or a teammate's handoff — run, in a terminal, in the repo:
+
+```sh
+sticky-note resume m2abc1               # by id or unique id prefix
+sticky-note resume invoice rounding bug # or by search words, if there's a clear best match
+```
+
+This arms a one-time resume: your **next prompt** (in a new Claude Code session, or the one you already have open — resume works mid-session) attaches to that thread instead of starting a new one. You'll see:
+
+```
+[sticky-note] Resumed thread "Fix rounding in invoice totals" (id mvei8pya-06b9d2)
+Status: active · Author: Alice · Branch: main · Last updated 2h ago
+Files: src/billing/invoice.ts, src/billing/credit-note.ts
+Notes: Totals were a cent off on discounted orders.
+Continue this thread: tell the user you've picked it back up, and use the context above.
+```
+
+A closed thread reopens. If you were already partway into your own thread this session, that work isn't lost — its session is ended cleanly and it stays as its own thread; your session just starts contributing to the resumed one instead. If the search words don't point at one clear thread, `resume` lists the candidates and asks you to pick an id rather than guessing.
+
+### MCP tools
+
+Agents call these on their own; the server tells them when (for example, check overlaps before editing).
+
+| Tool | What it answers |
+|---|---|
+| `check_overlaps(files)` | Has a teammate claimed these files, or are they working on them? |
+| `search_threads(query)` | What has the team already done or tried (including failed approaches) about this? |
+| `get_file_context(file)` | Which threads worked on this file, by files touched or by commits in its git history? |
+| `get_presence()` | Who's active right now, on what, and what's claimed? |
+| `list_threads(status?, author?)` / `get_thread(id)` | Browse threads / read one in full |
+| `get_stuck_threads()` | Who is stuck, on what, and what did they try? |
+| `close_thread(id, summary?)` | Mark a goal done (only when the user confirms) |
+| `claim_files(files, reason?, hours?)` | Claim files for the user |
+| `get_audit_trail(author?, threadId?)` | Who created, resumed or closed threads, and who claimed files, and when |
+
+The server reads local data and starts a background sync when it launches. To use it from another MCP client (Cursor, Windsurf, …), point the client at `sticky-note mcp`, run in the repo.
+
 ### Commands
 
 | Command | What it does |
@@ -137,18 +181,21 @@ Details: `sticky-note show <id>`. Tell the user about anything here that affects
 | `sticky-note show <id>` | One thread in full. Any unique id prefix works |
 | `sticky-note new "<title>"` | Start a thread by hand. `-f <file>` (repeatable), `-t bugfix`, `-m "<notes>"` |
 | `sticky-note close <id>` | Mark a thread done. `-s "<summary>"` is appended to its notes |
+| `sticky-note resume <id-or-words>` | Continue a thread: your next prompt (new session or this one) attaches to it. Reopens a closed thread |
+| `sticky-note audit` | Who created, resumed or closed threads, and who claimed files. `--author`, `--thread <id>`, `-n <limit>` |
 | `sticky-note sync` | Pull teammates' threads and push yours now |
 | `sticky-note who` | Whose agents are active right now (a heartbeat in the last 30 min), on what, plus active claims. `-r` includes the last 24h |
 | `sticky-note claim <files...>` | Tell teammates you're working on files; their agents are warned before editing them. `-m "<reason>"`, `--hours 2` (default 8) |
 | `sticky-note unclaim <files...>` | Release claims; `--all` releases all of yours |
 | `sticky-note claims` | List everyone's active claims |
+| `sticky-note mcp` | Run the MCP server on stdio (MCP clients start this from `.mcp.json`) |
 | `sticky-note context` | Preview what an agent would be shown. `-p "<prompt>"`, `-f <file>`, `-a` to see every thread's score and reasons |
 
 Every command accepts `--json` (machine-readable output), `--cwd <dir>` and `-h`/`--help`.
 
 ## How it works
 
-**Storage.** Each thread is one JSON file, `threads/<id>.json`, on the `sticky-note/context` branch. Each person's file claims are one file, `claims/<person>.json`, so teammates never write the same claims file. That branch is checked out in a private git worktree at `.git/sticky-note/worktree`, so your working tree, your current branch and your `git status` are never touched. Commits on the data branch skip your repo's git hooks.
+**Storage.** Each thread is one JSON file, `threads/<id>.json`, on the `sticky-note/context` branch. Each person's file claims (`claims/<person>.json`) and audit log (`audit/<person>.json`) are likewise one file per person, so teammates never write the same file. That branch is checked out in a private git worktree at `.git/sticky-note/worktree`, so your working tree, your current branch and your `git status` are never touched. Commits on the data branch skip your repo's git hooks.
 
 **Sync.** `sync` fetches the data branch, rebases your thread commits onto it, and pushes. If you and a teammate changed the *same* thread before syncing, it merges the two versions field by field instead of raising a git conflict:
 
@@ -164,6 +211,7 @@ If a teammate pushes first, sync retries.
 |---|---|
 | `worktree/` | The checked-out data branch |
 | `sessions/` | Per-session scratch state shared between hook calls |
+| `resume-intent.json` | A one-time, local-only marker written by `sticky-note resume`, consumed by the next hook event |
 | `logs/hooks.log` | One `start` and one `ok`/`FAILED` line per hook call, plus background sync output |
 
 **Reliability.** Hooks never fail or block Claude Code: errors go to the log and the hook exits 0. If a hook is killed (for example on timeout), the next write recovers: leftover changes are committed, stale git locks cleared, and a lock held by a dead process is taken over immediately.
@@ -187,7 +235,7 @@ For full error stacks from the CLI, set `STICKY_DEBUG=1`.
 
 ```sh
 npm install
-npm run build        # bundle to dist/cli.js
+npm run build        # bundle to dist/ (cli.js + lazily loaded chunks such as the MCP SDK)
 npm run typecheck
 npm test             # unit and integration tests (real temp git repos)
 npm run test:e2e     # builds, then runs dist/cli.js as real processes: two teammates, a shared remote
@@ -205,11 +253,12 @@ node dist/cli.js init --hook-command 'node "$CLAUDE_PROJECT_DIR/dist/cli.js"'
 
 ```
 src/
-  core/        threads, claims, config, git, locking, session state
+  core/        threads, claims, audit log, resume intent, config, git, locking, session state
     store/     ThreadStore interface + git data-branch backend (sync, merge, recovery)
   cli/         Cli class, command registry, output; commands/ has one file per command
   hooks/       agent-neutral events and handlers; adapters/ per agent; install/ per agent
-  surfacing/   relevance ranking, rendering, injection policy
+  surfacing/   relevance ranking, shared queries (overlaps, history, search), rendering, injection policy
+  mcp/         MCP server and tools, stdio runner, .mcp.json installer
 test/          unit and integration tests; e2e/ end-to-end tests against the built CLI
 ```
 

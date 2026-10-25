@@ -106,6 +106,27 @@ export function recordActivity(thread: Thread, activity: { files: string[]; pers
   };
 }
 
+/**
+ * Attach a new session to an existing thread, continuing it instead of
+ * starting fresh. Reopens a closed thread, since someone is working on it
+ * again. The old session (if any) is ended separately by the caller first.
+ */
+export function resumeThread(
+  thread: Thread,
+  session: { id: string; agent: string; startedAt: string },
+  now = new Date(),
+): Thread {
+  const iso = now.toISOString();
+  const wasClosed = thread.status === 'closed';
+  return {
+    ...thread,
+    status: wasClosed ? 'active' : thread.status,
+    closedAt: wasClosed ? null : thread.closedAt,
+    sessions: [...thread.sessions, { id: session.id, agent: session.agent, startedAt: session.startedAt, endedAt: null, lastActiveAt: iso }],
+    updatedAt: iso,
+  };
+}
+
 export function endSession(thread: Thread, sessionId: string, now = new Date()): Thread {
   const iso = now.toISOString();
   if (!thread.sessions.some((s) => s.id === sessionId && s.endedAt === null)) return thread;

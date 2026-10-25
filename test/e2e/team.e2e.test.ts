@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { cleanupTmpDirs } from '../helpers/repo.js';
-import { assertBuilt, BRANCH, makeTeam, sn, snJson, step, waitForRemoteThread } from './helpers.js';
+import { assertBuilt, BIN, BRANCH, makeTeam, sn, snJson, step, waitForRemoteThread } from './helpers.js';
 
 beforeAll(assertBuilt);
 afterAll(cleanupTmpDirs);
@@ -14,7 +14,7 @@ describe('e2e 1: threads via the CLI, across two teammates', () => {
     const [alice, bob] = team as [(typeof team)[0], (typeof team)[0]];
 
     step('both teammates run init');
-    for (const p of team) expect((await sn(p.dir, ['init', '--skip-hooks'])).code).toBe(0);
+    for (const p of team) expect((await sn(p.dir, ['init', '--skip-hooks', '--skip-mcp'])).code).toBe(0);
     for (const p of team) expect(await p.git.run(['status', '--porcelain'])).toBe('?? .sticky-note/');
 
     step('Alice creates a thread and sees it');
@@ -237,5 +237,111 @@ describe('e2e 4: presence, claims, and history across teammates', () => {
     await sn(bob.dir, ['sync']);
     await sn(alice.dir, ['sync']);
     expect((await snJson(alice.dir, ['claims'])).claims).toEqual([]);
+  });
+});
+
+describe('e2e 5: the MCP server, launched the way .mcp.json says', () => {
+  it("Bob's agent asks before editing and searches before starting work", async () => {
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+    const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
+    const { readFile } = await import('node:fs/promises');
+    const { team } = await makeTeam('Alice', 'Bob');
+    const [alice, bob] = team as [(typeof team)[0], (typeof team)[0]];
+    for (const p of team) await sn(p.dir, ['init', '--hook-command', `node "$CLAUDE_PROJECT_DIR/../../never-used"`]);
+
+    step('init registered the server in .mcp.json');
+    const mcpJson = JSON.parse(await readFile(path.join(bob.dir, '.mcp.json'), 'utf8'));
+    expect(mcpJson.mcpServers['sticky-note']).toMatchObject({ type: 'stdio', command: 'node' });
+    expect(mcpJson.mcpServers['sticky-note'].args.at(-1)).toBe('mcp');
+
+    step('Alice is working on src/payments/refund.ts and once gave up on idempotency keys');
+    await alice.hook('a1', { hook_event_name: 'UserPromptSubmit', prompt: 'Handle duplicate refund webhooks' });
+    await alice.hook('a1', { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/payments/refund.ts' } });
+    await alice.hook('a1', { hook_event_name: 'Stop' });
+    await sn(alice.dir, ['sync']);
+    await sn(bob.dir, ['sync']);
+
+    step("Bob's MCP client launches `sticky-note mcp` over stdio (like Claude Code, Cursor, ...)");
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [BIN, 'mcp'],
+      cwd: bob.dir,
+      env: { ...process.env, STICKY_NO_BACKGROUND_SYNC: '1' } as Record<string, string>,
+      stderr: 'pipe',
+    });
+    const client = new Client({ name: 'e2e', version: '0' });
+    await client.connect(transport);
+    try {
+      const call = async (name: string, args: Record<string, unknown>) =>
+        ((await client.callTool({ name, arguments: args })) as { content: { text: string }[] }).content[0]!.text;
+
+      expect((await client.listTools()).tools).toHaveLength(10);
+
+      step('check_overlaps before editing refund.ts → Alice is on it');
+      expect(await call('check_overlaps', { files: ['src/payments/refund.ts'] })).toContain('Alice (working on it right now): "Handle duplicate refund webhooks"');
+
+      step('search_threads before starting → finds her thread');
+      expect(await call('search_threads', { query: 'refund webhooks' })).toContain('"Handle duplicate refund webhooks" · Alice');
+
+      step('get_presence → Alice is active');
+      expect(await call('get_presence', {})).toMatch(/- Alice: "Handle duplicate refund webhooks"/);
+
+      step('claim_files from the agent → shows up in the CLI');
+      await call('claim_files', { files: ['src/payments/ledger.ts'], reason: 'ledger rewrite' });
+      expect((await snJson(bob.dir, ['claims'])).claims).toMatchObject([{ file: 'src/payments/ledger.ts', owner: { name: 'Bob' } }]);
+    } finally {
+      await client.close();
+    }
+  });
+});
+
+describe('e2e 6: resuming a thread, including handing it to a teammate', () => {
+  it('Alice resumes her own paused thread, then Bob picks it up where she left off', async () => {
+    const { team } = await makeTeam('Alice', 'Bob');
+    const [alice, bob] = team as [(typeof team)[0], (typeof team)[0]];
+    for (const p of team) await sn(p.dir, ['init', '--skip-hooks', '--skip-mcp']);
+
+    step('Alice starts investigating a bug, then her session ends mid-investigation');
+    await alice.hook('a1', { hook_event_name: 'UserPromptSubmit', prompt: 'Investigate why checkout totals are off by a cent' });
+    await alice.hook('a1', { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/checkout/totals.ts' } });
+    await alice.hook('a1', { hook_event_name: 'Stop' });
+    await sn(alice.dir, ['sync']);
+    const threadId = (await snJson(alice.dir, ['threads'])).threads[0].id;
+
+    step('a day later, Alice resumes it herself in a new session');
+    const armed = await snJson(alice.dir, ['resume', threadId]);
+    expect(armed.armed).toBe(threadId);
+    const resumed1 = await alice.hook('a2', { hook_event_name: 'SessionStart', source: 'startup' });
+    expect(resumed1?.hookSpecificOutput?.additionalContext).toContain(`Resumed thread "Investigate why checkout totals are off by a cent" (id ${threadId})`);
+    await alice.hook('a2', { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/checkout/rounding.ts' } });
+    await alice.hook('a2', { hook_event_name: 'Stop' });
+    await alice.hook('a2', { hook_event_name: 'SessionEnd', reason: 'other' });
+    await sn(alice.dir, ['sync']);
+
+    step('the thread now shows both sessions and both files, under one id');
+    const afterResume = (await snJson(alice.dir, ['show', threadId])).thread;
+    expect(afterResume.sessions).toHaveLength(2);
+    expect(afterResume.files.sort()).toEqual(['src/checkout/rounding.ts', 'src/checkout/totals.ts']);
+
+    step("the audit trail shows who created and who resumed it");
+    const auditOut = (await sn(alice.dir, ['audit', '--thread', threadId])).out;
+    expect(auditOut).toMatch(/thread\.resumed/);
+    expect(auditOut).toMatch(/thread\.created/);
+
+    step('Bob picks it up next: he resumes the same thread from his own clone');
+    await sn(bob.dir, ['sync']);
+    await sn(bob.dir, ['resume', threadId]);
+    const bobStart = await bob.hook('b1', { hook_event_name: 'SessionStart', source: 'startup' });
+    expect(bobStart?.hookSpecificOutput?.additionalContext).toContain('rounding.ts');
+    await bob.hook('b1', { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/checkout/tests.ts' } });
+    await bob.hook('b1', { hook_event_name: 'Stop' });
+    await sn(bob.dir, ['sync']);
+    await sn(alice.dir, ['sync']);
+
+    step('one thread, one history, contributed to by both of them');
+    const final = (await snJson(alice.dir, ['show', threadId])).thread;
+    expect(final.sessions).toHaveLength(3);
+    expect(final.files).toContain('src/checkout/tests.ts');
+    expect(final.contributors.map((c: { name: string }) => c.name).sort()).toEqual(['Alice', 'Bob']);
   });
 });

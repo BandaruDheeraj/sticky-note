@@ -27,6 +27,7 @@ export const newCommand = defineCommand({
       narrative: options.message,
     });
     await store.save(thread, `thread ${thread.id}: created`);
+    await store.appendAudit(author, { action: 'thread.created', threadId: thread.id, detail: thread.title });
 
     out.json({ ok: true, thread });
     out.success(`Created thread ${out.style(thread.id, 'cyan')}: ${thread.title}`);

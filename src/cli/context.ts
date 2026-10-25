@@ -4,6 +4,7 @@ import { Git } from '../core/git.js';
 import { resolveIdentity } from '../core/identity.js';
 import { FileLog } from '../core/log.js';
 import { localStateDir } from '../core/paths.js';
+import { ResumeIntentStore } from '../core/resume.js';
 import { SessionStore } from '../core/session.js';
 import { GitBranchStore } from '../core/store/git-branch-store.js';
 import type { ThreadStore } from '../core/store/thread-store.js';
@@ -55,6 +56,10 @@ export class Services {
 
   log(): Promise<FileLog> {
     return this.memo('log', async () => new FileLog(path.join(await localStateDir(this.git()), 'logs', 'hooks.log')));
+  }
+
+  resumeIntent(): Promise<ResumeIntentStore> {
+    return this.memo('resumeIntent', async () => new ResumeIntentStore(await localStateDir(this.git())));
   }
 
   private memo<T>(key: string, factory: () => Promise<T>): Promise<T> {
