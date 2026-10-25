@@ -26,7 +26,7 @@
       "id": "b5eb8c5b-affa-43ef-8b0d-97939ba905c1",
       "agent": "claude-code",
       "startedAt": "2026-10-25T21:39:06.558Z",
-      "endedAt": null,
+      "endedAt": "2026-10-25T22:56:42.287Z",
       "lastActiveAt": "2026-10-25T22:50:03.729Z"
     }
   ],
@@ -34,6 +34,6 @@
     "ca90a9d455082b68bf19252d09774ce746cb37f3"
   ],
   "createdAt": "2026-10-25T22:18:18.944Z",
-  "updatedAt": "2026-10-25T22:50:03.729Z",
+  "updatedAt": "2026-10-25T22:56:42.287Z",
   "closedAt": null
 }
