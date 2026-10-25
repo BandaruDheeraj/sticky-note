@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { flattenAudit } from '../../src/core/audit.js';
+import { Git } from '../../src/core/git.js';
 import { localStateDir } from '../../src/core/paths.js';
 import { GitBranchStore } from '../../src/core/store/git-branch-store.js';
 import { claudeCodeAdapter } from '../../src/hooks/adapters/claude-code.js';
@@ -469,9 +470,10 @@ describe('resume', () => {
     const t = createThread({ title: 'Will be gone', author: alice, branch: 'main' });
     await store.save(t);
     await cli(['resume', t.id]);
-    const { rm } = await import('node:fs/promises');
-    const path = (await import('node:path')).default;
-    await rm(path.join(await store.worktreePath(), 'threads', `${t.id}.json`)); // simulate the thread having disappeared
+    // Simulate the thread having been deleted from the data branch.
+    const wt = new Git(await store.worktreePath());
+    await wt.run(['rm', '--quiet', `threads/${t.id}.json`]);
+    await wt.run(['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--quiet', '-m', 'delete']);
 
     // Falls back to normal first-prompt behavior instead of erroring.
     const out = await hook('s1', { hook_event_name: 'UserPromptSubmit', prompt: 'fresh start' });
