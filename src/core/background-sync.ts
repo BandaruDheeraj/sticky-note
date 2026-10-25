@@ -17,7 +17,8 @@ export function syncInBackground(repoRoot: string, logFile: string): void {
       // Without this, Windows opens a new console window for every detached sync.
       windowsHide: true,
       stdio: ['ignore', fd, fd],
-      env: { ...process.env, NO_COLOR: '1', GIT_TERMINAL_PROMPT: '0' },
+      // GCM_INTERACTIVE: Git Credential Manager (Windows) ignores GIT_TERMINAL_PROMPT and would wait on a hidden dialog.
+      env: { ...process.env, NO_COLOR: '1', GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never' },
     }).unref();
   } finally {
     closeSync(fd);

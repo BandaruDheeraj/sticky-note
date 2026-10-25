@@ -25,6 +25,8 @@ const AUDIT_DIR = 'audit';
 /** Directories of records sticky-note owns on the data branch, and how to merge each kind. */
 const RECORD_DIRS = [THREADS_DIR, CLAIMS_DIR, AUDIT_DIR];
 const MAX_PUSH_ATTEMPTS = 3;
+/** Per fetch/push, so a stalled sync dies before the lock's 60s stale takeover lets another start. */
+const NETWORK_TIMEOUT_MS = 20_000;
 
 export interface GitBranchStoreOptions {
   /** Any directory inside the user's repo. */
@@ -181,7 +183,7 @@ export class GitBranchStore implements ThreadStore {
         const pushed = await this.countCommits(wt, remoteExists ? `${remoteRef}..HEAD` : 'HEAD');
         if (remoteExists && pushed === 0) return { pulled, pushed, merged };
         try {
-          await wt.run(['push', '--quiet', remote, `HEAD:refs/heads/${dataBranch}`]);
+          await wt.run(['push', '--quiet', remote, `HEAD:refs/heads/${dataBranch}`], { timeoutMs: NETWORK_TIMEOUT_MS });
           await wt.run(['update-ref', remoteRef, 'HEAD']);
           return { pulled, pushed, merged };
         } catch (err) {
@@ -281,7 +283,7 @@ export class GitBranchStore implements ThreadStore {
   private async fetch(wt: Git): Promise<boolean> {
     const { remote, dataBranch } = this.opts;
     try {
-      await wt.run(['fetch', '--quiet', remote, `+refs/heads/${dataBranch}:refs/remotes/${remote}/${dataBranch}`]);
+      await wt.run(['fetch', '--quiet', remote, `+refs/heads/${dataBranch}:refs/remotes/${remote}/${dataBranch}`], { timeoutMs: NETWORK_TIMEOUT_MS });
       return true;
     } catch (err) {
       if (err instanceof GitError && /couldn't find remote ref/i.test(err.stderr)) return false;

@@ -19,6 +19,8 @@ export interface GitRunOptions {
   /** Extra `-c key=value` config applied to this invocation only. */
   config?: Record<string, string>;
   env?: NodeJS.ProcessEnv;
+  /** Kill git if it runs longer than this, so a stalled network call can't linger. */
+  timeoutMs?: number;
 }
 
 /** Thin, testable wrapper around the git binary, bound to one working directory. */
@@ -33,6 +35,7 @@ export class Git {
         cwd: this.cwd,
         env: { ...process.env, ...opts.env },
         maxBuffer: 64 * 1024 * 1024,
+        timeout: opts.timeoutMs,
         // Callers like the detached sync have no console, so Windows would open one per git call.
         windowsHide: true,
       });
