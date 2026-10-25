@@ -20,7 +20,13 @@ export const SessionState = z.object({
    * deferred to the end of the turn to keep git off the prompt's critical path.
    */
   pendingThread: z
-    .object({ title: z.string(), branch: z.string().nullable(), createdAt: z.string().datetime() })
+    .object({
+      title: z.string(),
+      /** The full first prompt, kept when the title had to shorten it. */
+      prompt: z.string().optional(),
+      branch: z.string().nullable(),
+      createdAt: z.string().datetime(),
+    })
     .nullable()
     .default(null),
   /** Files edited since the last flush to the thread. */

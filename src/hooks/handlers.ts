@@ -16,6 +16,9 @@ import { renderClaimWarning, renderContext, renderOverlapWarning } from '../surf
 import { editedFiles, touchedFiles } from './edited-files.js';
 import type { HookEvent, HookResult } from './events.js';
 
+/** How much of a long first prompt is kept in the thread's notes. */
+const MAX_PROMPT_NOTE = 500;
+
 export interface HookDeps {
   store: ThreadStore;
   sessions: SessionStore;
@@ -76,7 +79,14 @@ export async function handleHookEvent(event: HookEvent, deps: HookDeps): Promise
       return deps.sessions.update<HookResult>(event.sessionId, async (cur) => {
         let state = cur ?? freshSession(event, deps);
         if (!state.threadId && !state.pendingThread) {
-          const pendingThread = { title: titleFromText(event.prompt), branch: await deps.currentBranch(), createdAt: deps.now().toISOString() };
+          const title = titleFromText(event.prompt);
+          const prompt = event.prompt.trim();
+          const pendingThread = {
+            title,
+            ...(prompt !== title && { prompt: prompt.length > MAX_PROMPT_NOTE ? `${prompt.slice(0, MAX_PROMPT_NOTE - 1)}…` : prompt }),
+            branch: await deps.currentBranch(),
+            createdAt: deps.now().toISOString(),
+          };
           state = { ...state, pendingThread, updatedAt: deps.now().toISOString() };
         }
 
@@ -216,6 +226,8 @@ async function flush(state: SessionState, deps: HookDeps): Promise<SessionState>
       author: deps.identity,
       branch: state.pendingThread.branch,
       files: state.pendingFiles,
+      // Keeps the whole request searchable and visible to teammates when the title shortened it.
+      narrative: state.pendingThread.prompt ? `Asked: ${state.pendingThread.prompt}` : undefined,
       session: { id: state.sessionId, agent: state.agent, startedAt: state.startedAt, lastActiveAt: now.toISOString() },
       now: new Date(state.pendingThread.createdAt),
     });

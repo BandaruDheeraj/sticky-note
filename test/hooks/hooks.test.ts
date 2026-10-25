@@ -126,6 +126,7 @@ describe('run-hook claude-code', () => {
       sessions: [{ id: 'sess-1', agent: 'claude-code', endedAt: null }],
     });
     expect(thread!.files.sort()).toEqual(['src/login.ts', 'test/login.test.ts']);
+    expect(thread!.narrative).toBe('Asked: Fix the flaky login test\nmore detail here'); // full prompt kept
     expect(await commits()).toBe(initial + 1);
 
     // Later turns update the same thread.
@@ -153,7 +154,7 @@ describe('run-hook claude-code', () => {
     await hook({ hook_event_name: 'UserPromptSubmit', prompt: 'interrupted' });
     await hook({ hook_event_name: 'SessionEnd', reason: 'other' });
     const [thread] = (await store.list()).threads;
-    expect(thread).toMatchObject({ title: 'interrupted' });
+    expect(thread).toMatchObject({ title: 'interrupted', narrative: '' }); // short prompt: title is enough
     expect(thread!.sessions[0]!.endedAt).not.toBeNull();
   });
 

@@ -59,14 +59,24 @@ say "(Nothing new: Bob's agent already saw Alice's thread at session start.)"
 say "Bob's agent is about to edit invoice.js:"
 hook "$BOB" b1 "\"hook_event_name\":\"PreToolUse\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$BOB/src/billing/invoice.js\"}"
 
-scene "5. Bob claims the auth module; Alice's agent is warned before touching it"
+scene "5. Bob's agent asks sticky-note directly, through the MCP server"
+say "Hooks push context automatically; with MCP the agent asks on purpose, and must read the answer."
+mcp() {
+  printf '%s  agent calls › %s(%s)%s\n' "$cyan" "$2" "$3" "$reset"
+  node "$SN_ROOT/scripts/mcp-call.mjs" "$1" "$2" "$3" | sed "s/^/    /"
+}
+mcp "$BOB" check_overlaps '{"files":["src/billing/invoice.js","README.md"]}'
+mcp "$BOB" search_threads '{"query":"invoice cents"}'
+mcp "$BOB" get_presence '{}'
+
+scene "6. Bob claims the auth module; Alice's agent is warned before touching it"
 sn "$BOB" claim src/auth/session.js -m "rewriting sessions"
 sn "$BOB" sync >/dev/null && sn "$ALICE" sync >/dev/null
 say 'Alice: "Make session ids in src/auth/session.js use crypto.randomUUID"'
 hook "$ALICE" a1 '"hook_event_name":"UserPromptSubmit","prompt":"Make session ids in src/auth/session.js use crypto.randomUUID"'
 hook "$ALICE" a1 "\"hook_event_name\":\"PreToolUse\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$ALICE/src/auth/session.js\"}"
 
-scene "6. Alice commits her fix and ends her session"
+scene "7. Alice commits her fix and ends her session"
 printf 'export function computeTotal(items, taxRate) {\n  const cents = items.reduce((s, i) => s + Math.round(i.price * 100) * i.quantity, 0);\n  return Math.round(cents * (1 + taxRate)) / 100;\n}\n' > "$ALICE/src/billing/invoice.js"
 git -C "$ALICE" commit -qam "Compute invoice totals in integer cents"
 git -C "$ALICE" push -q origin main
@@ -74,12 +84,12 @@ hook "$ALICE" a1 '"hook_event_name":"Stop"'
 hook "$ALICE" a1 '"hook_event_name":"SessionEnd","reason":"prompt_input_exit"'
 say "Her commit is now linked to her thread; session ended and synced."
 
-scene "7. Later, a new session of Bob's reads invoice.js: git history leads back to Alice's thread"
+scene "8. Later, a new session of Bob's reads invoice.js: git history leads back to Alice's thread"
 git -C "$BOB" pull -q origin main
 sn "$BOB" sync >/dev/null
 hook "$BOB" b2 "\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Read\",\"tool_input\":{\"file_path\":\"$BOB/src/billing/invoice.js\"}"
 
-scene "8. The shared record"
+scene "9. The shared record"
 sn "$BOB" threads -a
 echo
 sn "$BOB" claims
