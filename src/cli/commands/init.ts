@@ -2,18 +2,20 @@ import path from 'node:path';
 import { CONFIG_RELATIVE_PATH, Config, saveConfig } from '../../core/config.js';
 import { GitBranchStore } from '../../core/store/git-branch-store.js';
 import { CLAUDE_SETTINGS_PATH, DEFAULT_HOOK_COMMAND, installClaudeCodeHooks } from '../../hooks/install/claude-code.js';
+import { installMcpServer, MCP_CONFIG_PATH } from '../../mcp/install.js';
 import { defineCommand } from '../command.js';
 
 export const initCommand = defineCommand({
   name: 'init',
   summary: 'Set up sticky-note in this repository',
   description:
-    'Writes .sticky-note/config.json, creates the private data worktree, and installs Claude Code hooks ' +
-    'in .claude/settings.json. If the team already has a data branch on the remote, it is reused. Safe to re-run.',
+    'Writes .sticky-note/config.json, creates the private data worktree, installs Claude Code hooks ' +
+    'in .claude/settings.json, and registers the MCP server in .mcp.json. If the team already has a data branch on the remote, it is reused. Safe to re-run.',
   options: {
     branch: { type: 'string', valueName: '<name>', description: 'Data branch name (default: sticky-note/context)' },
     remote: { type: 'string', valueName: '<name>', description: 'Remote to sync with (default: origin)' },
     'skip-hooks': { type: 'boolean', description: 'Do not install agent hooks' },
+    'skip-mcp': { type: 'boolean', description: 'Do not register the MCP server in .mcp.json' },
     'hook-command': {
       type: 'string',
       valueName: '<cmd>',
@@ -50,14 +52,18 @@ export const initCommand = defineCommand({
     await store.init();
     const worktree = await store.worktreePath();
 
-    const hooks = options['skip-hooks'] ? null : await installClaudeCodeHooks(repoRoot, options['hook-command']);
+    const hookCommand = options['hook-command'] ?? DEFAULT_HOOK_COMMAND;
+    const hooks = options['skip-hooks'] ? null : await installClaudeCodeHooks(repoRoot, hookCommand);
+    const mcp = options['skip-mcp'] ? null : await installMcpServer(repoRoot, hookCommand);
 
-    out.json({ ok: true, config, configPath: path.join(repoRoot, CONFIG_RELATIVE_PATH), worktree, hooks });
+    out.json({ ok: true, config, configPath: path.join(repoRoot, CONFIG_RELATIVE_PATH), worktree, hooks, mcp });
     out.success(`${changed ? 'Wrote' : 'Kept'} ${CONFIG_RELATIVE_PATH}`);
     out.success(`Data branch ${out.style(config.dataBranch, 'cyan')} ready at ${path.relative(repoRoot, worktree)}`);
     if (hooks) out.success(`${hooks.changed ? 'Installed' : 'Kept'} Claude Code hooks in ${CLAUDE_SETTINGS_PATH}`);
-    if (changed || hooks?.changed) {
-      out.print(out.style(`Commit ${CONFIG_RELATIVE_PATH}${hooks ? ` and ${CLAUDE_SETTINGS_PATH}` : ''} so teammates get the same setup.`, 'dim'));
+    if (mcp) out.success(`${mcp.changed ? 'Registered' : 'Kept'} the MCP server in ${MCP_CONFIG_PATH}`);
+    if (changed || hooks?.changed || mcp?.changed) {
+      const files = [CONFIG_RELATIVE_PATH, ...(hooks ? [CLAUDE_SETTINGS_PATH] : []), ...(mcp ? [MCP_CONFIG_PATH] : [])];
+      out.print(out.style(`Commit ${files.join(', ')} so teammates get the same setup.`, 'dim'));
     }
   },
 });

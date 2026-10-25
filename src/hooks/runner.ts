@@ -1,6 +1,5 @@
-import { spawn } from 'node:child_process';
-import { closeSync, openSync } from 'node:fs';
 import { Services } from '../cli/context.js';
+import { syncInBackground } from '../core/background-sync.js';
 import type { AgentAdapter, HookEvent } from './events.js';
 import { handleHookEvent } from './handlers.js';
 
@@ -62,24 +61,5 @@ export async function runHook(adapter: AgentAdapter, rawInput: string): Promise<
     if (log) await log.write(`${adapter.name} ${where} FAILED ${Date.now() - started}ms: ${message}`);
     if (process.env.STICKY_DEBUG || !log) process.stderr.write(`sticky-note hook error (${where}): ${message}\n`);
     return '';
-  }
-}
-
-/**
- * Run `sticky-note sync` as a detached process so the hook returns at once.
- * Output is appended to the hook log. Disabled with STICKY_NO_BACKGROUND_SYNC=1 (tests).
- */
-function syncInBackground(repoRoot: string, logFile: string): void {
-  const entry = process.argv[1];
-  if (process.env.STICKY_NO_BACKGROUND_SYNC === '1' || !entry) return;
-  const fd = openSync(logFile, 'a');
-  try {
-    spawn(process.execPath, [entry, 'sync', '--cwd', repoRoot], {
-      detached: true,
-      stdio: ['ignore', fd, fd],
-      env: { ...process.env, NO_COLOR: '1', GIT_TERMINAL_PROMPT: '0' },
-    }).unref();
-  } finally {
-    closeSync(fd);
   }
 }

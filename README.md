@@ -19,9 +19,10 @@ When one person's agent works on something, the next person's agent already know
 | **Overlap warnings** | Before your agent edits a file that's part of a teammate's open thread, or that a teammate has *claimed*, the agent is warned and so are you. Warnings never block the edit. |
 | **Presence** | `sticky-note who` shows whose agents are active right now, on what thread, branch and files, plus active file claims. |
 | **History on first touch** | The first time your agent reads or edits a file in a session, it's shown earlier threads that worked on that file, including closed ones and what didn't work. Commits made during a session are linked to its thread, so a file's git history leads back to the thread that changed it. |
+| **MCP server** | Tools any MCP-capable agent can call on purpose: check overlaps before editing, search past work before starting, see who's active, read a file's history, claim files, close a thread. `init` registers it in `.mcp.json`. This also covers Cursor, Windsurf and other tools without hooks. |
 | **CLI** | List, show, create, close and sync threads; claim files; see who's active; preview exactly what agents are shown. |
 
-**Not built yet** (planned for Release 1): continuing (resuming) a teammate's thread, automatic stuck detection, the MCP server, transcripts and line-level AI blame, Copilot CLI and Codex support, the cloud backend (real-time presence without git), and environment sync.
+**Not built yet** (planned for Release 1): continuing (resuming) a teammate's thread, automatic stuck detection, MCP tools for audit, transcripts and environment, the remote MCP server for claude.ai, transcripts and line-level AI blame, Copilot CLI and Codex support, the cloud backend (real-time presence without git), and environment sync.
 
 ## Requirements
 
@@ -37,7 +38,7 @@ Until v4 is on npm, build it from source once per machine:
 git clone -b ailaney-rewrite https://github.com/BandaruDheeraj/sticky-note.git ~/tools/sticky-note
 cd ~/tools/sticky-note
 npm install
-npm run build          # produces dist/cli.js, a single self-contained file
+npm run build          # produces dist/: cli.js plus chunks loaded on demand, with no runtime dependencies
 ```
 
 Optionally put it on your `PATH` so you can type `sticky-note` instead of `node ~/tools/sticky-note/dist/cli.js`:
@@ -62,13 +63,14 @@ node ~/tools/sticky-note/dist/cli.js init --hook-command "node $HOME/tools/stick
 1. writes `.sticky-note/config.json` (the data branch name and remote)
 2. creates the data branch `sticky-note/context`, or reuses it if a teammate already pushed one
 3. adds Claude Code hooks to `.claude/settings.json`, keeping any settings and hooks you already have
+4. registers the sticky-note MCP server in `.mcp.json`, keeping any other servers
 
-`--hook-command` tells the hooks how to run sticky-note. While v4 isn't on npm, point it at your build with an **absolute path**. The default, `npx --no-install sticky-note-cli`, will be right once v4 is published.
+`--hook-command` tells the hooks and the MCP server how to run sticky-note. While v4 isn't on npm, point it at your build with an **absolute path**. The default, `npx --no-install sticky-note-cli`, will be right once v4 is published.
 
 Then commit the setup so teammates get it:
 
 ```sh
-git add .sticky-note/config.json .claude/settings.json
+git add .sticky-note/config.json .claude/settings.json .mcp.json
 git commit -m "Set up sticky-note"
 ```
 
@@ -81,7 +83,8 @@ git commit -m "Set up sticky-note"
 
 1. Open Claude Code **in the repo root**. If your editor opens a parent folder, Claude Code won't load the repo's hooks.
 2. Run `/hooks`. You should see sticky-note on `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop` and `SessionEnd`. Approve them if prompted.
-3. Ask Claude something and let it finish the turn, then in a terminal:
+3. Run `/mcp`. `sticky-note` should be listed as connected with 9 tools. Approve the project server if prompted.
+4. Ask Claude something and let it finish the turn, then in a terminal:
    ```sh
    sticky-note threads
    ```
@@ -127,6 +130,23 @@ What the agent receives looks like this:
 Details: `sticky-note show <id>`. Tell the user about anything here that affects their request.
 ```
 
+### MCP tools
+
+Agents call these on their own; the server tells them when (for example, check overlaps before editing).
+
+| Tool | What it answers |
+|---|---|
+| `check_overlaps(files)` | Has a teammate claimed these files, or are they working on them? |
+| `search_threads(query)` | What has the team already done or tried (including failed approaches) about this? |
+| `get_file_context(file)` | Which threads worked on this file, by files touched or by commits in its git history? |
+| `get_presence()` | Who's active right now, on what, and what's claimed? |
+| `list_threads(status?, author?)` / `get_thread(id)` | Browse threads / read one in full |
+| `get_stuck_threads()` | Who is stuck, on what, and what did they try? |
+| `close_thread(id, summary?)` | Mark a goal done (only when the user confirms) |
+| `claim_files(files, reason?, hours?)` | Claim files for the user |
+
+The server reads local data and starts a background sync when it launches. To use it from another MCP client (Cursor, Windsurf, …), point the client at `sticky-note mcp`, run in the repo.
+
 ### Commands
 
 | Command | What it does |
@@ -142,6 +162,7 @@ Details: `sticky-note show <id>`. Tell the user about anything here that affects
 | `sticky-note claim <files...>` | Tell teammates you're working on files; their agents are warned before editing them. `-m "<reason>"`, `--hours 2` (default 8) |
 | `sticky-note unclaim <files...>` | Release claims; `--all` releases all of yours |
 | `sticky-note claims` | List everyone's active claims |
+| `sticky-note mcp` | Run the MCP server on stdio (MCP clients start this from `.mcp.json`) |
 | `sticky-note context` | Preview what an agent would be shown. `-p "<prompt>"`, `-f <file>`, `-a` to see every thread's score and reasons |
 
 Every command accepts `--json` (machine-readable output), `--cwd <dir>` and `-h`/`--help`.
@@ -187,7 +208,7 @@ For full error stacks from the CLI, set `STICKY_DEBUG=1`.
 
 ```sh
 npm install
-npm run build        # bundle to dist/cli.js
+npm run build        # bundle to dist/ (cli.js + lazily loaded chunks such as the MCP SDK)
 npm run typecheck
 npm test             # unit and integration tests (real temp git repos)
 npm run test:e2e     # builds, then runs dist/cli.js as real processes: two teammates, a shared remote
@@ -209,7 +230,8 @@ src/
     store/     ThreadStore interface + git data-branch backend (sync, merge, recovery)
   cli/         Cli class, command registry, output; commands/ has one file per command
   hooks/       agent-neutral events and handlers; adapters/ per agent; install/ per agent
-  surfacing/   relevance ranking, rendering, injection policy
+  surfacing/   relevance ranking, shared queries (overlaps, history, search), rendering, injection policy
+  mcp/         MCP server and tools, stdio runner, .mcp.json installer
 test/          unit and integration tests; e2e/ end-to-end tests against the built CLI
 ```
 

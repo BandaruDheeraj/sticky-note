@@ -7,6 +7,8 @@ export default defineConfig({
   target: 'node20',
   platform: 'node',
   bundle: true,
+  // Lazy chunks (e.g. the MCP SDK) load only when used, keeping hook startup fast.
+  splitting: true,
   // Inline dependencies too: dist/cli.js must run standalone with no module resolution.
   noExternal: [/.*/],
   clean: true,

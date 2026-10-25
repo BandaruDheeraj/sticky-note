@@ -3,6 +3,7 @@ import { claimCommand, claimsCommand, unclaimCommand } from './claim.js';
 import { closeCommand } from './close.js';
 import { contextCommand } from './context.js';
 import { initCommand } from './init.js';
+import { mcpCommand } from './mcp.js';
 import { newCommand } from './new.js';
 import { runHookCommand } from './run-hook.js';
 import { showCommand } from './show.js';
@@ -26,6 +27,7 @@ export function createRegistry(): CommandRegistry {
     claimsCommand,
     contextCommand,
     syncCommand,
+    mcpCommand,
     runHookCommand,
   );
 }
