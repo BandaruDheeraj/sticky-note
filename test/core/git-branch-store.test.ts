@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Git } from '../../src/core/git.js';
@@ -147,6 +147,25 @@ describe('GitBranchStore', () => {
       const bob = await makeRepo({ remote, user: 'Bob' });
       await store(bob.dir).sync();
       expect(await store(bob.dir).get(orphan.id)).not.toBeNull();
+    });
+
+    it("restores a teammate's record missing from disk instead of pushing its deletion", async () => {
+      const remote = await makeBareRemote();
+      const alice = await makeRepo({ remote, user: 'Alice' });
+      const bob = await makeRepo({ remote, user: 'Bob' });
+      const hers = thread('alice work');
+      await store(alice.dir).save(hers);
+      await store(alice.dir).sync();
+      await store(bob.dir).sync();
+
+      const worktree = await store(bob.dir).worktreePath();
+      await rm(path.join(worktree, 'threads', `${hers.id}.json`));
+      await store(bob.dir).save(thread('bob work'));
+      await store(bob.dir).sync();
+
+      await store(alice.dir).sync();
+      expect((await store(alice.dir).list()).threads.map((t) => t.title).sort()).toEqual(['alice work', 'bob work']);
+      expect(await new Git(worktree).run(['status', '--porcelain'])).toBe('');
     });
 
     it('takes over a lock held by a dead process immediately', async () => {

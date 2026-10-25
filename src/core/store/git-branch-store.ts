@@ -328,11 +328,18 @@ export class GitBranchStore implements ThreadStore {
     }
   }
 
-  /** Stage and commit every change to sticky-note's records. Returns false if there was nothing to commit. */
+  /**
+   * Stage and commit every new or changed record. Returns false if there was nothing to commit.
+   * sticky-note never deletes records, so a record missing from disk is damage, not a change to
+   * publish: it is restored from HEAD instead, or the deletion would erase it for every teammate.
+   */
   private async commitPending(wt: Git, message: string): Promise<boolean> {
+    const missing = (await wt.tryRun(['diff', '--name-only', '--diff-filter=D', 'HEAD', '--', ...RECORD_DIRS]))?.split('\n').filter(Boolean) ?? [];
+    if (missing.length) await wt.run(['checkout', 'HEAD', '--', ...missing]);
+
     const dirs = RECORD_DIRS.filter((d) => existsSync(path.join(wt.cwd, d)));
     if (dirs.length === 0) return false;
-    await wt.run(['add', '--all', '--', ...dirs]);
+    await wt.run(['add', '--ignore-removal', '--', ...dirs]);
     if ((await wt.tryRun(['diff', '--cached', '--quiet'])) !== null) return false;
     await wt.run(['commit', '--quiet', '--no-verify', '-m', message], { config: await this.commitConfig() });
     return true;
