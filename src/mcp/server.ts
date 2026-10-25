@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { Services } from '../cli/context.js';
+import { flattenAudit } from '../core/audit.js';
 import { activeClaims, addClaims, ClaimSet, DEFAULT_CLAIM_HOURS, ownerKey } from '../core/claim.js';
 import { AmbiguousIdError } from '../core/store/thread-store.js';
 import { closeThread, samePerson, type Thread } from '../core/thread.js';
@@ -179,7 +180,9 @@ export function createMcpServer(services: Services, version: string): McpServer 
       if ('error' in found) return error(found.error);
       if (found.thread.status === 'closed') return text(`Thread ${found.thread.id} was already closed.`);
       const closed = closeThread(found.thread, { summary });
-      await (await services.store()).save(closed, `thread ${closed.id}: closed`);
+      const store = await services.store();
+      await store.save(closed, `thread ${closed.id}: closed`);
+      await store.appendAudit(await services.identity(), { action: 'thread.closed', threadId: closed.id, detail: closed.title });
       return text(`Closed "${closed.title}" (${closed.id}). Teammates see it after the next sync.`);
     },
   );
@@ -202,7 +205,43 @@ export function createMcpServer(services: Services, version: string): McpServer 
       const sets = await store.listClaims();
       const mine = sets.find((s) => samePerson(s.owner, me) || ownerKey(s.owner) === ownerKey(me)) ?? ClaimSet.parse({ schemaVersion: 1, owner: me });
       await store.saveClaims(addClaims(mine, paths, { reason, hours }), `claims: ${me.name} claimed ${paths.join(', ')}`);
+      await store.appendAudit(me, { action: 'claim.created', file: paths.join(', '), detail: reason });
       return text(`Claimed ${paths.join(', ')} for ${hours}h${reason ? ` (${reason})` : ''}. Teammates see it after the next sync.`);
+    },
+  );
+
+  server.registerTool(
+    'get_audit_trail',
+    {
+      title: 'Audit trail',
+      description:
+        'Who created, resumed or closed threads, and who claimed files, with timestamps. ' +
+        'Answers "who changed what with AI, and when" for a person, a thread, or the whole repo.',
+      inputSchema: {
+        author: z.string().optional().describe('Name or email'),
+        threadId: z.string().optional().describe('Thread id or prefix'),
+        limit: z.number().int().min(1).max(200).default(50),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ author, threadId, limit }) => {
+      let records = flattenAudit(await (await services.store()).listAudit());
+      if (author) {
+        const needle = author.toLowerCase();
+        records = records.filter((r) => r.actor.name.toLowerCase() === needle || r.actor.email?.toLowerCase() === needle);
+      }
+      if (threadId) records = records.filter((r) => r.threadId === threadId || r.threadId?.startsWith(threadId));
+      records.sort((a, b) => b.at.localeCompare(a.at));
+      const shown = records.slice(0, limit);
+      if (shown.length === 0) return text('No audit entries match.');
+      return text(
+        shown
+          .map(
+            (r) =>
+              `- ${r.at} ${r.actor.name} ${r.action}${r.threadId ? ` thread ${r.threadId}` : ''}${r.file ? ` file ${r.file}` : ''}${r.detail ? `: ${r.detail}` : ''}`,
+          )
+          .join('\n'),
+      );
     },
   );
 

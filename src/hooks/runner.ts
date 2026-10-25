@@ -26,11 +26,12 @@ export async function runHook(adapter: AgentAdapter, rawInput: string): Promise<
     const log = await services.log();
     // A "start" with no matching "ok"/"FAILED" means the agent killed the hook (e.g. timeout).
     await log.write(`${adapter.name} ${event.kind} session=${event.sessionId} start`);
-    const [store, sessions, identity, repoRoot] = await Promise.all([
+    const [store, sessions, identity, repoRoot, resumeIntent] = await Promise.all([
       services.store(),
       services.sessions(),
       services.identity(),
       services.repoRoot(),
+      services.resumeIntent(),
     ]);
     const result = await handleHookEvent(event, {
       store,
@@ -39,6 +40,7 @@ export async function runHook(adapter: AgentAdapter, rawInput: string): Promise<
       repoRoot,
       currentBranch: () => services!.git().currentBranch(),
       syncInBackground: () => syncInBackground(repoRoot, log.file),
+      consumeResumeIntent: () => resumeIntent.consume(),
       head: async () => (await services!.git().tryRun(['rev-parse', '--verify', '--quiet', 'HEAD'])) || null,
       myCommitsSince: async (base) => {
         const author = identity.email ?? identity.name;

@@ -42,6 +42,7 @@ export const claimCommand = defineCommand({
     const { store, set } = await myClaims(ctx);
     const next = addClaims(set, files, { reason: options.message, hours });
     await store.saveClaims(next, `claims: ${next.owner.name} claimed ${files.join(', ')}`);
+    await store.appendAudit(set.owner, { action: 'claim.created', file: files.join(', '), detail: options.message });
 
     ctx.out.json({ ok: true, claims: next.claims });
     ctx.out.success(`Claimed ${files.join(', ')} for ${hours}h${options.message ? `: ${options.message}` : ''}`);
@@ -61,7 +62,11 @@ export const unclaimCommand = defineCommand({
     const { store, set } = await myClaims(ctx);
     const next = removeClaims(set, files);
     const released = set.claims.length - next.claims.length;
-    if (released > 0) await store.saveClaims(next, `claims: ${next.owner.name} released ${released}`);
+    if (released > 0) {
+      await store.saveClaims(next, `claims: ${next.owner.name} released ${released}`);
+      const releasedFiles = set.claims.filter((c) => !next.claims.some((k) => k.file === c.file)).map((c) => c.file);
+      await store.appendAudit(set.owner, { action: 'claim.released', file: releasedFiles.join(', ') });
+    }
 
     ctx.out.json({ ok: true, released, claims: next.claims });
     ctx.out.success(released ? `Released ${released} claim(s)` : 'Nothing to release');

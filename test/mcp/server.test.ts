@@ -40,6 +40,7 @@ describe('MCP server', () => {
       'check_overlaps',
       'claim_files',
       'close_thread',
+      'get_audit_trail',
       'get_file_context',
       'get_presence',
       'get_stuck_threads',
@@ -121,6 +122,25 @@ describe('MCP server', () => {
     expect(presence).toContain('Nobody is active right now.');
     expect(presence).toContain('- src/a.ts: Test User (refactor)');
     expect(await call('claim_files', { files: ['/elsewhere/x.ts'] })).toMatchObject({ isError: true });
+  });
+
+  it('get_audit_trail records tool-driven actions, filterable by author and thread', async () => {
+    const { store, call } = await setup();
+    const t = createThread({ title: 'Ship pagination', author: alice, branch: 'main' });
+    await store.save(t);
+
+    await call('claim_files', { files: ['src/a.ts'], reason: 'refactor' });
+    expect((await call('close_thread', { id: t.id, summary: 'done' })).text).toMatch(/^Closed "Ship pagination"/);
+
+    const trail = (await call('get_audit_trail', {})).text;
+    expect(trail).toContain('claim.created file src/a.ts: refactor');
+    expect(trail).toContain(`thread.closed thread ${t.id}: Ship pagination`);
+
+    const byThread = (await call('get_audit_trail', { threadId: t.id })).text;
+    expect(byThread).toContain('thread.closed');
+    expect(byThread).not.toContain('claim.created');
+
+    expect((await call('get_audit_trail', { author: 'nobody' })).text).toBe('No audit entries match.');
   });
 });
 

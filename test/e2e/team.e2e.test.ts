@@ -275,7 +275,7 @@ describe('e2e 5: the MCP server, launched the way .mcp.json says', () => {
       const call = async (name: string, args: Record<string, unknown>) =>
         ((await client.callTool({ name, arguments: args })) as { content: { text: string }[] }).content[0]!.text;
 
-      expect((await client.listTools()).tools).toHaveLength(9);
+      expect((await client.listTools()).tools).toHaveLength(10);
 
       step('check_overlaps before editing refund.ts → Alice is on it');
       expect(await call('check_overlaps', { files: ['src/payments/refund.ts'] })).toContain('Alice (working on it right now): "Handle duplicate refund webhooks"');
@@ -292,5 +292,56 @@ describe('e2e 5: the MCP server, launched the way .mcp.json says', () => {
     } finally {
       await client.close();
     }
+  });
+});
+
+describe('e2e 6: resuming a thread, including handing it to a teammate', () => {
+  it('Alice resumes her own paused thread, then Bob picks it up where she left off', async () => {
+    const { team } = await makeTeam('Alice', 'Bob');
+    const [alice, bob] = team as [(typeof team)[0], (typeof team)[0]];
+    for (const p of team) await sn(p.dir, ['init', '--skip-hooks', '--skip-mcp']);
+
+    step('Alice starts investigating a bug, then her session ends mid-investigation');
+    await alice.hook('a1', { hook_event_name: 'UserPromptSubmit', prompt: 'Investigate why checkout totals are off by a cent' });
+    await alice.hook('a1', { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/checkout/totals.ts' } });
+    await alice.hook('a1', { hook_event_name: 'Stop' });
+    await sn(alice.dir, ['sync']);
+    const threadId = (await snJson(alice.dir, ['threads'])).threads[0].id;
+
+    step('a day later, Alice resumes it herself in a new session');
+    const armed = await snJson(alice.dir, ['resume', threadId]);
+    expect(armed.armed).toBe(threadId);
+    const resumed1 = await alice.hook('a2', { hook_event_name: 'SessionStart', source: 'startup' });
+    expect(resumed1?.hookSpecificOutput?.additionalContext).toContain(`Resumed thread "Investigate why checkout totals are off by a cent" (id ${threadId})`);
+    await alice.hook('a2', { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/checkout/rounding.ts' } });
+    await alice.hook('a2', { hook_event_name: 'Stop' });
+    await alice.hook('a2', { hook_event_name: 'SessionEnd', reason: 'other' });
+    await sn(alice.dir, ['sync']);
+
+    step('the thread now shows both sessions and both files, under one id');
+    const afterResume = (await snJson(alice.dir, ['show', threadId])).thread;
+    expect(afterResume.sessions).toHaveLength(2);
+    expect(afterResume.files.sort()).toEqual(['src/checkout/rounding.ts', 'src/checkout/totals.ts']);
+
+    step("the audit trail shows who created and who resumed it");
+    const auditOut = (await sn(alice.dir, ['audit', '--thread', threadId])).out;
+    expect(auditOut).toMatch(/thread\.resumed/);
+    expect(auditOut).toMatch(/thread\.created/);
+
+    step('Bob picks it up next: he resumes the same thread from his own clone');
+    await sn(bob.dir, ['sync']);
+    await sn(bob.dir, ['resume', threadId]);
+    const bobStart = await bob.hook('b1', { hook_event_name: 'SessionStart', source: 'startup' });
+    expect(bobStart?.hookSpecificOutput?.additionalContext).toContain('rounding.ts');
+    await bob.hook('b1', { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/checkout/tests.ts' } });
+    await bob.hook('b1', { hook_event_name: 'Stop' });
+    await sn(bob.dir, ['sync']);
+    await sn(alice.dir, ['sync']);
+
+    step('one thread, one history, contributed to by both of them');
+    const final = (await snJson(alice.dir, ['show', threadId])).thread;
+    expect(final.sessions).toHaveLength(3);
+    expect(final.files).toContain('src/checkout/tests.ts');
+    expect(final.contributors.map((c: { name: string }) => c.name).sort()).toEqual(['Alice', 'Bob']);
   });
 });

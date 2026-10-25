@@ -21,6 +21,7 @@ export const closeCommand = defineCommand({
     }
     const closed = closeThread(thread, { summary: options.summary });
     await store.save(closed, `thread ${closed.id}: closed`);
+    await store.appendAudit(await services.identity(), { action: 'thread.closed', threadId: closed.id, detail: closed.title });
 
     out.json({ ok: true, thread: closed });
     out.success(`Closed ${out.style(closed.id, 'cyan')}: ${closed.title}`);

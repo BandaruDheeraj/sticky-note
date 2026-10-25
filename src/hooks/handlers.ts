@@ -1,7 +1,7 @@
 import { SessionState, type SessionStore } from '../core/session.js';
 import type { ThreadStore } from '../core/store/thread-store.js';
 import type { ActiveClaim } from '../core/claim.js';
-import { createThread, endSession, heartbeat, recordActivity, titleFromText, type Person, type Thread } from '../core/thread.js';
+import { createThread, endSession, heartbeat, recordActivity, resumeThread, titleFromText, type Person, type Thread } from '../core/thread.js';
 import {
   BACKGROUND_SYNC_INTERVAL_MS,
   HISTORY_LIMIT,
@@ -12,7 +12,7 @@ import {
 } from '../surfacing/policy.js';
 import { fileHistory, overlapsFor } from '../surfacing/queries.js';
 import { isLive, rankThreads, type RankedThread } from '../surfacing/relevance.js';
-import { renderClaimWarning, renderContext, renderOverlapWarning } from '../surfacing/render.js';
+import { renderClaimWarning, renderContext, renderOverlapWarning, renderResume } from '../surfacing/render.js';
 import { editedFiles, touchedFiles } from './edited-files.js';
 import type { HookEvent, HookResult } from './events.js';
 
@@ -27,6 +27,8 @@ export interface HookDeps {
   currentBranch(): Promise<string | null>;
   /** Start a detached sync so hooks never wait on the network. */
   syncInBackground(): void;
+  /** Read and clear a pending `sticky-note resume` intent, if any, for this repo. */
+  consumeResumeIntent(): Promise<string | null>;
   /** Current HEAD commit, or null in a repo with no commits. */
   head(): Promise<string | null>;
   /** My commits in base..HEAD (for attributing commits to the session's thread). */
@@ -41,7 +43,9 @@ export interface HookDeps {
  * What each event does. Only turn-end and session-end write to git; the others
  * update the local session file and read threads, so they stay fast.
  *  - session-start: remember the session, start a sync, show stuck/live/branch work
+ *                   (or, if `sticky-note resume` was run, attach to that thread instead)
  *  - prompt:        plan the thread on the first prompt; show threads related to the prompt
+ *                   (or attach to a resumed thread, including mid-session)
  *  - tool-before:   before an edit, warn once per file about teammates' claims or open threads on it,
  *                   and show the file's history the first time it's touched
  *  - tool-used:     note edited files; after a read, show the file's history on first touch
@@ -55,7 +59,14 @@ export async function handleHookEvent(event: HookEvent, deps: HookDeps): Promise
       deps.syncInBackground();
       return deps.sessions.update<HookResult>(event.sessionId, async (cur) => {
         const base = cur ?? freshSession(event, deps);
-        const state = { ...base, baseHead: base.baseHead ?? (await deps.head()), lastSyncAt: deps.now().toISOString() };
+        let state: SessionState = { ...base, baseHead: base.baseHead ?? (await deps.head()), lastSyncAt: deps.now().toISOString() };
+
+        const resumed = await tryResume(state, deps);
+        if (resumed) {
+          state = resumed.state;
+          return { next: state, result: { context: renderResume(resumed.thread, deps.now()), notice: resumeNotice(resumed.thread) } };
+        }
+
         const { threads } = await deps.store.list();
         const selected = rankThreads(threads, {
           me: deps.identity,
@@ -78,6 +89,12 @@ export async function handleHookEvent(event: HookEvent, deps: HookDeps): Promise
     case 'prompt':
       return deps.sessions.update<HookResult>(event.sessionId, async (cur) => {
         let state = cur ?? freshSession(event, deps);
+
+        const resumed = await tryResume(state, deps);
+        if (resumed) {
+          return { next: resumed.state, result: { context: renderResume(resumed.thread, deps.now()), notice: resumeNotice(resumed.thread) } };
+        }
+
         if (!state.threadId && !state.pendingThread) {
           const title = titleFromText(event.prompt);
           const prompt = event.prompt.trim();
@@ -232,6 +249,7 @@ async function flush(state: SessionState, deps: HookDeps): Promise<SessionState>
       now: new Date(state.pendingThread.createdAt),
     });
     await deps.store.save(thread, `thread ${thread.id}: started in ${state.agent}`);
+    await deps.store.appendAudit(deps.identity, { action: 'thread.created', threadId: thread.id, detail: thread.title });
     return { ...state, threadId: thread.id, pendingThread: null, pendingFiles: [], updatedAt: now.toISOString() };
   }
 
@@ -274,6 +292,41 @@ function overlapNotice(file: string, claims: ActiveClaim[], overlaps: Thread[], 
   const lead = overlaps[0]!;
   const who = lead.contributors.at(-1)?.name ?? lead.author.name;
   return `sticky-note: ${who} ${isLive(lead, now) ? 'is working on' : 'has open work on'} ${file} ("${lead.title}")`;
+}
+
+/**
+ * If `sticky-note resume` armed a thread for this repo, attach the session to
+ * it: end whatever it was tracking before (without losing that work — it
+ * stays as its own thread), add a session ref to the resumed thread, and
+ * audit the resume. Returns null if there was nothing to resume.
+ */
+async function tryResume(state: SessionState, deps: HookDeps): Promise<{ state: SessionState; thread: Thread } | null> {
+  const resumeId = await deps.consumeResumeIntent();
+  if (!resumeId) return null;
+  const thread = await deps.store.get(resumeId).catch(() => null);
+  if (!thread) return null; // thread no longer exists; the intent is already consumed, so just carry on normally
+  if (state.threadId === thread.id) return null; // already resumed this one; nothing to do
+
+  if (state.threadId) {
+    const old = await deps.store.get(state.threadId).catch(() => null);
+    if (old) {
+      const ended = endSession(old, state.sessionId, deps.now());
+      if (ended !== old) await deps.store.save(ended, `thread ${old.id}: session ended (resumed another thread)`);
+    }
+  }
+
+  const resumed = resumeThread(thread, { id: state.sessionId, agent: state.agent, startedAt: state.startedAt }, deps.now());
+  await deps.store.save(resumed, `thread ${resumed.id}: resumed`);
+  await deps.store.appendAudit(deps.identity, { action: 'thread.resumed', threadId: resumed.id, detail: resumed.title });
+
+  return {
+    state: { ...state, threadId: resumed.id, pendingThread: null, updatedAt: deps.now().toISOString() },
+    thread: resumed,
+  };
+}
+
+function resumeNotice(t: Thread): string {
+  return `sticky-note: Resumed "${t.title}" (${t.id}) — continuing from here.`;
 }
 
 function ownThreadIds(state: SessionState): string[] {

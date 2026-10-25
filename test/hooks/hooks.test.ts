@@ -2,12 +2,13 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { flattenAudit } from '../../src/core/audit.js';
 import { localStateDir } from '../../src/core/paths.js';
 import { GitBranchStore } from '../../src/core/store/git-branch-store.js';
 import { claudeCodeAdapter } from '../../src/hooks/adapters/claude-code.js';
 import { editedFiles } from '../../src/hooks/edited-files.js';
 import { installClaudeCodeHooks } from '../../src/hooks/install/claude-code.js';
-import { createThread } from '../../src/core/thread.js';
+import { closeThread, createThread } from '../../src/core/thread.js';
 import { runCli } from '../helpers/cli.js';
 import { cleanupTmpDirs, makeBareRemote, makeRepo } from '../helpers/repo.js';
 
@@ -115,7 +116,7 @@ describe('run-hook claude-code', () => {
     expect(await commits()).toBe(initial);
     expect((await store.list()).threads).toHaveLength(0);
 
-    // End of turn: thread and files land in one commit.
+    // End of turn: thread+files land in one commit, plus one for the audit entry.
     await hook({ hook_event_name: 'Stop' });
     let [thread] = (await store.list()).threads;
     expect(thread).toMatchObject({
@@ -127,19 +128,21 @@ describe('run-hook claude-code', () => {
     });
     expect(thread!.files.sort()).toEqual(['src/login.ts', 'test/login.test.ts']);
     expect(thread!.narrative).toBe('Asked: Fix the flaky login test\nmore detail here'); // full prompt kept
-    expect(await commits()).toBe(initial + 1);
+    expect(await commits()).toBe(initial + 2);
+    const auditEntries = flattenAudit(await store.listAudit());
+    expect(auditEntries).toMatchObject([{ action: 'thread.created', threadId: thread!.id, detail: 'Fix the flaky login test' }]);
 
-    // Later turns update the same thread.
+    // Later turns update the same thread (no new audit entry, so only one more commit).
     await hook({ hook_event_name: 'UserPromptSubmit', prompt: 'second prompt' });
     await hook({ hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/session.ts' } });
     await hook({ hook_event_name: 'Stop' });
     [thread] = (await store.list()).threads;
     expect(thread!.title).toBe('Fix the flaky login test');
     expect(thread!.files).toContain('src/session.ts');
-    expect(await commits()).toBe(initial + 2);
+    expect(await commits()).toBe(initial + 3);
 
     await hook({ hook_event_name: 'Stop' }); // nothing pending: no commit
-    expect(await commits()).toBe(initial + 2);
+    expect(await commits()).toBe(initial + 3);
 
     await hook({ hook_event_name: 'SessionEnd', reason: 'prompt_input_exit' });
     [thread] = (await store.list()).threads;
@@ -352,5 +355,128 @@ describe('4b: claims, history on first touch, commit attribution', () => {
     await hook('s1', { hook_event_name: 'UserPromptSubmit', prompt: 'x' });
     await hook('s1', { hook_event_name: 'Stop' });
     expect((await store.list()).threads[0]!.commits).toEqual([]);
+  });
+});
+
+describe('resume', () => {
+  const alice = { name: 'Alice', email: 'alice@example.com' };
+
+  async function setup() {
+    const repo = await makeRepo();
+    await runCli(['init', '--skip-hooks'], { cwd: repo.dir });
+    const store = new GitBranchStore({ repoDir: repo.dir, dataBranch: BRANCH, remote: 'origin' });
+    const hook = async (session: string, payload: Record<string, unknown>) => {
+      const r = await runCli(['run-hook', 'claude-code'], { cwd: repo.dir, stdin: JSON.stringify({ session_id: session, cwd: repo.dir, ...payload }) });
+      return r.out.trim() ? JSON.parse(r.out) : null;
+    };
+    const cli = (args: string[]) => runCli(args, { cwd: repo.dir });
+    return { ...repo, store, hook, cli };
+  }
+
+  it('sticky-note resume arms a thread, and the next session attaches to it', async () => {
+    const { store, hook, cli } = await setup();
+    const original = createThread({
+      title: 'Add rate limiting',
+      author: alice,
+      branch: 'main',
+      files: ['src/api/rate-limit.ts'],
+      narrative: 'Got partway through, ran out of time.',
+    });
+    await store.save(original);
+
+    const resumeResult = await cli(['resume', original.id, '--json']);
+    expect(resumeResult.code).toBe(0);
+    expect(JSON.parse(resumeResult.out).armed).toBe(original.id);
+
+    const out = await hook('new-session', { hook_event_name: 'SessionStart', source: 'startup' });
+    expect(out.hookSpecificOutput.hookEventName).toBe('SessionStart');
+    expect(out.hookSpecificOutput.additionalContext).toContain(`Resumed thread "Add rate limiting" (id ${original.id})`);
+    expect(out.hookSpecificOutput.additionalContext).toContain('Got partway through, ran out of time.');
+    expect(out.systemMessage).toBe(`sticky-note: Resumed "Add rate limiting" (${original.id}) — continuing from here.`);
+
+    const [thread] = (await store.list()).threads;
+    expect(thread!.sessions).toMatchObject([{ id: 'new-session', agent: 'claude-code', endedAt: null }]);
+
+    const audit = flattenAudit(await store.listAudit());
+    expect(audit).toContainEqual(expect.objectContaining({ action: 'thread.resumed', threadId: original.id }));
+  });
+
+  it('resuming mid-session moves the running session over, ending its own thread cleanly', async () => {
+    const { store, hook, cli } = await setup();
+    const target = createThread({ title: 'Target thread', author: alice, branch: 'main' });
+    await store.save(target);
+
+    // The session already started its own thread before resume was requested.
+    await hook('s1', { hook_event_name: 'UserPromptSubmit', prompt: 'something else entirely' });
+    await hook('s1', { hook_event_name: 'Stop' });
+    const ownThreadId = (await store.list()).threads.find((t) => t.title === 'something else entirely')!.id;
+
+    await cli(['resume', target.id]);
+    const out = await hook('s1', { hook_event_name: 'UserPromptSubmit', prompt: 'continuing target thread' });
+    expect(out.hookSpecificOutput.additionalContext).toContain(`Resumed thread "Target thread" (id ${target.id})`);
+
+    const own = await store.get(ownThreadId);
+    expect(own!.sessions[0]).toMatchObject({ id: 's1', endedAt: expect.any(String) }); // ended, not lost
+    const resumed = await store.get(target.id);
+    expect(resumed!.sessions).toMatchObject([{ id: 's1', endedAt: null }]);
+
+    // Subsequent edits land on the resumed thread, not a new one.
+    await hook('s1', { hook_event_name: 'PostToolUse', tool_name: 'Edit', tool_input: { file_path: 'src/target.ts' } });
+    await hook('s1', { hook_event_name: 'Stop' });
+    expect((await store.get(target.id))!.files).toEqual(['src/target.ts']);
+  });
+
+  it('reopens a closed thread on resume', async () => {
+    const { store, hook, cli } = await setup();
+    const closed = closeThread(createThread({ title: 'Old work', author: alice, branch: 'main' }), { summary: 'done' });
+    await store.save(closed);
+
+    await cli(['resume', closed.id]);
+    await hook('s1', { hook_event_name: 'SessionStart', source: 'startup' });
+
+    expect((await store.get(closed.id))!.status).toBe('active');
+  });
+
+  it('resume by search words when no id matches', async () => {
+    const { store, cli } = await setup();
+    await store.save(createThread({ title: 'Rate limiter rewrite', author: alice, branch: 'main', files: ['src/api/rate-limit.ts'] }));
+    await store.save(createThread({ title: 'Unrelated docs cleanup', author: alice, branch: 'main' }));
+
+    const result = await cli(['resume', 'rate', 'limiter', '--json']);
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.out).thread.title).toBe('Rate limiter rewrite');
+  });
+
+  it('refuses to guess between equally good matches', async () => {
+    const { store, cli } = await setup();
+    await store.save(createThread({ title: 'exact match', author: alice, branch: 'main' }));
+    await store.save(createThread({ title: 'exact match', author: alice, branch: 'main' }));
+
+    const result = await cli(['resume', 'exact', 'match', '--json']);
+    expect(result.code).toBe(1);
+    expect(JSON.parse(result.out).ambiguous).toBe(true);
+  });
+
+  it('fails clearly when nothing matches', async () => {
+    const { cli } = await setup();
+    const result = await cli(['resume', 'nothing', 'like', 'this', 'exists']);
+    expect(result.code).toBe(1);
+    expect(result.err).toMatch(/No thread matches/);
+  });
+
+  it('a resume intent for a deleted thread is silently ignored', async () => {
+    const { store, hook, cli } = await setup();
+    const t = createThread({ title: 'Will be gone', author: alice, branch: 'main' });
+    await store.save(t);
+    await cli(['resume', t.id]);
+    const { rm } = await import('node:fs/promises');
+    const path = (await import('node:path')).default;
+    await rm(path.join(await store.worktreePath(), 'threads', `${t.id}.json`)); // simulate the thread having disappeared
+
+    // Falls back to normal first-prompt behavior instead of erroring.
+    const out = await hook('s1', { hook_event_name: 'UserPromptSubmit', prompt: 'fresh start' });
+    expect(out?.hookSpecificOutput?.additionalContext ?? '').not.toContain('Resumed');
+    await hook('s1', { hook_event_name: 'Stop' });
+    expect((await store.list()).threads.map((x) => x.title)).toEqual(['fresh start']);
   });
 });

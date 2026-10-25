@@ -89,7 +89,16 @@ git -C "$BOB" pull -q origin main
 sn "$BOB" sync >/dev/null
 hook "$BOB" b2 "\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Read\",\"tool_input\":{\"file_path\":\"$BOB/src/billing/invoice.js\"}"
 
-scene "9. The shared record"
+scene "9. Weeks later, Bob picks Alice's thread back up instead of starting fresh"
+THREAD_ID=$(node -e 'const r=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(r.threads.find(t=>t.title.startsWith("In src/billing")).id)' < <(sn "$BOB" threads -a --json))
+say "sn resume $THREAD_ID"
+sn "$BOB" resume "$THREAD_ID" >/dev/null
+hook "$BOB" b3 '"hook_event_name":"SessionStart","source":"startup"'
+
+scene "10. Who did what, and when"
+sn "$BOB" audit --thread "$THREAD_ID"
+
+scene "11. The shared record"
 sn "$BOB" threads -a
 echo
 sn "$BOB" claims

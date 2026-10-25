@@ -1,5 +1,6 @@
+import type { AuditEntry, AuditLog } from '../audit.js';
 import type { ClaimSet } from '../claim.js';
-import type { Thread, ThreadStatus } from '../thread.js';
+import type { Person, Thread, ThreadStatus } from '../thread.js';
 
 export interface ThreadFilter {
   status?: ThreadStatus | ThreadStatus[];
@@ -47,6 +48,10 @@ export interface ThreadStore {
   listClaims(): Promise<ClaimSet[]>;
   /** Replace one person's claims. */
   saveClaims(set: ClaimSet, message?: string): Promise<void>;
+  /** Every person's audit log. */
+  listAudit(): Promise<AuditLog[]>;
+  /** Append one entry to `actor`'s audit log. */
+  appendAudit(actor: Person, entry: Omit<AuditEntry, 'at'> & { at?: string }, message?: string): Promise<void>;
   sync(): Promise<SyncResult>;
   status(): Promise<StoreStatus>;
 }
