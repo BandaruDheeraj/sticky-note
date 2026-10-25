@@ -33,6 +33,8 @@ export class Git {
         cwd: this.cwd,
         env: { ...process.env, ...opts.env },
         maxBuffer: 64 * 1024 * 1024,
+        // Callers like the detached sync have no console, so Windows would open one per git call.
+        windowsHide: true,
       });
       return stdout.trimEnd();
     } catch (err) {

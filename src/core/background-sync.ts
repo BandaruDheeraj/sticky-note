@@ -14,6 +14,8 @@ export function syncInBackground(repoRoot: string, logFile: string): void {
   try {
     spawn(process.execPath, [entry, 'sync', '--cwd', repoRoot], {
       detached: true,
+      // Without this, Windows opens a new console window for every detached sync.
+      windowsHide: true,
       stdio: ['ignore', fd, fd],
       env: { ...process.env, NO_COLOR: '1', GIT_TERMINAL_PROMPT: '0' },
     }).unref();
